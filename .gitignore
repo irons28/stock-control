@@ -1,0 +1,10 @@
+.DS_Store
+.Rhistory
+review/
+review_latest/
+app/node_modules/
+app/stock-control.db
+app/__MACOSX/
+app/public/.DS_Store
+app/.DS_Store
+app/ssl/
