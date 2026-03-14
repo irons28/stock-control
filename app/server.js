@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
+const { createImportTools } = require("./import-tools");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -613,6 +614,23 @@ async function getOrderSummaryReport() {
   const sales = await all(`SELECT so.order_number AS reference, 'sales' AS kind, so.status, c.name AS party_name, so.created_at, COALESCE(SUM(sol.qty_ordered),0) AS qty_ordered, COALESCE(SUM(sol.qty_dispatched),0) AS qty_progress FROM sales_orders so JOIN customers c ON c.id = so.customer_id LEFT JOIN sales_order_lines sol ON sol.sales_order_id = so.id GROUP BY so.id ORDER BY datetime(so.created_at) DESC LIMIT 20`);
   return { purchase, sales };
 }
+
+createImportTools({
+  app,
+  get,
+  all,
+  run,
+  transaction,
+  normalizeCode,
+  parseInteger,
+  parseMoney,
+  requestError,
+  createActivity,
+  emitInventoryEvent,
+  getLocationByCode,
+  refreshPurchaseOrderStatus,
+  rootDir: __dirname,
+});
 
 app.get("/api/health", async (req, res, next) => {
   try {

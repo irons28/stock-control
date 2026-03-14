@@ -441,3 +441,149 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+
+.section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+
+.section-tab,
+.secondary-button,
+.ghost-button,
+.ghost-link {
+  border-radius: 999px;
+}
+
+.section-tab {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font-weight: 700;
+  padding: 10px 16px;
+}
+
+.section-tab-active {
+  background: linear-gradient(135deg, var(--olive), #7f9456);
+  color: white;
+}
+
+.intro-panel {
+  background: linear-gradient(135deg, rgba(255, 252, 245, 0.96), rgba(255, 248, 238, 0.82));
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.summary-card strong {
+  font-size: 1.9rem;
+}
+
+.summary-card small {
+  color: var(--muted);
+}
+
+.badge-warn {
+  background: rgba(188, 120, 32, 0.16);
+  color: #935d12;
+}
+
+.badge-neutral {
+  background: rgba(24, 35, 15, 0.08);
+  color: var(--ink);
+}
+
+.line-pill-row,
+.rule-list,
+.stack-note {
+  display: grid;
+  gap: 10px;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.secondary-button,
+.ghost-button {
+  background: rgba(24, 35, 15, 0.08);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.ghost-button {
+  padding: 8px 12px;
+}
+
+.ghost-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  color: var(--ink);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.draft-lines,
+.line-builder,
+.line-builder-grid,
+.two-column-report {
+  display: grid;
+  gap: 12px;
+}
+
+.line-builder-grid,
+.two-column-report {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.draft-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.serial-list,
+.stack-note p,
+.code-block {
+  margin: 0;
+}
+
+.code-block {
+  border-radius: 18px;
+  padding: 16px;
+  background: #1f211d;
+  color: #f7f2e8;
+  overflow-x: auto;
+}
+
+@media (max-width: 1120px) {
+  .summary-grid,
+  .line-builder-grid,
+  .two-column-report {
+    grid-template-columns: 1fr;
+  }
+}

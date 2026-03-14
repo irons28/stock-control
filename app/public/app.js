@@ -12,11 +12,13 @@ const state = {
   holdingStock: [],
   stockMovements: [],
   adjustments: [],
+  importTemplates: [],
   reports: { stockByLocation: { quantity: [], serialised: [] }, orderSummary: { purchase: [], sales: [] } },
   activity: [],
   poDraftLines: [],
   soDraftLines: [],
   selectedPoId: "",
+  activeSection: "overview",
   message: "",
   error: "",
 };
@@ -44,7 +46,7 @@ function escapeHtml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
 
@@ -76,6 +78,18 @@ function putawayDestinations() {
   return state.locations.filter((location) => location.code !== "HOLDING" && location.is_active);
 }
 
+function navSections() {
+  return [
+    { key: "overview", label: "Overview" },
+    { key: "setup", label: "Setup" },
+    { key: "inbound", label: "Inbound" },
+    { key: "outbound", label: "Outbound" },
+    { key: "control", label: "Control" },
+    { key: "reports", label: "Reports" },
+    { key: "imports", label: "Imports" },
+  ];
+}
+
 function renderHero() {
   const totals = state.dashboard?.totals || {};
   return `
@@ -83,7 +97,7 @@ function renderHero() {
       <div>
         <p class="eyebrow">Warehouse Operations Suite</p>
         <h1>Stock Control</h1>
-        <p class="hero-copy">Inbound, putaway, dispatch, and stock correction are now in one flow. This is a stable milestone for import planning and a GitHub checkpoint.</p>
+        <p class="hero-copy">Inbound, putaway, dispatch, and stock correction are now separated into clear operating areas. Import tooling is ready for controlled migration work.</p>
       </div>
       <div class="hero-panel">
         <div class="hero-stat"><span>${totals.products || 0}</span><small>Products</small></div>
@@ -103,6 +117,28 @@ function renderMessages() {
 function renderMilestones() {
   const items = state.dashboard?.nextMilestones || [];
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Build order</p><h2>Current implementation milestones</h2></div></div><div class="chip-row">${items.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join("")}</div></section>`;
+}
+
+function renderSectionNav() {
+  return `
+    <section class="section-nav">
+      ${navSections().map((section) => `<button type="button" class="${section.key === state.activeSection ? "section-tab section-tab-active" : "section-tab"}" data-section="${section.key}">${section.label}</button>`).join("")}
+    </section>
+  `;
+}
+
+function renderSectionHeader(title, copy) {
+  return `
+    <section class="panel span-12 intro-panel">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Section focus</p>
+          <h2>${title}</h2>
+        </div>
+      </div>
+      <p class="muted">${copy}</p>
+    </section>
+  `;
 }
 
 function renderFormPanel({ id, title, kicker, span = "span-4", fields, button }) {
@@ -181,6 +217,19 @@ function renderProductsTable() {
   return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Catalogue</p><h2>Products</h2></div><span class="count-pill">${state.products.length} items</span></div><div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Type</th><th>On hand</th><th>Available</th><th>Allocated</th></tr></thead><tbody>${state.products.map((item) => `<tr><td>${escapeHtml(item.sku)}</td><td><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.category_name || "-")}</div></td><td>${item.serial_tracking ? "Serialised" : "Quantity"}</td><td>${item.qty_on_hand || 0}</td><td>${item.qty_available || 0}</td><td>${item.qty_allocated || 0}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No products yet</td></tr>'}</tbody></table></div></section>`;
 }
 
+function renderOverviewCards() {
+  const totals = state.dashboard?.totals || {};
+  const cards = [
+    { label: "Products", value: totals.products || 0, note: "Active catalogue lines" },
+    { label: "Suppliers", value: totals.suppliers || 0, note: "Purchasing accounts" },
+    { label: "Open purchase orders", value: totals.openPurchaseOrders || 0, note: "Still expected in" },
+    { label: "Open sales orders", value: totals.openSalesOrders || 0, note: "Still to ship" },
+    { label: "Holding items", value: totals.holdingItems || 0, note: "Waiting for putaway" },
+    { label: "Adjustments", value: totals.adjustments || 0, note: "Control actions logged" },
+  ];
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Snapshot</p><h2>Current operating picture</h2></div></div><div class="summary-grid">${cards.map((card) => `<article class="summary-card"><strong>${card.value}</strong><span>${card.label}</span><small>${card.note}</small></article>`).join("")}</div></section>`;
+}
+
 function renderListPanel(title, kicker, items, renderItem, span = "span-6") {
   return `<section class="panel ${span}"><div class="panel-header"><div><p class="panel-kicker">${kicker}</p><h2>${title}</h2></div></div><div class="list-grid">${items.map(renderItem).join("") || '<p class="empty">Nothing to show</p>'}</div></section>`;
 }
@@ -245,7 +294,9 @@ function renderAdjustmentsList() {
 
 function renderStockByLocationReport() {
   const report = state.reports.stockByLocation;
-  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Reporting</p><h2>Stock by location</h2></div></div><div class="table-wrap"><table><thead><tr><th>Location</th><th>Product</th><th>On hand</th><th>Allocated</th><th>Available</th><th>Serial</th></tr></thead><tbody>${report.quantity.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>-</td></tr>`).join("")}${report.serialised.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>${escapeHtml(item.serial_number)}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No stock report rows yet</td></tr>'}</tbody></table></div></section>`;
+  const quantityRows = report.quantity.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>-</td></tr>`).join("");
+  const serialRows = report.serialised.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>${escapeHtml(item.serial_number)}</td></tr>`).join("");
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Reporting</p><h2>Stock by location</h2></div></div><div class="table-wrap"><table><thead><tr><th>Location</th><th>Product</th><th>On hand</th><th>Allocated</th><th>Available</th><th>Serial</th></tr></thead><tbody>${quantityRows}${serialRows || '<tr><td colspan="6" class="empty">No stock report rows yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderOrderSummaryReport() {
@@ -266,37 +317,135 @@ function renderActivity() {
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Audit</p><h2>Recent activity</h2></div></div><div class="timeline">${state.activity.map((item) => `<div class="timeline-row"><span class="timeline-tag">${escapeHtml(item.entity_type)}</span><div><strong>${escapeHtml(item.action)}</strong><p class="muted">${escapeHtml(item.entity_type)} #${escapeHtml(item.entity_id)}</p></div><time>${new Date(item.created_at).toLocaleString()}</time></div>`).join("") || '<p class="empty">No activity yet</p>'}</div></section>`;
 }
 
+function renderImportsPanel() {
+  return `
+    <section class="panel span-7">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Import tooling</p>
+          <h2>Templates and validation rules</h2>
+        </div>
+      </div>
+      <div class="list-grid">
+        ${state.importTemplates.map((template) => `
+          <article class="list-card">
+            <div class="list-card-top">
+              <div>
+                <h3>${escapeHtml(template.type)}</h3>
+                <p class="muted">${escapeHtml(template.description)}</p>
+              </div>
+              <a class="ghost-link" href="${template.download_path}" target="_blank" rel="noreferrer">Download CSV</a>
+            </div>
+            <div class="rule-list">${template.rules.map((rule) => `<span class="chip">${escapeHtml(rule)}</span>`).join("")}</div>
+          </article>
+        `).join("") || '<p class="empty">No import templates available</p>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderImportGuide() {
+  return `
+    <section class="panel span-5">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Migration path</p>
+          <h2>How to load live data</h2>
+        </div>
+      </div>
+      <div class="stack-note">
+        <p><strong>Step 1:</strong> load suppliers, customers, locations, and products first.</p>
+        <p><strong>Step 2:</strong> import opening stock and serial stock only after the locations and products exist.</p>
+        <p><strong>Step 3:</strong> import open purchase orders last so the expected stock position stays correct.</p>
+      </div>
+      <pre class="code-block">node scripts/import-data.js products ./my-products.csv
+node scripts/import-data.js products ./my-products.csv --apply
+node scripts/import-data.js purchase-orders ./open-pos.csv --apply</pre>
+      <div class="stack-note">
+        <p><strong>Validation rules:</strong> stock imports require known products and locations, serial imports require unique serial numbers, and open purchase orders are rejected if the PO already exists.</p>
+      </div>
+    </section>
+  `;
+}
+
+function renderSectionContent() {
+  if (state.activeSection === "overview") {
+    return `
+      ${renderSectionHeader("Overview", "Use this as the landing page for the current position. Detailed workflows now live behind focused tabs so the home screen stays readable.")}
+      ${renderOverviewCards()}
+      ${renderMilestones()}
+      ${renderLowStock()}
+      ${renderActivity()}
+    `;
+  }
+
+  if (state.activeSection === "setup") {
+    return `
+      ${renderSectionHeader("Setup", "Create and maintain the master data that the rest of the application depends on.")}
+      ${renderProductForm()}
+      ${renderProductsTable()}
+      ${renderSupplierForm()}
+      ${renderCustomerForm()}
+      ${renderLocationForm()}
+      ${renderSuppliersList()}
+      ${renderCustomersList()}
+      ${renderLocationsList()}
+    `;
+  }
+
+  if (state.activeSection === "inbound") {
+    return `
+      ${renderSectionHeader("Inbound", "Manage purchase orders, receive stock into HOLDING, and complete putaway into live shelf or bin locations.")}
+      ${renderPurchaseOrderForm()}
+      ${renderPurchaseOrdersList()}
+      ${renderGoodsInForm()}
+      ${renderGoodsReceiptsList()}
+      ${renderHoldingStock()}
+      ${renderPutawayForm()}
+    `;
+  }
+
+  if (state.activeSection === "outbound") {
+    return `
+      ${renderSectionHeader("Outbound", "Create customer orders, allocate available stock, and dispatch picked items.")}
+      ${renderSalesOrderForm()}
+      ${renderSalesOrdersList()}
+      ${renderDispatchesList()}
+    `;
+  }
+
+  if (state.activeSection === "control") {
+    return `
+      ${renderSectionHeader("Control", "Use this area for corrections, damage handling, and movement history when you need to explain stock changes.")}
+      ${renderAdjustmentForm()}
+      ${renderAdjustmentsList()}
+      ${renderStockMovements()}
+    `;
+  }
+
+  if (state.activeSection === "reports") {
+    return `
+      ${renderSectionHeader("Reports", "Review stock position and order progress without the transaction forms getting in the way.")}
+      ${renderStockByLocationReport()}
+      ${renderOrderSummaryReport()}
+    `;
+  }
+
+  return `
+    ${renderSectionHeader("Imports", "Bring current live data into the system in a controlled order with validation first and apply second.")}
+    ${renderImportsPanel()}
+    ${renderImportGuide()}
+  `;
+}
+
 function render() {
   document.getElementById("app").innerHTML = `
     <main class="shell">
       ${renderHero()}
       ${renderMessages()}
+      ${renderSectionNav()}
       <section class="grid">
-        ${renderMilestones()}
-        ${renderProductForm()}
-        ${renderProductsTable()}
-        ${renderSupplierForm()}
-        ${renderCustomerForm()}
-        ${renderLocationForm()}
-        ${renderSuppliersList()}
-        ${renderCustomersList()}
-        ${renderLocationsList()}
-        ${renderPurchaseOrderForm()}
-        ${renderPurchaseOrdersList()}
-        ${renderGoodsInForm()}
-        ${renderGoodsReceiptsList()}
-        ${renderHoldingStock()}
-        ${renderPutawayForm()}
-        ${renderSalesOrderForm()}
-        ${renderSalesOrdersList()}
-        ${renderDispatchesList()}
-        ${renderAdjustmentForm()}
-        ${renderAdjustmentsList()}
-        ${renderStockByLocationReport()}
-        ${renderOrderSummaryReport()}
-        ${renderStockMovements()}
-        ${renderLowStock()}
-        ${renderActivity()}
+        ${renderSectionContent()}
       </section>
     </main>`;
   bindForms();
@@ -327,6 +476,11 @@ function bindForms() {
   const putawayForm = document.getElementById("putaway-form");
   const salesOrderForm = document.getElementById("sales-order-form");
   const adjustmentForm = document.getElementById("adjustment-form");
+
+  document.querySelectorAll("[data-section]").forEach((button) => button.addEventListener("click", () => {
+    state.activeSection = button.getAttribute("data-section");
+    render();
+  }));
 
   productForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -415,7 +569,7 @@ function bindForms() {
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, stockByLocation, orderSummary, activity] = await Promise.all([
+    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
@@ -432,8 +586,9 @@ async function loadAll() {
       api("/api/reports/stock-by-location"),
       api("/api/reports/order-summary"),
       api("/api/activity"),
+      api("/api/import/templates"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, reports: { stockByLocation, orderSummary }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, importTemplates, reports: { stockByLocation, orderSummary }, activity });
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {

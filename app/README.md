@@ -19,3 +19,40 @@ npm start
 ```
 
 By default the app runs on `http://localhost:3001`.
+
+## Import Tooling
+
+CSV templates are available from the app at:
+
+- `/api/import/templates`
+- `/api/import/templates/:type`
+
+Supported import types are:
+
+- `suppliers`
+- `customers`
+- `locations`
+- `products`
+- `opening-stock`
+- `serial-stock`
+- `purchase-orders`
+
+Validate a CSV before applying it:
+
+```bash
+node scripts/import-data.js products ./my-products.csv --url=http://localhost:3001
+```
+
+Apply an import only after validation returns zero invalid rows:
+
+```bash
+node scripts/import-data.js products ./my-products.csv --apply --url=http://localhost:3001
+```
+
+Recommended import order:
+
+1. suppliers, customers, locations
+2. products
+3. opening-stock and serial-stock
+4. purchase-orders
+
