@@ -90,6 +90,25 @@ function createImportTools(deps) {
 
   const templatesDir = path.join(rootDir, "import-templates");
 
+  async function recordImportRun({ type, mode, status = "success", validation = null, summary = null, errorMessage = "" }) {
+    await run(
+      `INSERT INTO import_runs (import_type, mode, status, total_rows, valid_rows, invalid_rows, created_count, updated_count, error_message, details)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        type,
+        mode,
+        status,
+        Number(validation?.total_rows || summary?.total_rows || 0),
+        Number(validation?.valid_rows || 0),
+        Number(validation?.invalid_rows || 0),
+        Number(summary?.created || 0),
+        Number(summary?.updated || 0),
+        String(errorMessage || ""),
+        JSON.stringify({ validation, summary }),
+      ]
+    );
+  }
+
   function importTemplateMetadata() {
     return TEMPLATE_DEFINITIONS.map((item) => ({
       ...item,
@@ -268,6 +287,7 @@ function createImportTools(deps) {
     if (validation.invalid_rows > 0) {
       const error = requestError("Import validation failed", 400);
       error.payload = validation;
+      error.validation = validation;
       throw error;
     }
 
@@ -423,6 +443,7 @@ function createImportTools(deps) {
       }
     });
 
+    await recordImportRun({ type, mode: "apply", status: "success", validation, summary });
     await createActivity("import", type, "applied", summary);
     emitInventoryEvent("import.applied", summary);
     return { ...summary, validation };
@@ -449,7 +470,9 @@ function createImportTools(deps) {
       const type = String(req.params.type || "").trim();
       if (!importTemplateForType(type)) throw requestError("Unsupported import type", 404);
       const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
-      res.json(await validateImportRows(type, rows));
+      const validation = await validateImportRows(type, rows);
+      await recordImportRun({ type, mode: "validate", status: validation.invalid_rows > 0 ? "warning" : "success", validation });
+      res.json(validation);
     } catch (error) {
       next(error);
     }
@@ -462,6 +485,8 @@ function createImportTools(deps) {
       const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
       res.json(await applyImportRows(type, rows));
     } catch (error) {
+      const type = String(req.params.type || "").trim();
+      await recordImportRun({ type, mode: "apply", status: "failed", validation: error.validation || error.payload || null, errorMessage: error.message || "Import failed" }).catch(() => {});
       if (error.payload) return res.status(error.status || 400).json(error.payload);
       next(error);
     }

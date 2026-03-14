@@ -13,6 +13,8 @@ const state = {
   stockMovements: [],
   adjustments: [],
   importTemplates: [],
+  importRuns: [],
+  reconciliation: null,
   reports: { stockByLocation: { quantity: [], serialised: [] }, orderSummary: { purchase: [], sales: [] } },
   activity: [],
   poDraftLines: [],
@@ -317,6 +319,44 @@ function renderActivity() {
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Audit</p><h2>Recent activity</h2></div></div><div class="timeline">${state.activity.map((item) => `<div class="timeline-row"><span class="timeline-tag">${escapeHtml(item.entity_type)}</span><div><strong>${escapeHtml(item.action)}</strong><p class="muted">${escapeHtml(item.entity_type)} #${escapeHtml(item.entity_id)}</p></div><time>${new Date(item.created_at).toLocaleString()}</time></div>`).join("") || '<p class="empty">No activity yet</p>'}</div></section>`;
 }
 
+function renderMigrationReadiness() {
+  const data = state.reconciliation;
+  if (!data) return `<section class="panel span-12"><p class="empty">Migration reconciliation is loading</p></section>`;
+  const readinessClass = data.go_live_ready ? "badge badge-active" : "badge badge-warn";
+  const totals = data.totals || {};
+  return `
+    <section class="panel span-12">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Migration checkpoint</p>
+          <h2>Go-live reconciliation</h2>
+        </div>
+        <span class="${readinessClass}">${data.go_live_ready ? "Ready to review" : "Needs attention"}</span>
+      </div>
+      <div class="summary-grid">
+        <article class="summary-card"><strong>${totals.products || 0}</strong><span>Products</span><small>Active catalogue lines</small></article>
+        <article class="summary-card"><strong>${totals.suppliers || 0}</strong><span>Suppliers</span><small>Accounts imported</small></article>
+        <article class="summary-card"><strong>${totals.customers || 0}</strong><span>Customers</span><small>Customer accounts loaded</small></article>
+        <article class="summary-card"><strong>${totals.quantity_stock_on_hand || 0}</strong><span>Qty stock</span><small>Non-serial units on hand</small></article>
+        <article class="summary-card"><strong>${totals.serial_stock_on_hand || 0}</strong><span>Serial stock</span><small>Tracked units on hand</small></article>
+        <article class="summary-card"><strong>${totals.open_purchase_orders || 0}</strong><span>Open POs</span><small>Still expected after import</small></article>
+      </div>
+      <div class="two-column-report migration-columns">
+        <div>
+          <h3>Warnings</h3>
+          <div class="list-grid">${(data.warnings || []).map((warning) => `<article class="list-card"><p>${escapeHtml(warning)}</p></article>`).join("") || '<p class="empty">No migration warnings</p>'}</div>
+        </div>
+        <div>
+          <h3>Required locations</h3>
+          <div class="chip-row">${(data.required_locations || []).map((location) => `<span class="${location.present ? 'chip' : 'chip chip-alert'}">${escapeHtml(location.code)} ${location.present ? 'ready' : 'missing'}</span>`).join("")}</div>
+          <h3>Location types</h3>
+          <div class="chip-row">${(data.location_types || []).map((row) => `<span class="chip">${escapeHtml(row.type)} · ${row.count}</span>`).join("") || '<span class="chip">No location types yet</span>'}</div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderImportsPanel() {
   return `
     <section class="panel span-7">
@@ -339,6 +379,25 @@ function renderImportsPanel() {
             <div class="rule-list">${template.rules.map((rule) => `<span class="chip">${escapeHtml(rule)}</span>`).join("")}</div>
           </article>
         `).join("") || '<p class="empty">No import templates available</p>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderImportRuns() {
+  return `
+    <section class="panel span-12">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Audit trail</p>
+          <h2>Recent import runs</h2>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>When</th><th>Type</th><th>Mode</th><th>Status</th><th>Rows</th><th>Created</th><th>Updated</th><th>Issue</th></tr></thead>
+          <tbody>${state.importRuns.map((run) => `<tr><td>${new Date(run.created_at).toLocaleString()}</td><td>${escapeHtml(run.import_type)}</td><td>${escapeHtml(run.mode)}</td><td><span class="${run.status === 'success' ? 'badge badge-active' : run.status === 'warning' ? 'badge badge-warn' : 'badge badge-inactive'}">${escapeHtml(run.status)}</span></td><td>${run.valid_rows}/${run.total_rows}</td><td>${run.created_count}</td><td>${run.updated_count}</td><td>${escapeHtml(run.error_message || '-')}</td></tr>`).join("") || '<tr><td colspan="8" class="empty">No import runs logged yet</td></tr>'}</tbody>
+        </table>
       </div>
     </section>
   `;
@@ -433,8 +492,10 @@ function renderSectionContent() {
 
   return `
     ${renderSectionHeader("Imports", "Bring current live data into the system in a controlled order with validation first and apply second.")}
+    ${renderMigrationReadiness()}
     ${renderImportsPanel()}
     ${renderImportGuide()}
+    ${renderImportRuns()}
   `;
 }
 
@@ -569,7 +630,7 @@ function bindForms() {
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates] = await Promise.all([
+    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
@@ -587,8 +648,10 @@ async function loadAll() {
       api("/api/reports/order-summary"),
       api("/api/activity"),
       api("/api/import/templates"),
+      api("/api/migration/import-runs"),
+      api("/api/migration/reconciliation"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, importTemplates, reports: { stockByLocation, orderSummary }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary }, activity });
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {

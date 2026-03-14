@@ -56,3 +56,5 @@ Recommended import order:
 3. opening-stock and serial-stock
 4. purchase-orders
 
+For the full cutover sequence, see `migration-playbook.md`.
+

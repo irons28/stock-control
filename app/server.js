@@ -368,6 +368,21 @@ async function initDatabase() {
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await run(`CREATE TABLE IF NOT EXISTS import_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    import_type TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'success',
+    total_rows INTEGER NOT NULL DEFAULT 0,
+    valid_rows INTEGER NOT NULL DEFAULT 0,
+    invalid_rows INTEGER NOT NULL DEFAULT 0,
+    created_count INTEGER NOT NULL DEFAULT 0,
+    updated_count INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT DEFAULT '',
+    details TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   for (const name of ["EPOS", "Printing", "Scanning", "Payments", "Labels", "Accessories"]) {
     await run(`INSERT OR IGNORE INTO product_categories (name) VALUES (?)`, [name]);
   }
@@ -615,6 +630,76 @@ async function getOrderSummaryReport() {
   return { purchase, sales };
 }
 
+async function getImportRuns(limit = 20) {
+  return all(`SELECT * FROM import_runs ORDER BY datetime(created_at) DESC, id DESC LIMIT ?`, [limit]);
+}
+
+async function getMigrationReconciliation() {
+  const [
+    products, suppliers, customers, locations, openPurchaseOrders, openSalesOrders,
+    quantityStock, serialStock, serialAvailable, serialAllocated, serialHolding,
+    productsMissingSupplier, serialProducts, requiredLocationsRaw, importRuns,
+    locationTypes, pendingPoLines, allocatedQuantityStock
+  ] = await Promise.all([
+    get(`SELECT COUNT(*) AS count FROM products WHERE is_active = 1`),
+    get(`SELECT COUNT(*) AS count FROM suppliers WHERE is_active = 1`),
+    get(`SELECT COUNT(*) AS count FROM customers WHERE is_active = 1`),
+    get(`SELECT COUNT(*) AS count FROM locations WHERE is_active = 1`),
+    get(`SELECT COUNT(*) AS count FROM purchase_orders WHERE status IN ('ordered','part_received')`),
+    get(`SELECT COUNT(*) AS count FROM sales_orders WHERE status IN ('draft','allocated','part_dispatched')`),
+    get(`SELECT COALESCE(SUM(qty_on_hand),0) AS count FROM inventory_balances`),
+    get(`SELECT COUNT(*) AS count FROM inventory_units WHERE status IN ('in_holding','available','allocated','damaged')`),
+    get(`SELECT COUNT(*) AS count FROM inventory_units WHERE status = 'available'`),
+    get(`SELECT COUNT(*) AS count FROM inventory_units WHERE status = 'allocated'`),
+    get(`SELECT COUNT(*) AS count FROM inventory_units WHERE status = 'in_holding'`),
+    get(`SELECT COUNT(*) AS count FROM products WHERE is_active = 1 AND supplier_id IS NULL`),
+    get(`SELECT COUNT(*) AS count FROM products WHERE is_active = 1 AND serial_tracking = 1`),
+    all(`SELECT code FROM locations WHERE code IN ('GOODS-IN','HOLDING','DISPATCH','DAMAGED') ORDER BY code ASC`),
+    getImportRuns(8),
+    all(`SELECT type, COUNT(*) AS count FROM locations WHERE is_active = 1 GROUP BY type ORDER BY type ASC`),
+    get(`SELECT COUNT(*) AS count FROM purchase_order_lines WHERE qty_received < qty_ordered`),
+    get(`SELECT COALESCE(SUM(qty_allocated),0) AS count FROM inventory_balances`),
+  ]);
+
+  const requiredLocations = ['GOODS-IN', 'HOLDING', 'DISPATCH', 'DAMAGED'];
+  const presentLocations = new Set(requiredLocationsRaw.map((row) => row.code));
+  const missingLocations = requiredLocations.filter((code) => !presentLocations.has(code));
+  const warnings = [];
+  if ((products?.count || 0) === 0) warnings.push('No active products loaded');
+  if ((suppliers?.count || 0) === 0) warnings.push('No active suppliers loaded');
+  if (missingLocations.length) warnings.push(`Required locations missing: ${missingLocations.join(', ')}`);
+  if ((productsMissingSupplier?.count || 0) > 0) warnings.push(`${productsMissingSupplier.count} active products do not have a default supplier`);
+  if ((serialProducts?.count || 0) > 0 && (serialStock?.count || 0) === 0) warnings.push('Serial-tracked products exist but no serial stock has been imported');
+  if ((pendingPoLines?.count || 0) > 0 && (openPurchaseOrders?.count || 0) === 0) warnings.push('Purchase order lines show outstanding stock but there are no open purchase orders');
+
+  const latestImportAt = importRuns[0]?.created_at || '';
+  const goLiveReady = warnings.length === 0 && (products?.count || 0) > 0 && (suppliers?.count || 0) > 0 && missingLocations.length === 0;
+
+  return {
+    go_live_ready: goLiveReady,
+    latest_import_at: latestImportAt,
+    warnings,
+    totals: {
+      products: products?.count || 0,
+      suppliers: suppliers?.count || 0,
+      customers: customers?.count || 0,
+      locations: locations?.count || 0,
+      open_purchase_orders: openPurchaseOrders?.count || 0,
+      open_sales_orders: openSalesOrders?.count || 0,
+      quantity_stock_on_hand: quantityStock?.count || 0,
+      quantity_stock_allocated: allocatedQuantityStock?.count || 0,
+      serial_stock_on_hand: serialStock?.count || 0,
+      serial_available: serialAvailable?.count || 0,
+      serial_allocated: serialAllocated?.count || 0,
+      serial_in_holding: serialHolding?.count || 0,
+      products_missing_supplier: productsMissingSupplier?.count || 0,
+    },
+    location_types: locationTypes,
+    required_locations: requiredLocations.map((code) => ({ code, present: presentLocations.has(code) })),
+    recent_imports: importRuns,
+  };
+}
+
 createImportTools({
   app,
   get,
@@ -664,7 +749,7 @@ app.get("/api/dashboard", async (req, res, next) => {
       get(`SELECT COUNT(*) AS count FROM adjustments`),
       all(`SELECT p.id, p.sku, p.name, p.reorder_level, COALESCE(balance.qty_available,0) + COALESCE(serials.qty_available,0) AS available_qty FROM products p LEFT JOIN (SELECT product_id, SUM(qty_on_hand - qty_allocated) AS qty_available FROM inventory_balances GROUP BY product_id) balance ON balance.product_id = p.id LEFT JOIN (SELECT product_id, SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS qty_available FROM inventory_units GROUP BY product_id) serials ON serials.product_id = p.id WHERE p.is_active = 1 GROUP BY p.id HAVING p.reorder_level > 0 AND available_qty <= p.reorder_level ORDER BY available_qty ASC, p.name ASC LIMIT 8`),
     ]);
-    res.json({ totals: { products: products?.count || 0, suppliers: suppliers?.count || 0, locations: locations?.count || 0, customers: customers?.count || 0, openPurchaseOrders: openPurchaseOrders?.count || 0, openSalesOrders: openSalesOrders?.count || 0, holdingStock: (holdingBalances?.count || 0) + (holdingUnits?.count || 0), adjustments: adjustments?.count || 0 }, lowStock, nextMilestones: ["Inbound, putaway, and dispatch are working", "Adjustments now handle stock corrections", "Import tooling and GitHub checkpoint are the next milestone"] });
+    res.json({ totals: { products: products?.count || 0, suppliers: suppliers?.count || 0, locations: locations?.count || 0, customers: customers?.count || 0, openPurchaseOrders: openPurchaseOrders?.count || 0, openSalesOrders: openSalesOrders?.count || 0, holdingStock: (holdingBalances?.count || 0) + (holdingUnits?.count || 0), adjustments: adjustments?.count || 0 }, lowStock, nextMilestones: ["Inbound, putaway, and dispatch are working", "Import validation and apply tools are live", "Migration reconciliation is the current go-live checkpoint"] });
   } catch (error) {
     next(error);
   }
@@ -733,6 +818,8 @@ app.get("/api/stock-movements", async (req, res, next) => { try { res.json(await
 app.get("/api/adjustments", async (req, res, next) => { try { res.json(await getAdjustmentsList()); } catch (error) { next(error); } });
 app.get("/api/reports/stock-by-location", async (req, res, next) => { try { res.json(await getStockByLocationReport()); } catch (error) { next(error); } });
 app.get("/api/reports/order-summary", async (req, res, next) => { try { res.json(await getOrderSummaryReport()); } catch (error) { next(error); } });
+app.get("/api/migration/import-runs", async (req, res, next) => { try { res.json(await getImportRuns()); } catch (error) { next(error); } });
+app.get("/api/migration/reconciliation", async (req, res, next) => { try { res.json(await getMigrationReconciliation()); } catch (error) { next(error); } });
 
 app.post("/api/purchase-orders", async (req, res, next) => {
   try {
