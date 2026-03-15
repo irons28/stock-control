@@ -3,6 +3,7 @@ const state = {
   products: [],
   suppliers: [],
   customers: [],
+  users: [],
   locations: [],
   categories: [],
   purchaseOrders: [],
@@ -23,6 +24,7 @@ const state = {
   activity: [],
   selectedPoId: "",
   activeSection: "overview",
+  activeUserName: "",
   message: "",
   error: "",
   batchFilter: "all",
@@ -102,6 +104,7 @@ function renderHero() {
         <p class="eyebrow">Veterinary Stock Pilot</p>
         <h1>Clinic and Mobile Stock</h1>
         <p class="hero-copy">Track what the clinic holds, what moves into each van or kit, and what gets used in the field with a clear audit trail.</p>
+        <div class="stack-note"><label>Active user<select id="active-user-select">${['<option value="">Select active user</option>'].concat(state.users.map((item) => `<option value="${escapeHtml(item.name)}" ${item.name === state.activeUserName ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.role)}</option>`)).join("")}</select></label></div>
       </div>
       <div class="hero-panel">
         <div class="hero-stat"><span>${totals.products || 0}</span><small>Products</small></div>
@@ -354,7 +357,7 @@ function renderAdjustmentsList() {
 }
 
 function renderStockTakeForm() {
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Stock take</p><h2>Count van or kit stock</h2></div></div><form id="stock-take-form" class="stack-form"><label>Mobile location<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select van or kit")}</select></label><label>Product<select name="product_id" required>${optionList(state.products.filter((item) => !item.serial_tracking), (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select quantity product")}</select></label><div class="two-up"><label>Counted qty<input name="counted_qty" type="number" min="0" step="1" value="0" /></label><label>Counted by<input name="counted_by" value="Stock Take" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Optional batch" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Notes<textarea name="notes" rows="2" placeholder="Optional count note"></textarea></label><button type="submit">Record stock take</button></form></section>`;
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Stock take</p><h2>Count van or kit stock</h2></div></div><form id="stock-take-form" class="stack-form"><label>Mobile location<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select van or kit")}</select></label><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}${item.serial_tracking ? ' · Serial' : ''}`, "Select product")}</select></label><div class="two-up"><label>Counted qty<input name="counted_qty" type="number" min="0" step="1" value="0" /></label><label>Counted by<input name="counted_by" value="Stock Take" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked stock takes"></textarea></label><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Optional batch" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Notes<textarea name="notes" rows="2" placeholder="Optional count note"></textarea></label><button type="submit">Record stock take</button></form></section>`;
 }
 
 function renderStockTakesList() {
@@ -612,6 +615,14 @@ function formDataToObject(form) {
   return result;
 }
 
+function apiOptions(method, payload) {
+  return {
+    method,
+    headers: state.activeUserName ? { "x-user-name": state.activeUserName } : undefined,
+    body: payload ? JSON.stringify(payload) : undefined,
+  };
+}
+
 function bindForms() {
   const productForm = document.getElementById("product-form");
   const supplierForm = document.getElementById("supplier-form");
@@ -632,22 +643,26 @@ function bindForms() {
     state.batchFilter = button.getAttribute("data-batch-filter");
     render();
   }));
+  document.getElementById("active-user-select")?.addEventListener("change", (event) => {
+    state.activeUserName = event.target.value;
+    render();
+  });
 
   productForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/products", { method: "POST", body: JSON.stringify(formDataToObject(productForm)) }); productForm.reset(); productForm.unit_of_measure.value = "each"; productForm.tax_flag.checked = true; setMessage("Product saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/products", apiOptions("POST", formDataToObject(productForm))); productForm.reset(); productForm.unit_of_measure.value = "each"; productForm.tax_flag.checked = true; setMessage("Product saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
   supplierForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/suppliers", { method: "POST", body: JSON.stringify(formDataToObject(supplierForm)) }); supplierForm.reset(); setMessage("Supplier saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/suppliers", apiOptions("POST", formDataToObject(supplierForm))); supplierForm.reset(); setMessage("Supplier saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
   customerForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/customers", { method: "POST", body: JSON.stringify(formDataToObject(customerForm)) }); customerForm.reset(); setMessage("Customer saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/customers", apiOptions("POST", formDataToObject(customerForm))); customerForm.reset(); setMessage("Customer saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
   locationForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/locations", { method: "POST", body: JSON.stringify(formDataToObject(locationForm)) }); locationForm.reset(); setMessage("Location saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/locations", apiOptions("POST", formDataToObject(locationForm))); locationForm.reset(); setMessage("Location saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
 
@@ -656,7 +671,7 @@ function bindForms() {
     event.preventDefault();
     try {
       const payload = formDataToObject(goodsInForm);
-      await api(`/api/purchase-orders/${encodeURIComponent(payload.purchase_order_id)}/receive`, { method: "POST", body: JSON.stringify(payload) });
+      await api(`/api/purchase-orders/${encodeURIComponent(payload.purchase_order_id)}/receive`, apiOptions("POST", payload));
       goodsInForm.reset();
       setMessage("Goods received into HOLDING");
       await loadAll();
@@ -665,44 +680,45 @@ function bindForms() {
 
   putawayForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/putaway", { method: "POST", body: JSON.stringify(formDataToObject(putawayForm)) }); putawayForm.reset(); setMessage("Putaway completed"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/putaway", apiOptions("POST", formDataToObject(putawayForm))); putawayForm.reset(); setMessage("Putaway completed"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
   transferForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/transfers", { method: "POST", body: JSON.stringify(formDataToObject(transferForm)) }); transferForm.reset(); transferForm.moved_by.value = "Replenishment"; setMessage("Replenishment recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/transfers", apiOptions("POST", formDataToObject(transferForm))); transferForm.reset(); transferForm.moved_by.value = "Replenishment"; setMessage("Replenishment recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
   usageForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/usage", { method: "POST", body: JSON.stringify(formDataToObject(usageForm)) }); usageForm.reset(); usageForm.used_by.value = "Veterinarian"; setMessage("Usage recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/usage", apiOptions("POST", formDataToObject(usageForm))); usageForm.reset(); usageForm.used_by.value = "Veterinarian"; setMessage("Usage recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
   adjustmentForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/adjustments", { method: "POST", body: JSON.stringify(formDataToObject(adjustmentForm)) }); adjustmentForm.reset(); adjustmentForm.adjusted_by.value = "Adjustment"; setMessage("Adjustment saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/adjustments", apiOptions("POST", formDataToObject(adjustmentForm))); adjustmentForm.reset(); adjustmentForm.adjusted_by.value = "Adjustment"; setMessage("Adjustment saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
   stockTakeForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/stock-takes", { method: "POST", body: JSON.stringify(formDataToObject(stockTakeForm)) }); stockTakeForm.reset(); stockTakeForm.counted_by.value = "Stock Take"; setMessage("Stock take recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/stock-takes", apiOptions("POST", formDataToObject(stockTakeForm))); stockTakeForm.reset(); stockTakeForm.counted_by.value = "Stock Take"; setMessage("Stock take recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
   document.querySelectorAll("[data-allocate-order]").forEach((button) => button.addEventListener("click", async () => {
-    try { await api(`/api/sales-orders/${button.getAttribute("data-allocate-order")}/allocate`, { method: "POST", body: JSON.stringify({ allocated_by: "Allocation" }) }); setMessage("Order allocated"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api(`/api/sales-orders/${button.getAttribute("data-allocate-order")}/allocate`, apiOptions("POST", { allocated_by: "Allocation" })); setMessage("Order allocated"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   }));
   document.querySelectorAll("[data-dispatch-order]").forEach((button) => button.addEventListener("click", async () => {
-    try { await api(`/api/sales-orders/${button.getAttribute("data-dispatch-order")}/dispatch`, { method: "POST", body: JSON.stringify({ dispatched_by: "Dispatch" }) }); setMessage("Order dispatched"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api(`/api/sales-orders/${button.getAttribute("data-dispatch-order")}/dispatch`, apiOptions("POST", { dispatched_by: "Dispatch" })); setMessage("Order dispatched"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   }));
 }
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockTakes, stockByLocation, orderSummary, controlledDrugs, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
+    const [dashboard, products, suppliers, customers, users, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockTakes, stockByLocation, orderSummary, controlledDrugs, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
       api("/api/customers"),
+      api("/api/users"),
       api("/api/locations"),
       api("/api/categories"),
       api("/api/purchase-orders"),
@@ -724,7 +740,8 @@ async function loadAll() {
       api("/api/migration/import-runs"),
       api("/api/migration/reconciliation"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockTakes, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary, controlledDrugs }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, users, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockTakes, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary, controlledDrugs }, activity });
+    if (!state.activeUserName && users.length) state.activeUserName = users[0].name;
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {

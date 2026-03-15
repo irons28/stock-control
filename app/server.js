@@ -116,6 +116,24 @@ function requestError(message, status = 400) {
   return error;
 }
 
+async function getActiveUser(req) {
+  const requestedName = String(req.headers['x-user-name'] || '').trim();
+  if (!requestedName) return null;
+  return get(`SELECT * FROM users WHERE is_active = 1 AND name = ?`, [requestedName]);
+}
+
+function roleCanHandleControlledDrugs(role) {
+  return ['manager', 'controlled_drugs'].includes(String(role || '').trim());
+}
+
+async function requireControlledDrugUser(req, product) {
+  if (!Number(product?.controlled_drug || 0)) return null;
+  const user = await getActiveUser(req);
+  if (!user) throw requestError('Select an active user before recording a controlled-drug action', 403);
+  if (!roleCanHandleControlledDrugs(user.role)) throw requestError('The selected user is not allowed to record controlled-drug actions', 403);
+  return user;
+}
+
 async function initDatabase() {
   await run(`PRAGMA foreign_keys = ON`);
 
@@ -139,6 +157,15 @@ async function initDatabase() {
     phone TEXT DEFAULT '',
     email TEXT DEFAULT '',
     address TEXT DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'staff',
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -491,6 +518,10 @@ async function initDatabase() {
     ["KIT-01", "Vet Kit 01", "bin", "Mobile veterinarian bag or kit"],
   ]) {
     await run(`INSERT OR IGNORE INTO locations (code, name, type, notes) VALUES (?, ?, ?, ?)`, [code, name, type, notes]);
+  }
+
+  for (const [name, role] of [["Practice Manager", "manager"], ["Lead Vet", "controlled_drugs"], ["Warehouse Staff", "staff"]]) {
+    await run(`INSERT OR IGNORE INTO users (name, role, is_active, updated_at) VALUES (?, ?, 1, CURRENT_TIMESTAMP)`, [name, role]);
   }
 }
 
@@ -919,6 +950,7 @@ app.get("/api/dashboard", async (req, res, next) => {
 });
 
 app.get("/api/categories", async (req, res, next) => { try { res.json(await all(`SELECT * FROM product_categories ORDER BY name ASC`)); } catch (error) { next(error); } });
+app.get("/api/users", async (req, res, next) => { try { res.json(await all(`SELECT * FROM users WHERE is_active = 1 ORDER BY name ASC`)); } catch (error) { next(error); } });
 app.get("/api/suppliers", async (req, res, next) => { try { res.json(await all(`SELECT * FROM suppliers ORDER BY name ASC`)); } catch (error) { next(error); } });
 app.get("/api/customers", async (req, res, next) => { try { res.json(await all(`SELECT * FROM customers ORDER BY name ASC`)); } catch (error) { next(error); } });
 app.get("/api/locations", async (req, res, next) => { try { res.json(await all(`SELECT * FROM locations ORDER BY code ASC`)); } catch (error) { next(error); } });
@@ -1227,6 +1259,7 @@ app.post("/api/transfers", async (req, res, next) => {
     ]);
     if (!product) throw requestError("Product not found", 404);
     if (!fromLocation || !toLocation) throw requestError("Transfer location not found", 404);
+    await requireControlledDrugUser(req, product);
     if (Number(product.controlled_drug || 0) && (!authorisedBy || !witnessName)) throw requestError("Controlled drugs require an authorised by name and witness name");
     const transfer = await transaction(async () => {
       let movedQty = qty;
@@ -1282,6 +1315,7 @@ app.post("/api/usage", async (req, res, next) => {
     ]);
     if (!product) throw requestError("Product not found", 404);
     if (!location) throw requestError("Location not found", 404);
+    await requireControlledDrugUser(req, product);
     if (Number(product.controlled_drug || 0) && (!authorisedBy || !witnessName)) throw requestError("Controlled drugs require an authorised by name and witness name");
     const usage = await transaction(async () => {
       let usedQty = qty;
@@ -1329,6 +1363,7 @@ app.post("/api/adjustments", async (req, res, next) => {
     if (!productId || !adjustmentType || !reason) throw requestError("Product, adjustment type, and reason are required");
     const product = await get(`SELECT * FROM products WHERE id = ?`, [productId]);
     if (!product) throw requestError("Product not found", 404);
+    await requireControlledDrugUser(req, product);
     if (Number(product.controlled_drug || 0) && (!authorisedBy || !witnessName)) throw requestError("Controlled drugs require an authorised by name and witness name");
     const location = locationId ? await get(`SELECT * FROM locations WHERE id = ?`, [locationId]) : null;
     if (locationId && !location) throw requestError("Location not found", 404);
@@ -1387,18 +1422,32 @@ app.post("/api/stock-takes", async (req, res, next) => {
     if (!location) throw requestError("Location not found", 404);
     if (!product) throw requestError("Product not found", 404);
     if (!(location.type === 'vehicle' || String(location.code || '').startsWith('KIT-'))) throw requestError("Stock takes are limited to vans and kits in this pilot");
-    if (Number(product.serial_tracking || 0)) throw requestError("Serial-tracked stock takes are not supported yet. Use serial verification instead.");
-    const balance = await get(`SELECT * FROM inventory_balances WHERE product_id = ? AND location_id = ?`, [productId, locationId]);
-    const expectedQty = Number(balance?.qty_on_hand || 0);
-    const varianceQty = countedQty - expectedQty;
+    const serialNumbers = Array.from(new Set(parseSerialNumbers(req.body?.serial_numbers)));
     const stockTake = await transaction(async () => {
-      if (varianceQty !== 0) {
-        await updateInventoryBalance(productId, locationId, varianceQty, 0);
-        await updateStockBatch(productId, locationId, batchNumber, expiryDate, varianceQty, 0);
-        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, 'stock_take', ?, ?, ?, ?, ?)`, [productId, varianceQty > 0 ? 'stock_take_gain' : 'stock_take_loss', Math.abs(varianceQty), varianceQty > 0 ? null : locationId, varianceQty > 0 ? locationId : null, `ST-${Date.now()}`, `Stock take expected ${expectedQty}, counted ${countedQty}${notes ? ` - ${notes}` : ''}`, countedBy, batchNumber, expiryDate]);
+      let expectedQty = 0;
+      let finalCountedQty = countedQty;
+      let varianceQty = 0;
+      if (Number(product.serial_tracking || 0)) {
+        if (!serialNumbers.length) throw requestError("Serial numbers are required for serial-tracked stock takes");
+        const expectedUnits = await all(`SELECT * FROM inventory_units WHERE product_id = ? AND current_location_id = ? AND status IN ('available','in_holding')`, [productId, locationId]);
+        expectedQty = expectedUnits.length;
+        finalCountedQty = serialNumbers.length;
+        varianceQty = finalCountedQty - expectedQty;
+        const countedUnits = await all(`SELECT * FROM inventory_units WHERE product_id = ? AND current_location_id = ? AND serial_number IN (${serialNumbers.map(() => '?').join(',')})`, [productId, locationId, ...serialNumbers]);
+        if (countedUnits.length !== serialNumbers.length) throw requestError("One or more serial numbers were not found at the selected mobile location", 409);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'stock_take_check', ?, ?, ?, 'stock_take', ?, ?, ?, ?, ?)`, [productId, finalCountedQty, locationId, locationId, `ST-${Date.now()}`, `Serial stock take verified ${finalCountedQty} units${notes ? ` - ${notes}` : ''}`, countedBy, batchNumber, expiryDate]);
+      } else {
+        const balance = await get(`SELECT * FROM inventory_balances WHERE product_id = ? AND location_id = ?`, [productId, locationId]);
+        expectedQty = Number(balance?.qty_on_hand || 0);
+        varianceQty = countedQty - expectedQty;
+        if (varianceQty !== 0) {
+          await updateInventoryBalance(productId, locationId, varianceQty, 0);
+          await updateStockBatch(productId, locationId, batchNumber, expiryDate, varianceQty, 0);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, 'stock_take', ?, ?, ?, ?, ?)`, [productId, varianceQty > 0 ? 'stock_take_gain' : 'stock_take_loss', Math.abs(varianceQty), varianceQty > 0 ? null : locationId, varianceQty > 0 ? locationId : null, `ST-${Date.now()}`, `Stock take expected ${expectedQty}, counted ${countedQty}${notes ? ` - ${notes}` : ''}`, countedBy, batchNumber, expiryDate]);
+        }
       }
-      const result = await run(`INSERT INTO stock_takes (location_id, product_id, expected_qty, counted_qty, variance_qty, batch_number, expiry_date, notes, counted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [locationId, productId, expectedQty, countedQty, varianceQty, batchNumber, expiryDate, notes, countedBy]);
-      return get(`SELECT st.*, p.sku, p.name AS product_name, l.code AS location_code, l.name AS location_name FROM stock_takes st JOIN products p ON p.id = st.product_id JOIN locations l ON l.id = st.location_id WHERE st.id = ?`, [result.id]);
+      const result = await run(`INSERT INTO stock_takes (location_id, product_id, expected_qty, counted_qty, variance_qty, batch_number, expiry_date, notes, counted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [locationId, productId, expectedQty, finalCountedQty, varianceQty, batchNumber, expiryDate, notes + (serialNumbers.length ? ` | Serials: ${serialNumbers.join(', ')}` : ''), countedBy]);
+      return get(`SELECT st.*, p.sku, p.name AS product_name, p.serial_tracking, l.code AS location_code, l.name AS location_name FROM stock_takes st JOIN products p ON p.id = st.product_id JOIN locations l ON l.id = st.location_id WHERE st.id = ?`, [result.id]);
     });
     await createActivity('stock_take', stockTake.id, 'created', stockTake);
     emitInventoryEvent('stock_take.created', stockTake);
