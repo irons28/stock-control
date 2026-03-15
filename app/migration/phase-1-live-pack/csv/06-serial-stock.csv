@@ -1,0 +1,3 @@
+sku,serial_number,location_code,status
+TILL-002,SN-2001,SHELF-A1,available
+TILL-002,SN-2002,HOLDING,in_holding

@@ -15,6 +15,7 @@ Create one CSV for each of these:
 5. opening-stock
 6. serial-stock
 7. purchase-orders
+8. sales-orders
 
 Use the matching templates from `/api/import/templates/:type`.
 
@@ -34,6 +35,7 @@ Use the matching templates from `/api/import/templates/:type`.
 - `serial-stock` requires one row per serial number.
 - `location_code` must already exist before stock imports.
 - `purchase-orders` should only contain open or part-received orders.
+- `sales-orders` should only contain open customer orders still to be fulfilled.
 - Imported PO numbers must not already exist in the database.
 
 ## Reconciliation Checkpoints
@@ -62,3 +64,4 @@ Do not start using the app operationally until:
 - stock totals reconcile to the live stock position
 - serial counts and locations reconcile
 - open purchase orders have been loaded and checked
+- open sales orders have been loaded and checked

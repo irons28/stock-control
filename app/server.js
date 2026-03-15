@@ -714,6 +714,7 @@ createImportTools({
   emitInventoryEvent,
   getLocationByCode,
   refreshPurchaseOrderStatus,
+  refreshSalesOrderStatus,
   rootDir: __dirname,
 });
 
@@ -749,7 +750,7 @@ app.get("/api/dashboard", async (req, res, next) => {
       get(`SELECT COUNT(*) AS count FROM adjustments`),
       all(`SELECT p.id, p.sku, p.name, p.reorder_level, COALESCE(balance.qty_available,0) + COALESCE(serials.qty_available,0) AS available_qty FROM products p LEFT JOIN (SELECT product_id, SUM(qty_on_hand - qty_allocated) AS qty_available FROM inventory_balances GROUP BY product_id) balance ON balance.product_id = p.id LEFT JOIN (SELECT product_id, SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS qty_available FROM inventory_units GROUP BY product_id) serials ON serials.product_id = p.id WHERE p.is_active = 1 GROUP BY p.id HAVING p.reorder_level > 0 AND available_qty <= p.reorder_level ORDER BY available_qty ASC, p.name ASC LIMIT 8`),
     ]);
-    res.json({ totals: { products: products?.count || 0, suppliers: suppliers?.count || 0, locations: locations?.count || 0, customers: customers?.count || 0, openPurchaseOrders: openPurchaseOrders?.count || 0, openSalesOrders: openSalesOrders?.count || 0, holdingStock: (holdingBalances?.count || 0) + (holdingUnits?.count || 0), adjustments: adjustments?.count || 0 }, lowStock, nextMilestones: ["Inbound, putaway, and dispatch are working", "Import validation and apply tools are live", "Migration reconciliation is the current go-live checkpoint"] });
+    res.json({ totals: { products: products?.count || 0, suppliers: suppliers?.count || 0, locations: locations?.count || 0, customers: customers?.count || 0, openPurchaseOrders: openPurchaseOrders?.count || 0, openSalesOrders: openSalesOrders?.count || 0, holdingStock: (holdingBalances?.count || 0) + (holdingUnits?.count || 0), adjustments: adjustments?.count || 0 }, lowStock, nextMilestones: ["Warehouse execution flows are working", "Purchase and sales orders are now expected to be imported", "Migration reconciliation is the current go-live checkpoint"] });
   } catch (error) {
     next(error);
   }

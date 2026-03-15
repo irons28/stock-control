@@ -1,0 +1,3 @@
+code,name,type,notes,is_active
+SHELF-B2,Shelf B2,shelf,Secondary shelf,true
+BIN-02,Bin 02,bin,Small stock bin,true

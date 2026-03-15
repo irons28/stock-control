@@ -41,8 +41,14 @@ const TEMPLATE_DEFINITIONS = [
   {
     type: "purchase-orders",
     filename: "purchase-orders-template.csv",
-    description: "Open purchase orders and lines",
+    description: "Imported open purchase orders and lines",
     rules: ["po_number, supplier_name, product_sku, and qty_ordered are required", "qty_received is optional but cannot exceed qty_ordered", "supplier will be created if missing"],
+  },
+  {
+    type: "sales-orders",
+    filename: "sales-orders-template.csv",
+    description: "Imported open sales orders and lines",
+    rules: ["order_number, customer_name, product_sku, and qty_ordered are required", "qty_ordered must be a positive whole number", "customer will be created if missing"],
   },
 ];
 
@@ -85,6 +91,7 @@ function createImportTools(deps) {
     emitInventoryEvent,
     getLocationByCode,
     refreshPurchaseOrderStatus,
+    refreshSalesOrderStatus,
     rootDir,
   } = deps;
 
@@ -148,6 +155,19 @@ function createImportTools(deps) {
     const existing = await get(`SELECT * FROM product_categories WHERE name = ? LIMIT 1`, [trimmed]);
     if (existing) return existing.id;
     const result = await run(`INSERT INTO product_categories (name) VALUES (?)`, [trimmed]);
+    return result.id;
+  }
+
+  async function getCustomerByName(name) {
+    return get(`SELECT * FROM customers WHERE name = ? LIMIT 1`, [String(name || "").trim()]);
+  }
+
+  async function ensureCustomer(name) {
+    const trimmed = String(name || "").trim();
+    if (!trimmed) return null;
+    const existing = await getCustomerByName(trimmed);
+    if (existing) return existing.id;
+    const result = await run(`INSERT INTO customers (name, is_active, updated_at) VALUES (?, 1, CURRENT_TIMESTAMP)`, [trimmed]);
     return result.id;
   }
 
@@ -264,6 +284,23 @@ function createImportTools(deps) {
         if (normalized.qty_ordered <= 0) errors.push("qty_ordered must be greater than zero");
         if (normalized.qty_received < 0 || normalized.qty_received > normalized.qty_ordered) errors.push("qty_received must be between 0 and qty_ordered");
         if (normalized.expected_at === "INVALID_DATE") errors.push("expected_at must be a valid date");
+        const product = normalized.product_sku ? await getProductBySku(normalized.product_sku) : null;
+        if (!product) errors.push("product_sku was not found");
+      } else if (type === "sales-orders") {
+        normalized = {
+          order_number: normalizeCode(raw.order_number),
+          customer_name: String(raw.customer_name || "").trim(),
+          product_sku: normalizeCode(raw.product_sku),
+          qty_ordered: parseInteger(raw.qty_ordered, 0),
+          unit_price: parseMoney(raw.unit_price, 0),
+          ordered_at: normalizeDateValue(raw.ordered_at),
+          notes: String(raw.notes || "").trim(),
+        };
+        if (!normalized.order_number) errors.push("order_number is required");
+        if (!normalized.customer_name) errors.push("customer_name is required");
+        if (!normalized.product_sku) errors.push("product_sku is required");
+        if (normalized.qty_ordered <= 0) errors.push("qty_ordered must be greater than zero");
+        if (normalized.ordered_at === "INVALID_DATE") errors.push("ordered_at must be a valid date");
         const product = normalized.product_sku ? await getProductBySku(normalized.product_sku) : null;
         if (!product) errors.push("product_sku was not found");
       } else {
@@ -439,6 +476,32 @@ function createImportTools(deps) {
             );
           }
           await refreshPurchaseOrderStatus(poResult.id);
+        }
+      } else if (type === "sales-orders") {
+        const grouped = new Map();
+        for (const row of validRows) {
+          if (!grouped.has(row.order_number)) grouped.set(row.order_number, []);
+          grouped.get(row.order_number).push(row);
+        }
+        for (const [orderNumber, lines] of grouped.entries()) {
+          const existing = await get(`SELECT id FROM sales_orders WHERE order_number = ? LIMIT 1`, [orderNumber]);
+          if (existing) throw requestError(`Sales order ${orderNumber} already exists`, 409);
+          const customerId = await ensureCustomer(lines[0].customer_name);
+          const orderResult = await run(
+            `INSERT INTO sales_orders (order_number, customer_id, status, ordered_at, notes, updated_at)
+             VALUES (?, ?, 'draft', ?, ?, CURRENT_TIMESTAMP)`,
+            [orderNumber, customerId, lines[0].ordered_at || "", lines[0].notes || "Imported sales order"]
+          );
+          summary.created += 1;
+          for (const line of lines) {
+            const product = await getProductBySku(line.product_sku);
+            await run(
+              `INSERT INTO sales_order_lines (sales_order_id, product_id, qty_ordered, unit_price, notes, updated_at)
+               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+              [orderResult.id, product.id, line.qty_ordered, line.unit_price, line.notes]
+            );
+          }
+          await refreshSalesOrderStatus(orderResult.id);
         }
       }
     });

@@ -1,0 +1,3 @@
+sku,name,description,category_name,barcode,serial_tracking,unit_of_measure,cost_price,sell_price,supplier_name,reorder_level,tax_flag,is_active
+TILL-002,Counter Till Mk2,Main EPOS till,EPOS,1234567890123,true,each,220.00,329.99,Acme Supplies,2,true,true
+LABEL-001,Thermal Labels 4x6,Box of shipping labels,Labels,,false,box,9.50,14.99,Acme Supplies,5,true,true

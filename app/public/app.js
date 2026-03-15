@@ -99,7 +99,7 @@ function renderHero() {
       <div>
         <p class="eyebrow">Warehouse Operations Suite</p>
         <h1>Stock Control</h1>
-        <p class="hero-copy">Inbound, putaway, dispatch, and stock correction are now separated into clear operating areas. Import tooling is ready for controlled migration work.</p>
+        <p class="hero-copy">Imported orders now drive the warehouse flow. This app is focused on goods in, putaway, allocation, dispatch, and stock traceability.</p>
       </div>
       <div class="hero-panel">
         <div class="hero-stat"><span>${totals.products || 0}</span><small>Products</small></div>
@@ -257,7 +257,7 @@ function renderPurchaseOrderForm() {
 }
 
 function renderPurchaseOrdersList() {
-  return renderListPanel("Purchase orders", "Order book", state.purchaseOrders, (order) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(order.po_number)}</h3><p class="muted">${escapeHtml(order.supplier_name)} · ${order.total_received}/${order.total_ordered} received</p></div><span class="${orderStatusClass(order.status)}">${escapeHtml(order.status)}</span></div><div class="line-pill-row">${(order.lines || []).map((line) => `<span class="chip">${escapeHtml(line.sku)} · ${line.qty_received}/${line.qty_ordered}</span>`).join("")}</div></article>`, "span-7");
+  return renderListPanel("Imported purchase orders", "Inbound queue", state.purchaseOrders, (order) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(order.po_number)}</h3><p class="muted">${escapeHtml(order.supplier_name)} · ${order.total_received}/${order.total_ordered} received</p></div><span class="${orderStatusClass(order.status)}">${escapeHtml(order.status)}</span></div><div class="line-pill-row">${(order.lines || []).map((line) => `<span class="chip">${escapeHtml(line.sku)} · ${line.qty_received}/${line.qty_ordered}</span>`).join("")}</div></article>`, "span-7");
 }
 
 function renderGoodsInForm() {
@@ -283,12 +283,33 @@ function renderSalesOrderForm() {
 }
 
 function renderSalesOrdersList() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Dispatch queue</p><h2>Sales orders</h2></div><span class="count-pill">${state.salesOrders.length} orders</span></div><div class="list-grid">${state.salesOrders.map((order) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(order.order_number)}</h3><p class="muted">${escapeHtml(order.customer_name)} · ${order.total_dispatched}/${order.total_ordered} dispatched</p></div><span class="${orderStatusClass(order.status)}">${escapeHtml(order.status)}</span></div><div class="line-pill-row">${(order.lines || []).map((line) => `<span class="chip">${escapeHtml(line.sku)} · ${line.qty_dispatched}/${line.qty_ordered}${line.allocations?.length ? ` · ${line.allocations.length} alloc` : ''}</span>`).join("")}</div><div class="action-row"><button type="button" class="secondary-button" data-allocate-order="${order.id}">Allocate</button><button type="button" data-dispatch-order="${order.id}">Dispatch</button></div></article>`).join("") || '<p class="empty">No sales orders yet</p>'}</div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Dispatch queue</p><h2>Imported sales orders</h2></div><span class="count-pill">${state.salesOrders.length} orders</span></div><div class="list-grid">${state.salesOrders.map((order) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(order.order_number)}</h3><p class="muted">${escapeHtml(order.customer_name)} · ${order.total_dispatched}/${order.total_ordered} dispatched</p></div><span class="${orderStatusClass(order.status)}">${escapeHtml(order.status)}</span></div><div class="line-pill-row">${(order.lines || []).map((line) => `<span class="chip">${escapeHtml(line.sku)} · ${line.qty_dispatched}/${line.qty_ordered}${line.allocations?.length ? ` · ${line.allocations.length} alloc` : ''}</span>`).join("")}</div><div class="action-row"><button type="button" class="secondary-button" data-allocate-order="${order.id}">Allocate</button><button type="button" data-dispatch-order="${order.id}">Dispatch</button></div></article>`).join("") || '<p class="empty">No imported sales orders yet</p>'}</div></section>`;
 }
 
 function renderDispatchesList() {
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Outbound feed</p><h2>Recent dispatches</h2></div></div><div class="table-wrap"><table><thead><tr><th>Dispatch</th><th>Order</th><th>Customer</th><th>Product</th><th>Qty</th></tr></thead><tbody>${state.dispatches.map((item) => `<tr><td>${escapeHtml(item.dispatch_number)}</td><td>${escapeHtml(item.order_number)}</td><td>${escapeHtml(item.customer_name)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_dispatched}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No dispatches yet</td></tr>'}</tbody></table></div></section>`;
 }
+function renderImportedOrderHint(title, copy, templateType, commandType) {
+  const template = state.importTemplates.find((item) => item.type === templateType);
+  return `
+    <section class="panel span-5">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Imported documents</p>
+          <h2>${title}</h2>
+        </div>
+      </div>
+      <p class="muted">${copy}</p>
+      <div class="stack-note">
+        <p><strong>Template:</strong> ${template ? escapeHtml(template.filename) : 'Not available yet'}</p>
+        <p><strong>Action:</strong> import the external order file, then process the operational steps here.</p>
+      </div>
+      ${template ? `<a class="ghost-link" href="${template.download_path}" target="_blank" rel="noreferrer">Download ${escapeHtml(template.type)} template</a>` : ''}
+      <pre class="code-block">node scripts/import-data.js ${commandType} ./migration/phase-1-live-pack/csv/${templateType === 'purchase-orders' ? '07-purchase-orders.csv' : '08-sales-orders.csv'} --apply</pre>
+    </section>
+  `;
+}
+
 
 function renderAdjustmentsList() {
   return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Control log</p><h2>Recent adjustments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Type</th><th>Product</th><th>Qty</th><th>Location</th><th>Reason</th></tr></thead><tbody>${state.adjustments.map((item) => `<tr><td>${escapeHtml(item.adjustment_type)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reason)}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No adjustments yet</td></tr>'}</tbody></table></div></section>`;
@@ -340,6 +361,7 @@ function renderMigrationReadiness() {
         <article class="summary-card"><strong>${totals.quantity_stock_on_hand || 0}</strong><span>Qty stock</span><small>Non-serial units on hand</small></article>
         <article class="summary-card"><strong>${totals.serial_stock_on_hand || 0}</strong><span>Serial stock</span><small>Tracked units on hand</small></article>
         <article class="summary-card"><strong>${totals.open_purchase_orders || 0}</strong><span>Open POs</span><small>Still expected after import</small></article>
+        <article class="summary-card"><strong>${totals.open_sales_orders || 0}</strong><span>Open sales orders</span><small>Still to fulfil after import</small></article>
       </div>
       <div class="two-column-report migration-columns">
         <div>
@@ -415,13 +437,14 @@ function renderImportGuide() {
       <div class="stack-note">
         <p><strong>Step 1:</strong> load suppliers, customers, locations, and products first.</p>
         <p><strong>Step 2:</strong> import opening stock and serial stock only after the locations and products exist.</p>
-        <p><strong>Step 3:</strong> import open purchase orders last so the expected stock position stays correct.</p>
+        <p><strong>Step 3:</strong> import open purchase orders and open sales orders after master data and stock are in place.</p>
       </div>
       <pre class="code-block">node scripts/import-data.js products ./my-products.csv
 node scripts/import-data.js products ./my-products.csv --apply
-node scripts/import-data.js purchase-orders ./open-pos.csv --apply</pre>
+node scripts/import-data.js purchase-orders ./open-pos.csv --apply
+node scripts/import-data.js sales-orders ./open-sales.csv --apply</pre>
       <div class="stack-note">
-        <p><strong>Validation rules:</strong> stock imports require known products and locations, serial imports require unique serial numbers, and open purchase orders are rejected if the PO already exists.</p>
+        <p><strong>Validation rules:</strong> stock imports require known products and locations, serial imports require unique serial numbers, and imported purchase or sales order numbers are rejected if they already exist.</p>
       </div>
     </section>
   `;
@@ -454,8 +477,8 @@ function renderSectionContent() {
 
   if (state.activeSection === "inbound") {
     return `
-      ${renderSectionHeader("Inbound", "Manage purchase orders, receive stock into HOLDING, and complete putaway into live shelf or bin locations.")}
-      ${renderPurchaseOrderForm()}
+      ${renderSectionHeader("Inbound", "Use imported purchase orders as the inbound workload, then receive stock into HOLDING and complete putaway into live shelf or bin locations.")}
+      ${renderImportedOrderHint("Import purchase orders", "Purchase orders should be created elsewhere and imported here for warehouse receiving.", "purchase-orders", "purchase-orders")}
       ${renderPurchaseOrdersList()}
       ${renderGoodsInForm()}
       ${renderGoodsReceiptsList()}
@@ -466,8 +489,8 @@ function renderSectionContent() {
 
   if (state.activeSection === "outbound") {
     return `
-      ${renderSectionHeader("Outbound", "Create customer orders, allocate available stock, and dispatch picked items.")}
-      ${renderSalesOrderForm()}
+      ${renderSectionHeader("Outbound", "Use imported sales orders as the outbound workload, then allocate, build, and dispatch picked items.")}
+      ${renderImportedOrderHint("Import sales orders", "Sales orders should be created elsewhere and imported here for warehouse fulfilment.", "sales-orders", "sales-orders")}
       ${renderSalesOrdersList()}
       ${renderDispatchesList()}
     `;

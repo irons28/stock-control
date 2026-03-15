@@ -36,6 +36,7 @@ Supported import types are:
 - `opening-stock`
 - `serial-stock`
 - `purchase-orders`
+- `sales-orders`
 
 Validate a CSV before applying it:
 
@@ -55,6 +56,7 @@ Recommended import order:
 2. products
 3. opening-stock and serial-stock
 4. purchase-orders
+5. sales-orders
 
 For the full cutover sequence, see `migration-playbook.md`.
 

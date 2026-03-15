@@ -1,0 +1,2 @@
+order_number,customer_name,product_sku,qty_ordered,unit_price,ordered_at,notes
+SO-3001,Blue Fern Retail,TILL-001,1,329.99,2026-03-22,Imported open sales order
