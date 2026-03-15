@@ -397,6 +397,8 @@ async function initDatabase() {
     qty INTEGER NOT NULL DEFAULT 0,
     serial_numbers TEXT DEFAULT '',
     reference TEXT DEFAULT '',
+    patient_reference TEXT DEFAULT '',
+    visit_reference TEXT DEFAULT '',
     used_by TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -436,6 +438,8 @@ async function initDatabase() {
   await run(`ALTER TABLE transfers ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE usage_transactions ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE usage_transactions ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE usage_transactions ADD COLUMN patient_reference TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE usage_transactions ADD COLUMN visit_reference TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE adjustments ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE adjustments ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE stock_movements ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
@@ -1188,8 +1192,13 @@ app.post("/api/usage", async (req, res, next) => {
     const qty = parseInteger(req.body?.qty, 0);
     const serialNumbers = Array.from(new Set(parseSerialNumbers(req.body?.serial_numbers)));
     const reference = String(req.body?.reference || "").trim();
+    const patientReference = String(req.body?.patient_reference || "").trim();
+    const visitReference = String(req.body?.visit_reference || "").trim();
     const usedBy = String(req.body?.used_by || "Usage").trim();
     const notes = String(req.body?.notes || "").trim();
+    const batchNumber = String(req.body?.batch_number || "").trim();
+    const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
+    const movementReference = [visitReference, patientReference, reference].filter(Boolean).join(" | ");
     if (!productId || !locationId) throw requestError("Product and location are required");
     const [product, location] = await Promise.all([
       get(`SELECT * FROM products WHERE id = ?`, [productId]),
@@ -1206,7 +1215,7 @@ app.post("/api/usage", async (req, res, next) => {
         usedQty = units.length;
         for (const unit of units) {
           await run(`UPDATE inventory_units SET current_location_id = NULL, status = 'consumed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [unit.id]);
-          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', 1, ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, unit.serial_number, locationId, reference || `USE-${Date.now()}`, notes, usedBy, unit.batch_number || batchNumber, unit.expiry_date || expiryDate]);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', 1, ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, unit.serial_number, locationId, movementReference || `USE-${Date.now()}`, notes, usedBy, unit.batch_number || batchNumber, unit.expiry_date || expiryDate]);
         }
       } else {
         if (qty <= 0) throw requestError("Quantity must be greater than zero for stock usage");
@@ -1215,9 +1224,9 @@ app.post("/api/usage", async (req, res, next) => {
         if (available < qty) throw requestError(`Only ${available} units are available at the selected location`, 409);
         await updateInventoryBalance(productId, locationId, -qty, 0);
         await updateStockBatch(productId, locationId, batchNumber, expiryDate, -qty, 0);
-        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, qty, locationId, reference || `USE-${Date.now()}`, notes, usedBy, batchNumber, expiryDate]);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, qty, locationId, movementReference || `USE-${Date.now()}`, notes, usedBy, batchNumber, expiryDate]);
       }
-      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, used_by, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, usedBy, notes, batchNumber, expiryDate]);
+      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, patient_reference, visit_reference, used_by, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, patientReference, visitReference, usedBy, notes, batchNumber, expiryDate]);
       return get(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id WHERE u.id = ?`, [result.id]);
     });
     await createActivity("usage", usage.id, "created", usage);

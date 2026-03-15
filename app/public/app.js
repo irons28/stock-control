@@ -85,12 +85,10 @@ function navSections() {
   return [
     { key: "overview", label: "Overview" },
     { key: "setup", label: "Setup" },
-    { key: "inbound", label: "Inbound" },
-    { key: "outbound", label: "Outbound" },
+    { key: "receive", label: "Receive" },
     { key: "mobile", label: "Mobile" },
     { key: "control", label: "Control" },
     { key: "reports", label: "Reports" },
-    { key: "imports", label: "Imports" },
   ];
 }
 
@@ -99,15 +97,15 @@ function renderHero() {
   return `
     <section class="hero">
       <div>
-        <p class="eyebrow">Warehouse Operations Suite</p>
-        <h1>Stock Control</h1>
-        <p class="hero-copy">This veterinary pilot now focuses on clinic stock, van and kit transfers, field usage, and stock traceability.</p>
+        <p class="eyebrow">Veterinary Stock Pilot</p>
+        <h1>Clinic and Mobile Stock</h1>
+        <p class="hero-copy">Track what the clinic holds, what moves into each van or kit, and what gets used in the field with a clear audit trail.</p>
       </div>
       <div class="hero-panel">
         <div class="hero-stat"><span>${totals.products || 0}</span><small>Products</small></div>
         <div class="hero-stat"><span>${state.locations.filter((item) => item.type === 'vehicle').length}</span><small>Vans</small></div>
         <div class="hero-stat"><span>${state.locations.filter((item) => item.code.startsWith('KIT-')).length}</span><small>Kits</small></div>
-        <div class="hero-stat"><span>${totals.adjustments || 0}</span><small>Adjustments</small></div>
+        <div class="hero-stat"><span>${state.batchStock.length}</span><small>Batches</small></div>
       </div>
     </section>
   `;
@@ -225,12 +223,12 @@ function renderProductsTable() {
 function renderOverviewCards() {
   const totals = state.dashboard?.totals || {};
   const cards = [
-    { label: "Products", value: totals.products || 0, note: "Active catalogue lines" },
-    { label: "Suppliers", value: totals.suppliers || 0, note: "Purchasing accounts" },
-    { label: "Open purchase orders", value: totals.openPurchaseOrders || 0, note: "Still expected in" },
-    { label: "Open sales orders", value: totals.openSalesOrders || 0, note: "Still to ship" },
-    { label: "Holding items", value: totals.holdingItems || 0, note: "Waiting for putaway" },
-    { label: "Adjustments", value: totals.adjustments || 0, note: "Control actions logged" },
+    { label: "Products", value: totals.products || 0, note: "Active stock lines" },
+    { label: "Suppliers", value: totals.suppliers || 0, note: "Supply accounts" },
+    { label: "Open POs", value: totals.openPurchaseOrders || 0, note: "Still to receive" },
+    { label: "Holding stock", value: totals.holdingItems || 0, note: "Waiting for putaway" },
+    { label: "Mobile locations", value: mobileLocations().length, note: "Vans and kits in use" },
+    { label: "Recent usage", value: state.usageTransactions.length, note: "Latest field transactions" },
   ];
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Snapshot</p><h2>Current operating picture</h2></div></div><div class="summary-grid">${cards.map((card) => `<article class="summary-card"><strong>${card.value}</strong><span>${card.label}</span><small>${card.note}</small></article>`).join("")}</div></section>`;
 }
@@ -294,11 +292,11 @@ function renderTransfersList() {
 }
 
 function renderUsageForm() {
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 3</p><h2>Record stock used</h2></div></div><form id="usage-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From van or kit<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select mobile location")}</select></label><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Visit or patient ref<input name="reference" placeholder="Visit, patient, or case reference" /></label><label>Used by<input name="used_by" value="Veterinarian" /></label></div><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Record usage</button></form></section>`;
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 3</p><h2>Record stock used</h2></div></div><form id="usage-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From van or kit<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select mobile location")}</select></label><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Patient ref<input name="patient_reference" placeholder="Patient, animal, or tag ref" /></label><label>Visit ref<input name="visit_reference" placeholder="Visit, appointment, or case ref" /></label></div><div class="two-up"><label>General ref<input name="reference" placeholder="Optional extra note or job ref" /></label><label>Used by<input name="used_by" value="Veterinarian" /></label></div><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Record usage</button></form></section>`;
 }
 
 function renderUsageList() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Field activity</p><h2>Recent stock usage</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Location</th><th>Reference</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.usageTransactions.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reference || '-')}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No usage transactions yet</td></tr>'}</tbody></table></div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Field activity</p><h2>Recent stock usage</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Location</th><th>Patient</th><th>Visit</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.usageTransactions.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.patient_reference || '-')}</td><td><div>${escapeHtml(item.visit_reference || '-')}</div><div class="muted">${escapeHtml(item.reference || '-')}</div></td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">No usage transactions yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderBatchStockList() {
@@ -468,7 +466,7 @@ node scripts/import-data.js sales-orders ./open-sales.csv --apply</pre>
 function renderSectionContent() {
   if (state.activeSection === "overview") {
     return `
-      ${renderSectionHeader("Overview", "Start here. The core veterinary flow is: receive stock, move it to a van or kit, record usage in the field, and review the audit trail.")}
+      ${renderSectionHeader("Overview", "Start here. The core veterinary flow is: receive stock into the clinic, move it to a van or kit, record field usage, and review the audit trail.")}
       ${renderOverviewCards()}
       ${renderMilestones()}
       ${renderLowStock()}
@@ -478,22 +476,22 @@ function renderSectionContent() {
 
   if (state.activeSection === "setup") {
     return `
-      ${renderSectionHeader("Setup", "Set up products, suppliers, clinic locations, vans, and kits before staff begin using stock in the field.")}
+      ${renderSectionHeader("Setup", "Set up products, suppliers, and locations for the clinic, vans, and kits before staff begin using stock in the field.")}
       ${renderProductForm()}
       ${renderProductsTable()}
       ${renderSupplierForm()}
-      ${renderCustomerForm()}
       ${renderLocationForm()}
       ${renderSuppliersList()}
-      ${renderCustomersList()}
       ${renderLocationsList()}
+      ${renderImportsPanel()}
+      ${renderImportGuide()}
     `;
   }
 
-  if (state.activeSection === "inbound") {
+  if (state.activeSection === "receive") {
     return `
-      ${renderSectionHeader("Inbound", "Receive stock into the clinic, capture batch or expiry details where needed, and move it into live stock locations.")}
-      ${renderImportedOrderHint("Import purchase orders", "Purchase orders should be created elsewhere and imported here for warehouse receiving.", "purchase-orders", "purchase-orders")}
+      ${renderSectionHeader("Receive", "Receive stock into the clinic, capture batch and expiry details, and move it out of holding once it has been checked.")}
+      ${renderImportedOrderHint("Import purchase orders", "Purchase orders should be created elsewhere and imported here so the team can receive them against the clinic stock workflow.", "purchase-orders", "purchase-orders")}
       ${renderPurchaseOrdersList()}
       ${renderGoodsInForm()}
       ${renderGoodsReceiptsList()}
@@ -502,18 +500,9 @@ function renderSectionContent() {
     `;
   }
 
-  if (state.activeSection === "outbound") {
-    return `
-      ${renderSectionHeader("Outbound", "This branch still supports imported customer orders, but the veterinary focus is on clinic-to-van stock movement and field usage.")}
-      ${renderImportedOrderHint("Import sales orders", "Use this only if the pilot also needs customer shipment handling alongside mobile stock control.", "sales-orders", "sales-orders")}
-      ${renderSalesOrdersList()}
-      ${renderDispatchesList()}
-    `;
-  }
-
   if (state.activeSection === "mobile") {
     return `
-      ${renderSectionHeader("Mobile", "Move stock from clinic to vans or kits and record usage during appointments, visits, or jobs.")}
+      ${renderSectionHeader("Mobile", "Move stock from the clinic to vans or kits, then record what was used on visits or appointments.")}
       ${renderTransferForm()}
       ${renderTransfersList()}
       ${renderUsageForm()}
@@ -531,19 +520,11 @@ function renderSectionContent() {
     `;
   }
 
-  if (state.activeSection === "reports") {
-    return `
-      ${renderSectionHeader("Reports", "Review stock position and order progress without the transaction forms getting in the way.")}
-      ${renderStockByLocationReport()}
-      ${renderOrderSummaryReport()}
-    `;
-  }
-
   return `
-    ${renderSectionHeader("Imports", "Bring current live data into the system in a controlled order with validation first and apply second.")}
+    ${renderSectionHeader("Reports", "Review clinic, van, and batch stock without the transaction forms getting in the way.")}
+    ${renderStockByLocationReport()}
+    ${renderBatchStockList()}
     ${renderMigrationReadiness()}
-    ${renderImportsPanel()}
-    ${renderImportGuide()}
     ${renderImportRuns()}
   `;
 }
