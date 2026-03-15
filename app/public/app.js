@@ -24,6 +24,7 @@ const state = {
   activeSection: "overview",
   message: "",
   error: "",
+  batchFilter: "all",
 };
 
 const socket = io();
@@ -173,6 +174,7 @@ function renderProductForm() {
       </div>
       <div class="check-row">
         <label><input name="serial_tracking" type="checkbox" /> Serial tracked</label>
+        <label><input name="controlled_drug" type="checkbox" /> Controlled drug</label>
         <label><input name="tax_flag" type="checkbox" checked /> Taxable</label>
       </div>
     `,
@@ -211,13 +213,14 @@ function renderAdjustmentForm() {
       <div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div>
       <label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked adjustments"></textarea></label>
       <label>Reason<input name="reason" required placeholder="Damaged in transit, stock take correction, found stock" /></label>
+      <div class="two-up"><label>Authorised by<input name="authorised_by" placeholder="Required for controlled drugs" /></label><label>Witness name<input name="witness_name" placeholder="Required for controlled drugs" /></label></div>
       <label>Notes<textarea name="notes" rows="2"></textarea></label>
     `,
   });
 }
 
 function renderProductsTable() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Catalogue</p><h2>Products</h2></div><span class="count-pill">${state.products.length} items</span></div><div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Type</th><th>On hand</th><th>Available</th><th>Allocated</th></tr></thead><tbody>${state.products.map((item) => `<tr><td>${escapeHtml(item.sku)}</td><td><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.category_name || "-")}</div></td><td>${item.serial_tracking ? "Serialised" : "Quantity"}</td><td>${item.qty_on_hand || 0}</td><td>${item.qty_available || 0}</td><td>${item.qty_allocated || 0}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No products yet</td></tr>'}</tbody></table></div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Catalogue</p><h2>Products</h2></div><span class="count-pill">${state.products.length} items</span></div><div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th>Type</th><th>On hand</th><th>Available</th><th>Allocated</th></tr></thead><tbody>${state.products.map((item) => `<tr><td>${escapeHtml(item.sku)}</td><td><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.category_name || "-")}</div></td><td>${item.serial_tracking ? "Serialised" : "Quantity"}${item.controlled_drug ? " · Controlled" : ""}</td><td>${item.qty_on_hand || 0}</td><td>${item.qty_available || 0}</td><td>${item.qty_allocated || 0}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No products yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderOverviewCards() {
@@ -283,16 +286,36 @@ function mobileLocations() {
   return state.locations.filter((item) => item.is_active && ["vehicle", "bin", "shelf"].includes(item.type));
 }
 
+function clinicLocations() {
+  return state.locations.filter((item) => item.is_active && item.type !== "vehicle" && !String(item.code || "").startsWith("KIT-"));
+}
+
+function expiryStatus(expiryDate) {
+  if (!expiryDate) return { key: "unknown", label: "No expiry", className: "badge badge-neutral" };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(`${expiryDate}T00:00:00`);
+  if (Number.isNaN(expiry.getTime())) return { key: "unknown", label: "No expiry", className: "badge badge-neutral" };
+  const diffDays = Math.floor((expiry - today) / 86400000);
+  if (diffDays < 0) return { key: "expired", label: "Expired", className: "badge badge-inactive" };
+  if (diffDays <= 30) return { key: "expiring", label: "Expiring", className: "badge badge-warn" };
+  return { key: "ok", label: "OK", className: "badge badge-active" };
+}
+
+function filteredBatchStock() {
+  return state.batchStock.filter((item) => state.batchFilter === "all" || expiryStatus(item.expiry_date).key === state.batchFilter);
+}
+
 function renderTransferForm() {
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 1</p><h2>Move stock to van or kit</h2></div></div><form id="transfer-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From location<select name="from_location_id" required>${optionList(state.locations.filter((item) => item.is_active), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select clinic stock location")}</select></label><label>To location<select name="to_location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select van or kit")}</select></label></div><div class="two-up"><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label><label>Moved by<input name="moved_by" value="Veterinary Transfer" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Reference<input name="reference" placeholder="Van restock, kit refill" /></label><label>Notes<input name="notes" /></label></div><button type="submit">Record transfer</button></form></section>`;
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 1</p><h2>Replenish van or kit</h2></div></div><form id="transfer-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From location<select name="from_location_id" required>${optionList(clinicLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select clinic stock location")}</select></label><label>To location<select name="to_location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select van or kit")}</select></label></div><div class="two-up"><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label><label>Moved by<input name="moved_by" value="Replenishment" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Reference<input name="reference" placeholder="Van restock, kit refill" /></label><label>Notes<input name="notes" /></label></div><div class="two-up"><label>Authorised by<input name="authorised_by" placeholder="Required for controlled drugs" /></label><label>Witness name<input name="witness_name" placeholder="Required for controlled drugs" /></label></div><button type="submit">Record replenishment</button></form></section>`;
 }
 
 function renderTransfersList() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Step 2</p><h2>Recent van and kit transfers</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>From</th><th>To</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.transfers.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.from_location_code)}</td><td>${escapeHtml(item.to_location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No transfers yet</td></tr>'}</tbody></table></div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Step 2</p><h2>Recent replenishments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>From</th><th>To</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.transfers.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.from_location_code)}</td><td>${escapeHtml(item.to_location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No transfers yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderUsageForm() {
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 3</p><h2>Record stock used</h2></div></div><form id="usage-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From van or kit<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select mobile location")}</select></label><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Patient ref<input name="patient_reference" placeholder="Patient, animal, or tag ref" /></label><label>Visit ref<input name="visit_reference" placeholder="Visit, appointment, or case ref" /></label></div><div class="two-up"><label>General ref<input name="reference" placeholder="Optional extra note or job ref" /></label><label>Used by<input name="used_by" value="Veterinarian" /></label></div><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Record usage</button></form></section>`;
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 3</p><h2>Record stock used</h2></div></div><form id="usage-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From van or kit<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select mobile location")}</select></label><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Patient ref<input name="patient_reference" placeholder="Patient, animal, or tag ref" /></label><label>Visit ref<input name="visit_reference" placeholder="Visit, appointment, or case ref" /></label></div><div class="two-up"><label>General ref<input name="reference" placeholder="Optional extra note or job ref" /></label><label>Used by<input name="used_by" value="Veterinarian" /></label></div><div class="two-up"><label>Authorised by<input name="authorised_by" placeholder="Required for controlled drugs" /></label><label>Witness name<input name="witness_name" placeholder="Required for controlled drugs" /></label></div><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Record usage</button></form></section>`;
 }
 
 function renderUsageList() {
@@ -300,7 +323,8 @@ function renderUsageList() {
 }
 
 function renderBatchStockList() {
-  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Medicine control</p><h2>Batch and expiry stock</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Location</th><th>Batch</th><th>Expiry</th><th>On hand</th><th>Allocated</th></tr></thead><tbody>${state.batchStock.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No batch-tracked stock yet</td></tr>'}</tbody></table></div></section>`;
+  const items = filteredBatchStock();
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Medicine control</p><h2>Batch and expiry stock</h2></div></div><div class="chip-row"><button type="button" class="${state.batchFilter === 'all' ? 'section-tab section-tab-active' : 'section-tab'}" data-batch-filter="all">All</button><button type="button" class="${state.batchFilter === 'expired' ? 'section-tab section-tab-active' : 'section-tab'}" data-batch-filter="expired">Expired</button><button type="button" class="${state.batchFilter === 'expiring' ? 'section-tab section-tab-active' : 'section-tab'}" data-batch-filter="expiring">Expiring</button><button type="button" class="${state.batchFilter === 'ok' ? 'section-tab section-tab-active' : 'section-tab'}" data-batch-filter="ok">OK</button></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Location</th><th>Batch</th><th>Expiry</th><th>Status</th><th>On hand</th><th>Allocated</th></tr></thead><tbody>${items.map((item) => { const status = expiryStatus(item.expiry_date); return `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}${item.controlled_drug ? '<div class="muted">Controlled drug</div>' : ''}</td><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td><td><span class="${status.className}">${status.label}</span></td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td></tr>`; }).join("") || '<tr><td colspan="7" class="empty">No batch-tracked stock for this filter</td></tr>'}</tbody></table></div></section>`;
 }
 function renderImportedOrderHint(title, copy, templateType, commandType) {
   const template = state.importTemplates.find((item) => item.type === templateType);
@@ -352,7 +376,7 @@ function renderLowStock() {
 
 function renderExpiryWarnings() {
   const items = state.dashboard?.expiringSoon || [];
-  return `<section class="panel span-6"><div class="panel-header"><div><p class="panel-kicker">Expiry</p><h2>Batches expiring soon</h2></div></div><div class="list-grid">${items.map((item) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</h3><p class="muted">${escapeHtml(item.location_code)} · batch ${escapeHtml(item.batch_number || '-')}</p></div><span class="badge badge-warn">${escapeHtml(item.expiry_date)}</span></div><p>${item.qty_on_hand} on hand</p></article>`).join("") || '<p class="empty">No batches expiring in the next 30 days</p>'}</div></section>`;
+  return `<section class="panel span-6"><div class="panel-header"><div><p class="panel-kicker">Expiry</p><h2>Batches expiring soon</h2></div></div><div class="list-grid">${items.map((item) => { const status = expiryStatus(item.expiry_date); return `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</h3><p class="muted">${escapeHtml(item.location_code)} · batch ${escapeHtml(item.batch_number || '-')}</p></div><span class="${status.className}">${status.label}</span></div><p>${escapeHtml(item.expiry_date)} · ${item.qty_on_hand} on hand</p></article>`; }).join("") || '<p class="empty">No batches expiring in the next 30 days</p>'}</div></section>`;
 }
 
 function renderMobileStockSummary() {
@@ -586,6 +610,10 @@ function bindForms() {
     state.activeSection = button.getAttribute("data-section");
     render();
   }));
+  document.querySelectorAll("[data-batch-filter]").forEach((button) => button.addEventListener("click", () => {
+    state.batchFilter = button.getAttribute("data-batch-filter");
+    render();
+  }));
 
   productForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -624,7 +652,7 @@ function bindForms() {
 
   transferForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try { await api("/api/transfers", { method: "POST", body: JSON.stringify(formDataToObject(transferForm)) }); transferForm.reset(); transferForm.moved_by.value = "Transfer"; setMessage("Transfer recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+    try { await api("/api/transfers", { method: "POST", body: JSON.stringify(formDataToObject(transferForm)) }); transferForm.reset(); transferForm.moved_by.value = "Replenishment"; setMessage("Replenishment recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
   usageForm?.addEventListener("submit", async (event) => {

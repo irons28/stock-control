@@ -169,6 +169,7 @@ async function initDatabase() {
     category_id INTEGER,
     barcode TEXT DEFAULT '',
     serial_tracking INTEGER NOT NULL DEFAULT 0,
+    controlled_drug INTEGER NOT NULL DEFAULT 0,
     unit_of_measure TEXT NOT NULL DEFAULT 'each',
     cost_price REAL NOT NULL DEFAULT 0,
     sell_price REAL NOT NULL DEFAULT 0,
@@ -369,6 +370,8 @@ async function initDatabase() {
     reason TEXT NOT NULL,
     notes TEXT DEFAULT '',
     adjusted_by TEXT DEFAULT '',
+    authorised_by TEXT DEFAULT '',
+    witness_name TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id),
     FOREIGN KEY (location_id) REFERENCES locations(id)
@@ -383,6 +386,8 @@ async function initDatabase() {
     serial_numbers TEXT DEFAULT '',
     reference TEXT DEFAULT '',
     moved_by TEXT DEFAULT '',
+    authorised_by TEXT DEFAULT '',
+    witness_name TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id),
@@ -400,6 +405,8 @@ async function initDatabase() {
     patient_reference TEXT DEFAULT '',
     visit_reference TEXT DEFAULT '',
     used_by TEXT DEFAULT '',
+    authorised_by TEXT DEFAULT '',
+    witness_name TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id),
@@ -430,18 +437,25 @@ async function initDatabase() {
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  await run(`ALTER TABLE products ADD COLUMN controlled_drug INTEGER NOT NULL DEFAULT 0`).catch(() => {});
   await run(`ALTER TABLE inventory_units ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE inventory_units ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE goods_receipt_lines ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE goods_receipt_lines ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE transfers ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE transfers ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE transfers ADD COLUMN authorised_by TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE transfers ADD COLUMN witness_name TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE usage_transactions ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE usage_transactions ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE usage_transactions ADD COLUMN patient_reference TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE usage_transactions ADD COLUMN visit_reference TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE usage_transactions ADD COLUMN authorised_by TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE usage_transactions ADD COLUMN witness_name TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE adjustments ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE adjustments ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE adjustments ADD COLUMN authorised_by TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE adjustments ADD COLUMN witness_name TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE stock_movements ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
   await run(`ALTER TABLE stock_movements ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
 
@@ -475,6 +489,7 @@ function mapProductInput(body) {
     category_id: body.category_id ? parseInteger(body.category_id, null) : null,
     barcode: String(body.barcode || "").trim(),
     serial_tracking: body.serial_tracking ? 1 : 0,
+    controlled_drug: body.controlled_drug ? 1 : 0,
     unit_of_measure: String(body.unit_of_measure || "each").trim() || "each",
     cost_price: parseMoney(body.cost_price, 0),
     sell_price: parseMoney(body.sell_price, 0),
@@ -719,7 +734,7 @@ async function getUsageTransactionsList() {
 }
 
 async function getBatchStockReport() {
-  return all(`SELECT sb.*, p.sku, p.name AS product_name, l.code AS location_code FROM stock_batches sb JOIN products p ON p.id = sb.product_id JOIN locations l ON l.id = sb.location_id WHERE sb.qty_on_hand > 0 ORDER BY p.name ASC, sb.expiry_date ASC, sb.batch_number ASC`);
+  return all(`SELECT sb.*, p.sku, p.name AS product_name, p.controlled_drug, l.code AS location_code FROM stock_batches sb JOIN products p ON p.id = sb.product_id JOIN locations l ON l.id = sb.location_id WHERE sb.qty_on_hand > 0 ORDER BY p.name ASC, sb.expiry_date ASC, sb.batch_number ASC`);
 }
 
 async function getImportRuns(limit = 20) {
@@ -922,7 +937,7 @@ app.post("/api/locations", async (req, res, next) => {
 app.post("/api/products", async (req, res, next) => {
   try {
     const input = mapProductInput(req.body || {});
-    const result = await run(`INSERT INTO products (sku, name, description, category_id, barcode, serial_tracking, unit_of_measure, cost_price, sell_price, supplier_id, reorder_level, tax_flag, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, [input.sku, input.name, input.description, input.category_id, input.barcode, input.serial_tracking, input.unit_of_measure, input.cost_price, input.sell_price, input.supplier_id, input.reorder_level, input.tax_flag, input.is_active]);
+    const result = await run(`INSERT INTO products (sku, name, description, category_id, barcode, serial_tracking, controlled_drug, unit_of_measure, cost_price, sell_price, supplier_id, reorder_level, tax_flag, is_active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, [input.sku, input.name, input.description, input.category_id, input.barcode, input.serial_tracking, input.controlled_drug, input.unit_of_measure, input.cost_price, input.sell_price, input.supplier_id, input.reorder_level, input.tax_flag, input.is_active]);
     const row = await get(`SELECT p.*, c.name AS category_name, s.name AS supplier_name FROM products p LEFT JOIN product_categories c ON c.id = p.category_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.id = ?`, [result.id]);
     await createActivity("product", result.id, "created", row);
     emitInventoryEvent("product.created", row);
@@ -1172,6 +1187,8 @@ app.post("/api/transfers", async (req, res, next) => {
     const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
     const reference = String(req.body?.reference || "").trim();
     const movedBy = String(req.body?.moved_by || "Transfer").trim();
+    const authorisedBy = String(req.body?.authorised_by || "").trim();
+    const witnessName = String(req.body?.witness_name || "").trim();
     const notes = String(req.body?.notes || "").trim();
     if (!productId || !fromLocationId || !toLocationId) throw requestError("Product, from location, and to location are required");
     if (fromLocationId === toLocationId) throw requestError("Transfer locations must be different");
@@ -1182,6 +1199,7 @@ app.post("/api/transfers", async (req, res, next) => {
     ]);
     if (!product) throw requestError("Product not found", 404);
     if (!fromLocation || !toLocation) throw requestError("Transfer location not found", 404);
+    if (Number(product.controlled_drug || 0) && (!authorisedBy || !witnessName)) throw requestError("Controlled drugs require an authorised by name and witness name");
     const transfer = await transaction(async () => {
       let movedQty = qty;
       if (Number(product.serial_tracking || 0)) {
@@ -1204,7 +1222,7 @@ app.post("/api/transfers", async (req, res, next) => {
         await updateStockBatch(productId, toLocationId, batchNumber, expiryDate, qty, 0);
         await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'transfer', ?, ?, ?, 'transfer', ?, ?, ?, ?, ?)`, [productId, qty, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy, batchNumber, expiryDate]);
       }
-      const result = await run(`INSERT INTO transfers (product_id, from_location_id, to_location_id, qty, serial_numbers, reference, moved_by, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, fromLocationId, toLocationId, movedQty, JSON.stringify(serialNumbers), reference, movedBy, notes, batchNumber, expiryDate]);
+      const result = await run(`INSERT INTO transfers (product_id, from_location_id, to_location_id, qty, serial_numbers, reference, moved_by, authorised_by, witness_name, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, fromLocationId, toLocationId, movedQty, JSON.stringify(serialNumbers), reference, movedBy, authorisedBy, witnessName, notes, batchNumber, expiryDate]);
       return get(`SELECT t.*, p.sku, p.name AS product_name, lf.code AS from_location_code, lt.code AS to_location_code FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id WHERE t.id = ?`, [result.id]);
     });
     await createActivity("transfer", transfer.id, "created", transfer);
@@ -1223,6 +1241,8 @@ app.post("/api/usage", async (req, res, next) => {
     const patientReference = String(req.body?.patient_reference || "").trim();
     const visitReference = String(req.body?.visit_reference || "").trim();
     const usedBy = String(req.body?.used_by || "Usage").trim();
+    const authorisedBy = String(req.body?.authorised_by || "").trim();
+    const witnessName = String(req.body?.witness_name || "").trim();
     const notes = String(req.body?.notes || "").trim();
     const batchNumber = String(req.body?.batch_number || "").trim();
     const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
@@ -1234,6 +1254,7 @@ app.post("/api/usage", async (req, res, next) => {
     ]);
     if (!product) throw requestError("Product not found", 404);
     if (!location) throw requestError("Location not found", 404);
+    if (Number(product.controlled_drug || 0) && (!authorisedBy || !witnessName)) throw requestError("Controlled drugs require an authorised by name and witness name");
     const usage = await transaction(async () => {
       let usedQty = qty;
       if (Number(product.serial_tracking || 0)) {
@@ -1254,7 +1275,7 @@ app.post("/api/usage", async (req, res, next) => {
         await updateStockBatch(productId, locationId, batchNumber, expiryDate, -qty, 0);
         await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, qty, locationId, movementReference || `USE-${Date.now()}`, notes, usedBy, batchNumber, expiryDate]);
       }
-      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, patient_reference, visit_reference, used_by, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, patientReference, visitReference, usedBy, notes, batchNumber, expiryDate]);
+      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, patient_reference, visit_reference, used_by, authorised_by, witness_name, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, patientReference, visitReference, usedBy, authorisedBy, witnessName, notes, batchNumber, expiryDate]);
       return get(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id WHERE u.id = ?`, [result.id]);
     });
     await createActivity("usage", usage.id, "created", usage);
@@ -1275,9 +1296,12 @@ app.post("/api/adjustments", async (req, res, next) => {
     const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
     const notes = String(req.body?.notes || "").trim();
     const adjustedBy = String(req.body?.adjusted_by || "Adjustment").trim();
+    const authorisedBy = String(req.body?.authorised_by || "").trim();
+    const witnessName = String(req.body?.witness_name || "").trim();
     if (!productId || !adjustmentType || !reason) throw requestError("Product, adjustment type, and reason are required");
     const product = await get(`SELECT * FROM products WHERE id = ?`, [productId]);
     if (!product) throw requestError("Product not found", 404);
+    if (Number(product.controlled_drug || 0) && (!authorisedBy || !witnessName)) throw requestError("Controlled drugs require an authorised by name and witness name");
     const location = locationId ? await get(`SELECT * FROM locations WHERE id = ?`, [locationId]) : null;
     if (locationId && !location) throw requestError("Location not found", 404);
     const adjustment = await transaction(async () => {
@@ -1306,7 +1330,7 @@ app.post("/api/adjustments", async (req, res, next) => {
           }
         }
       }
-      const result = await run(`INSERT INTO adjustments (product_id, location_id, adjustment_type, qty, serial_numbers, reason, notes, adjusted_by, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, adjustmentType, Number(product.serial_tracking || 0) ? serialNumbers.length : qty, JSON.stringify(serialNumbers), reason, notes, adjustedBy, batchNumber, expiryDate]);
+      const result = await run(`INSERT INTO adjustments (product_id, location_id, adjustment_type, qty, serial_numbers, reason, notes, adjusted_by, authorised_by, witness_name, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, adjustmentType, Number(product.serial_tracking || 0) ? serialNumbers.length : qty, JSON.stringify(serialNumbers), reason, notes, adjustedBy, authorisedBy, witnessName, batchNumber, expiryDate]);
       return get(`SELECT a.*, p.sku, p.name AS product_name, l.code AS location_code FROM adjustments a JOIN products p ON p.id = a.product_id LEFT JOIN locations l ON l.id = a.location_id WHERE a.id = ?`, [result.id]);
     });
     await createActivity("adjustment", adjustment.id, "created", adjustment);
