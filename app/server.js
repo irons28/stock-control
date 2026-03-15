@@ -710,7 +710,7 @@ async function getStockMovementsList() {
 }
 
 async function getAdjustmentsList() {
-  return all(`SELECT a.*, p.sku, p.name AS product_name, l.code AS location_code FROM adjustments a JOIN products p ON p.id = a.product_id LEFT JOIN locations l ON l.id = a.location_id ORDER BY datetime(a.created_at) DESC, a.id DESC LIMIT 40`);
+  return all(`SELECT a.*, p.sku, p.name AS product_name, p.controlled_drug, l.code AS location_code FROM adjustments a JOIN products p ON p.id = a.product_id LEFT JOIN locations l ON l.id = a.location_id ORDER BY datetime(a.created_at) DESC, a.id DESC LIMIT 40`);
 }
 
 async function getStockByLocationReport() {
@@ -726,15 +726,22 @@ async function getOrderSummaryReport() {
 }
 
 async function getTransfersList() {
-  return all(`SELECT t.*, p.sku, p.name AS product_name, lf.code AS from_location_code, lt.code AS to_location_code FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id ORDER BY datetime(t.created_at) DESC, t.id DESC LIMIT 40`);
+  return all(`SELECT t.*, p.sku, p.name AS product_name, p.controlled_drug, lf.code AS from_location_code, lt.code AS to_location_code FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id ORDER BY datetime(t.created_at) DESC, t.id DESC LIMIT 40`);
 }
 
 async function getUsageTransactionsList() {
-  return all(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id ORDER BY datetime(u.created_at) DESC, u.id DESC LIMIT 40`);
+  return all(`SELECT u.*, p.sku, p.name AS product_name, p.controlled_drug, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id ORDER BY datetime(u.created_at) DESC, u.id DESC LIMIT 40`);
 }
 
 async function getBatchStockReport() {
   return all(`SELECT sb.*, p.sku, p.name AS product_name, p.controlled_drug, l.code AS location_code FROM stock_batches sb JOIN products p ON p.id = sb.product_id JOIN locations l ON l.id = sb.location_id WHERE sb.qty_on_hand > 0 ORDER BY p.name ASC, sb.expiry_date ASC, sb.batch_number ASC`);
+}
+
+async function getControlledDrugReport() {
+  const transfers = await all(`SELECT 'replenishment' AS activity_type, t.created_at, p.sku, p.name AS product_name, lf.code AS from_location_code, lt.code AS to_location_code, t.qty, t.batch_number, t.expiry_date, t.authorised_by, t.witness_name, t.reference FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id WHERE p.controlled_drug = 1 ORDER BY datetime(t.created_at) DESC LIMIT 40`);
+  const usage = await all(`SELECT 'usage' AS activity_type, u.created_at, p.sku, p.name AS product_name, l.code AS location_code, u.qty, u.batch_number, u.expiry_date, u.patient_reference, u.visit_reference, u.authorised_by, u.witness_name, u.reference FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id WHERE p.controlled_drug = 1 ORDER BY datetime(u.created_at) DESC LIMIT 40`);
+  const adjustments = await all(`SELECT 'adjustment' AS activity_type, a.created_at, p.sku, p.name AS product_name, l.code AS location_code, a.qty, a.batch_number, a.expiry_date, a.adjustment_type, a.reason, a.authorised_by, a.witness_name FROM adjustments a JOIN products p ON p.id = a.product_id LEFT JOIN locations l ON l.id = a.location_id WHERE p.controlled_drug = 1 ORDER BY datetime(a.created_at) DESC LIMIT 40`);
+  return { transfers, usage, adjustments };
 }
 
 async function getImportRuns(limit = 20) {
@@ -957,6 +964,7 @@ app.get("/api/batches", async (req, res, next) => { try { res.json(await getBatc
 app.get("/api/adjustments", async (req, res, next) => { try { res.json(await getAdjustmentsList()); } catch (error) { next(error); } });
 app.get("/api/reports/stock-by-location", async (req, res, next) => { try { res.json(await getStockByLocationReport()); } catch (error) { next(error); } });
 app.get("/api/reports/order-summary", async (req, res, next) => { try { res.json(await getOrderSummaryReport()); } catch (error) { next(error); } });
+app.get("/api/reports/controlled-drugs", async (req, res, next) => { try { res.json(await getControlledDrugReport()); } catch (error) { next(error); } });
 app.get("/api/migration/import-runs", async (req, res, next) => { try { res.json(await getImportRuns()); } catch (error) { next(error); } });
 app.get("/api/migration/reconciliation", async (req, res, next) => { try { res.json(await getMigrationReconciliation()); } catch (error) { next(error); } });
 

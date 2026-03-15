@@ -18,7 +18,7 @@ const state = {
   importTemplates: [],
   importRuns: [],
   reconciliation: null,
-  reports: { stockByLocation: { quantity: [], serialised: [] }, orderSummary: { purchase: [], sales: [] } },
+  reports: { stockByLocation: { quantity: [], serialised: [] }, orderSummary: { purchase: [], sales: [] }, controlledDrugs: { transfers: [], usage: [], adjustments: [] } },
   activity: [],
   selectedPoId: "",
   activeSection: "overview",
@@ -311,7 +311,7 @@ function renderTransferForm() {
 }
 
 function renderTransfersList() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Step 2</p><h2>Recent replenishments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>From</th><th>To</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.transfers.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.from_location_code)}</td><td>${escapeHtml(item.to_location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No transfers yet</td></tr>'}</tbody></table></div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Step 2</p><h2>Recent replenishments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>From</th><th>To</th><th>Batch</th><th>Expiry</th><th>Authorised</th></tr></thead><tbody>${state.transfers.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}${item.controlled_drug ? '<div class="muted">Controlled drug</div>' : ''}</td><td>${item.qty}</td><td>${escapeHtml(item.from_location_code)}</td><td>${escapeHtml(item.to_location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="7" class="empty">No transfers yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderUsageForm() {
@@ -319,7 +319,7 @@ function renderUsageForm() {
 }
 
 function renderUsageList() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Field activity</p><h2>Recent stock usage</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Location</th><th>Patient</th><th>Visit</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.usageTransactions.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.patient_reference || '-')}</td><td><div>${escapeHtml(item.visit_reference || '-')}</div><div class="muted">${escapeHtml(item.reference || '-')}</div></td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">No usage transactions yet</td></tr>'}</tbody></table></div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Field activity</p><h2>Recent stock usage</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Location</th><th>Patient</th><th>Visit</th><th>Batch</th><th>Expiry</th><th>Authorised</th></tr></thead><tbody>${state.usageTransactions.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}${item.controlled_drug ? '<div class="muted">Controlled drug</div>' : ''}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.patient_reference || '-')}</td><td><div>${escapeHtml(item.visit_reference || '-')}</div><div class="muted">${escapeHtml(item.reference || '-')}</div></td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="8" class="empty">No usage transactions yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderBatchStockList() {
@@ -349,7 +349,7 @@ function renderImportedOrderHint(title, copy, templateType, commandType) {
 
 
 function renderAdjustmentsList() {
-  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Control log</p><h2>Recent adjustments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Type</th><th>Product</th><th>Qty</th><th>Location</th><th>Reason</th></tr></thead><tbody>${state.adjustments.map((item) => `<tr><td>${escapeHtml(item.adjustment_type)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reason)}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No adjustments yet</td></tr>'}</tbody></table></div></section>`;
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Control log</p><h2>Recent adjustments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Type</th><th>Product</th><th>Qty</th><th>Location</th><th>Reason</th><th>Authorised</th></tr></thead><tbody>${state.adjustments.map((item) => `<tr><td>${escapeHtml(item.adjustment_type)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}${item.controlled_drug ? '<div class="muted">Controlled drug</div>' : ''}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reason)}</td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No adjustments yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderStockByLocationReport() {
@@ -387,6 +387,11 @@ function renderMobileStockSummary() {
 function renderUsageVisitSummary() {
   const items = state.dashboard?.recentUsageSummary || [];
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Visit usage</p><h2>Recent patient and visit activity</h2></div></div><div class="table-wrap"><table><thead><tr><th>Visit</th><th>Patient</th><th>Transactions</th><th>Qty used</th><th>Last used</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.visit_reference || '-')}</td><td>${escapeHtml(item.patient_reference || '-')}</td><td>${item.usage_count}</td><td>${item.qty_used || 0}</td><td>${item.last_used_at ? new Date(item.last_used_at).toLocaleString() : '-'}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No usage references recorded yet</td></tr>'}</tbody></table></div></section>`;
+}
+
+function renderControlledDrugReport() {
+  const report = state.reports.controlledDrugs;
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Controlled drugs</p><h2>Controlled drug activity</h2></div></div><div class="two-column-report"><div><h3>Replenishments</h3><div class="table-wrap compact"><table><thead><tr><th>When</th><th>Product</th><th>Route</th><th>Qty</th><th>Authorised</th></tr></thead><tbody>${report.transfers.map((item) => `<tr><td>${new Date(item.created_at).toLocaleString()}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.from_location_code)} to ${escapeHtml(item.to_location_code)}</td><td>${item.qty}</td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="5" class="empty">No controlled-drug replenishments yet</td></tr>'}</tbody></table></div></div><div><h3>Usage</h3><div class="table-wrap compact"><table><thead><tr><th>When</th><th>Product</th><th>Location</th><th>Visit</th><th>Authorised</th></tr></thead><tbody>${report.usage.map((item) => `<tr><td>${new Date(item.created_at).toLocaleString()}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.location_code || '-')}</td><td><div>${escapeHtml(item.visit_reference || '-')}</div><div class="muted">${escapeHtml(item.patient_reference || '-')}</div></td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="5" class="empty">No controlled-drug usage yet</td></tr>'}</tbody></table></div></div></div><div class="table-wrap"><table><thead><tr><th>When</th><th>Adjustment</th><th>Product</th><th>Location</th><th>Reason</th><th>Authorised</th></tr></thead><tbody>${report.adjustments.map((item) => `<tr><td>${new Date(item.created_at).toLocaleString()}</td><td>${escapeHtml(item.adjustment_type)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reason || '-')}</td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No controlled-drug adjustments yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderActivity() {
@@ -568,6 +573,7 @@ function renderSectionContent() {
     ${renderStockByLocationReport()}
     ${renderMobileStockSummary()}
     ${renderUsageVisitSummary()}
+    ${renderControlledDrugReport()}
     ${renderBatchStockList()}
     ${renderMigrationReadiness()}
     ${renderImportRuns()}
@@ -675,7 +681,7 @@ function bindForms() {
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
+    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockByLocation, orderSummary, controlledDrugs, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
@@ -694,12 +700,13 @@ async function loadAll() {
       api("/api/adjustments"),
       api("/api/reports/stock-by-location"),
       api("/api/reports/order-summary"),
+      api("/api/reports/controlled-drugs"),
       api("/api/activity"),
       api("/api/import/templates"),
       api("/api/migration/import-runs"),
       api("/api/migration/reconciliation"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary, controlledDrugs }, activity });
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {
