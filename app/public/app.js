@@ -224,10 +224,10 @@ function renderOverviewCards() {
   const totals = state.dashboard?.totals || {};
   const cards = [
     { label: "Products", value: totals.products || 0, note: "Active stock lines" },
-    { label: "Suppliers", value: totals.suppliers || 0, note: "Supply accounts" },
     { label: "Open POs", value: totals.openPurchaseOrders || 0, note: "Still to receive" },
-    { label: "Holding stock", value: totals.holdingItems || 0, note: "Waiting for putaway" },
-    { label: "Mobile locations", value: mobileLocations().length, note: "Vans and kits in use" },
+    { label: "Holding stock", value: totals.holdingStock || 0, note: "Waiting for putaway" },
+    { label: "Mobile locations", value: totals.mobileLocations || 0, note: "Vans and kits in use" },
+    { label: "Expiry alerts", value: totals.expiringBatches || 0, note: "Batches due within 30 days" },
     { label: "Recent usage", value: state.usageTransactions.length, note: "Latest field transactions" },
   ];
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Snapshot</p><h2>Current operating picture</h2></div></div><div class="summary-grid">${cards.map((card) => `<article class="summary-card"><strong>${card.value}</strong><span>${card.label}</span><small>${card.note}</small></article>`).join("")}</div></section>`;
@@ -332,7 +332,8 @@ function renderStockByLocationReport() {
   const report = state.reports.stockByLocation;
   const quantityRows = report.quantity.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>-</td></tr>`).join("");
   const serialRows = report.serialised.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>${escapeHtml(item.serial_number)}</td></tr>`).join("");
-  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Reporting</p><h2>Stock by location</h2></div></div><div class="table-wrap"><table><thead><tr><th>Location</th><th>Product</th><th>On hand</th><th>Allocated</th><th>Available</th><th>Serial</th></tr></thead><tbody>${quantityRows}${serialRows || '<tr><td colspan="6" class="empty">No stock report rows yet</td></tr>'}</tbody></table></div></section>`;
+  const rows = `${quantityRows}${serialRows}`;
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Reporting</p><h2>Clinic, van, and kit stock</h2></div></div><div class="table-wrap"><table><thead><tr><th>Location</th><th>Product</th><th>On hand</th><th>Allocated</th><th>Available</th><th>Serial</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">No stock report rows yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderOrderSummaryReport() {
@@ -346,7 +347,22 @@ function renderStockMovements() {
 
 function renderLowStock() {
   const items = state.dashboard?.lowStock || [];
-  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Attention</p><h2>Low stock watch</h2></div></div><div class="chip-row">${items.map((item) => `<span class="chip chip-alert">${escapeHtml(item.sku)} · ${item.available_qty} left</span>`).join("") || '<span class="chip">No low stock items yet</span>'}</div></section>`;
+  return `<section class="panel span-6"><div class="panel-header"><div><p class="panel-kicker">Attention</p><h2>Low stock watch</h2></div></div><div class="chip-row">${items.map((item) => `<span class="chip chip-alert">${escapeHtml(item.sku)} · ${item.available_qty} left</span>`).join("") || '<span class="chip">No low stock items yet</span>'}</div></section>`;
+}
+
+function renderExpiryWarnings() {
+  const items = state.dashboard?.expiringSoon || [];
+  return `<section class="panel span-6"><div class="panel-header"><div><p class="panel-kicker">Expiry</p><h2>Batches expiring soon</h2></div></div><div class="list-grid">${items.map((item) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</h3><p class="muted">${escapeHtml(item.location_code)} · batch ${escapeHtml(item.batch_number || '-')}</p></div><span class="badge badge-warn">${escapeHtml(item.expiry_date)}</span></div><p>${item.qty_on_hand} on hand</p></article>`).join("") || '<p class="empty">No batches expiring in the next 30 days</p>'}</div></section>`;
+}
+
+function renderMobileStockSummary() {
+  const items = state.dashboard?.mobileStockSummary || [];
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Mobile stock</p><h2>Stock by van and kit</h2></div></div><div class="table-wrap"><table><thead><tr><th>Location</th><th>Name</th><th>On hand</th><th>Available</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.location_name)}</td><td>${item.qty_on_hand || 0}</td><td>${item.qty_available || 0}</td></tr>`).join("") || '<tr><td colspan="4" class="empty">No mobile stock locations yet</td></tr>'}</tbody></table></div></section>`;
+}
+
+function renderUsageVisitSummary() {
+  const items = state.dashboard?.recentUsageSummary || [];
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Visit usage</p><h2>Recent patient and visit activity</h2></div></div><div class="table-wrap"><table><thead><tr><th>Visit</th><th>Patient</th><th>Transactions</th><th>Qty used</th><th>Last used</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.visit_reference || '-')}</td><td>${escapeHtml(item.patient_reference || '-')}</td><td>${item.usage_count}</td><td>${item.qty_used || 0}</td><td>${item.last_used_at ? new Date(item.last_used_at).toLocaleString() : '-'}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No usage references recorded yet</td></tr>'}</tbody></table></div></section>`;
 }
 
 function renderActivity() {
@@ -470,6 +486,9 @@ function renderSectionContent() {
       ${renderOverviewCards()}
       ${renderMilestones()}
       ${renderLowStock()}
+      ${renderExpiryWarnings()}
+      ${renderMobileStockSummary()}
+      ${renderUsageVisitSummary()}
       ${renderActivity()}
     `;
   }
@@ -521,8 +540,10 @@ function renderSectionContent() {
   }
 
   return `
-    ${renderSectionHeader("Reports", "Review clinic, van, and batch stock without the transaction forms getting in the way.")}
+    ${renderSectionHeader("Reports", "Review clinic, van, kit, batch, and usage activity without the transaction forms getting in the way.")}
     ${renderStockByLocationReport()}
+    ${renderMobileStockSummary()}
+    ${renderUsageVisitSummary()}
     ${renderBatchStockList()}
     ${renderMigrationReadiness()}
     ${renderImportRuns()}

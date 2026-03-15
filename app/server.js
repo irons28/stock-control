@@ -830,7 +830,7 @@ app.get("/api/health", async (req, res, next) => {
 
 app.get("/api/dashboard", async (req, res, next) => {
   try {
-    const [products, suppliers, locations, customers, openPurchaseOrders, openSalesOrders, holdingBalances, holdingUnits, adjustments, lowStock] = await Promise.all([
+    const [products, suppliers, locations, customers, openPurchaseOrders, openSalesOrders, holdingBalances, holdingUnits, adjustments, lowStock, mobileLocationCount, clinicLocationCount, expiringSoon, recentUsageSummary, mobileStockSummary] = await Promise.all([
       get(`SELECT COUNT(*) AS count FROM products WHERE is_active = 1`),
       get(`SELECT COUNT(*) AS count FROM suppliers WHERE is_active = 1`),
       get(`SELECT COUNT(*) AS count FROM locations WHERE is_active = 1`),
@@ -841,8 +841,36 @@ app.get("/api/dashboard", async (req, res, next) => {
       get(`SELECT COUNT(*) AS count FROM inventory_units iu JOIN locations l ON l.id = iu.current_location_id WHERE l.code = 'HOLDING' AND iu.status IN ('in_holding','available')`),
       get(`SELECT COUNT(*) AS count FROM adjustments`),
       all(`SELECT p.id, p.sku, p.name, p.reorder_level, COALESCE(balance.qty_available,0) + COALESCE(serials.qty_available,0) AS available_qty FROM products p LEFT JOIN (SELECT product_id, SUM(qty_on_hand - qty_allocated) AS qty_available FROM inventory_balances GROUP BY product_id) balance ON balance.product_id = p.id LEFT JOIN (SELECT product_id, SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS qty_available FROM inventory_units GROUP BY product_id) serials ON serials.product_id = p.id WHERE p.is_active = 1 GROUP BY p.id HAVING p.reorder_level > 0 AND available_qty <= p.reorder_level ORDER BY available_qty ASC, p.name ASC LIMIT 8`),
+      get(`SELECT COUNT(*) AS count FROM locations WHERE is_active = 1 AND type IN ('vehicle','bin') AND (code LIKE 'VAN-%' OR code LIKE 'KIT-%' OR type = 'vehicle')`),
+      get(`SELECT COUNT(*) AS count FROM locations WHERE is_active = 1 AND code LIKE 'CLINIC-%'`),
+      all(`SELECT sb.product_id, p.sku, p.name AS product_name, l.code AS location_code, sb.batch_number, sb.expiry_date, sb.qty_on_hand FROM stock_batches sb JOIN products p ON p.id = sb.product_id JOIN locations l ON l.id = sb.location_id WHERE sb.qty_on_hand > 0 AND sb.expiry_date != '' AND date(sb.expiry_date) <= date('now', '+30 day') ORDER BY date(sb.expiry_date) ASC, p.name ASC LIMIT 8`),
+      all(`SELECT COALESCE(visit_reference, '') AS visit_reference, COALESCE(patient_reference, '') AS patient_reference, COUNT(*) AS usage_count, SUM(qty) AS qty_used, MAX(created_at) AS last_used_at FROM usage_transactions GROUP BY COALESCE(visit_reference, ''), COALESCE(patient_reference, '') ORDER BY datetime(last_used_at) DESC LIMIT 8`),
+      all(`SELECT l.code AS location_code, l.name AS location_name, COALESCE(balance.qty_on_hand,0) + COALESCE(serials.qty_on_hand,0) AS qty_on_hand, COALESCE(balance.qty_available,0) + COALESCE(serials.qty_available,0) AS qty_available FROM locations l LEFT JOIN (SELECT location_id, SUM(qty_on_hand) AS qty_on_hand, SUM(qty_on_hand - qty_allocated) AS qty_available FROM inventory_balances GROUP BY location_id) balance ON balance.location_id = l.id LEFT JOIN (SELECT current_location_id AS location_id, SUM(CASE WHEN status IN ('available','allocated','in_holding') THEN 1 ELSE 0 END) AS qty_on_hand, SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS qty_available FROM inventory_units GROUP BY current_location_id) serials ON serials.location_id = l.id WHERE l.is_active = 1 AND (l.type = 'vehicle' OR l.code LIKE 'KIT-%') ORDER BY qty_on_hand DESC, l.code ASC`),
     ]);
-    res.json({ totals: { products: products?.count || 0, suppliers: suppliers?.count || 0, locations: locations?.count || 0, customers: customers?.count || 0, openPurchaseOrders: openPurchaseOrders?.count || 0, openSalesOrders: openSalesOrders?.count || 0, holdingStock: (holdingBalances?.count || 0) + (holdingUnits?.count || 0), adjustments: adjustments?.count || 0 }, lowStock, nextMilestones: ["Warehouse execution flows are working", "Purchase and sales orders are now expected to be imported", "Migration reconciliation is the current go-live checkpoint"] });
+    res.json({
+      totals: {
+        products: products?.count || 0,
+        suppliers: suppliers?.count || 0,
+        locations: locations?.count || 0,
+        customers: customers?.count || 0,
+        openPurchaseOrders: openPurchaseOrders?.count || 0,
+        openSalesOrders: openSalesOrders?.count || 0,
+        holdingStock: (holdingBalances?.count || 0) + (holdingUnits?.count || 0),
+        adjustments: adjustments?.count || 0,
+        mobileLocations: mobileLocationCount?.count || 0,
+        clinicLocations: clinicLocationCount?.count || 0,
+        expiringBatches: expiringSoon.length,
+      },
+      lowStock,
+      expiringSoon,
+      recentUsageSummary,
+      mobileStockSummary,
+      nextMilestones: [
+        "Clinic receive and holding workflow is working",
+        "Van and kit transfers are ready for team testing",
+        "Expiry monitoring and usage traceability are now in the dashboard"
+      ]
+    });
   } catch (error) {
     next(error);
   }
