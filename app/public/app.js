@@ -10,6 +10,8 @@ const state = {
   goodsReceipts: [],
   dispatches: [],
   holdingStock: [],
+  transfers: [],
+  usageTransactions: [],
   stockMovements: [],
   adjustments: [],
   importTemplates: [],
@@ -84,6 +86,7 @@ function navSections() {
     { key: "setup", label: "Setup" },
     { key: "inbound", label: "Inbound" },
     { key: "outbound", label: "Outbound" },
+    { key: "mobile", label: "Mobile" },
     { key: "control", label: "Control" },
     { key: "reports", label: "Reports" },
     { key: "imports", label: "Imports" },
@@ -97,7 +100,7 @@ function renderHero() {
       <div>
         <p class="eyebrow">Warehouse Operations Suite</p>
         <h1>Stock Control</h1>
-        <p class="hero-copy">Imported orders now drive the warehouse flow. This app is focused on goods in, putaway, allocation, dispatch, and stock traceability.</p>
+        <p class="hero-copy">This veterinary pilot now focuses on clinic stock, van and kit transfers, field usage, and stock traceability.</p>
       </div>
       <div class="hero-panel">
         <div class="hero-stat"><span>${totals.products || 0}</span><small>Products</small></div>
@@ -475,10 +478,20 @@ function renderSectionContent() {
 
   if (state.activeSection === "outbound") {
     return `
-      ${renderSectionHeader("Outbound", "Use imported sales orders as the outbound workload, then allocate, build, and dispatch picked items.")}
-      ${renderImportedOrderHint("Import sales orders", "Sales orders should be created elsewhere and imported here for warehouse fulfilment.", "sales-orders", "sales-orders")}
+      ${renderSectionHeader("Outbound", "This branch still supports imported customer orders, but the veterinary focus is on clinic-to-van stock movement and field usage.")}
+      ${renderImportedOrderHint("Import sales orders", "Use this only if the pilot also needs customer shipment handling alongside mobile stock control.", "sales-orders", "sales-orders")}
       ${renderSalesOrdersList()}
       ${renderDispatchesList()}
+    `;
+  }
+
+  if (state.activeSection === "mobile") {
+    return `
+      ${renderSectionHeader("Mobile", "Move stock from clinic to vans or kits and record usage during appointments, visits, or jobs.")}
+      ${renderTransferForm()}
+      ${renderTransfersList()}
+      ${renderUsageForm()}
+      ${renderUsageList()}
     `;
   }
 
@@ -536,6 +549,8 @@ function bindForms() {
   const locationForm = document.getElementById("location-form");
   const goodsInForm = document.getElementById("goods-in-form");
   const putawayForm = document.getElementById("putaway-form");
+  const transferForm = document.getElementById("transfer-form");
+  const usageForm = document.getElementById("usage-form");
   const adjustmentForm = document.getElementById("adjustment-form");
 
   document.querySelectorAll("[data-section]").forEach((button) => button.addEventListener("click", () => {
@@ -578,6 +593,16 @@ function bindForms() {
     try { await api("/api/putaway", { method: "POST", body: JSON.stringify(formDataToObject(putawayForm)) }); putawayForm.reset(); setMessage("Putaway completed"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
+  transferForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try { await api("/api/transfers", { method: "POST", body: JSON.stringify(formDataToObject(transferForm)) }); transferForm.reset(); transferForm.moved_by.value = "Transfer"; setMessage("Transfer recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+  });
+
+  usageForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try { await api("/api/usage", { method: "POST", body: JSON.stringify(formDataToObject(usageForm)) }); usageForm.reset(); usageForm.used_by.value = "Veterinarian"; setMessage("Usage recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+  });
+
   adjustmentForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     try { await api("/api/adjustments", { method: "POST", body: JSON.stringify(formDataToObject(adjustmentForm)) }); adjustmentForm.reset(); adjustmentForm.adjusted_by.value = "Adjustment"; setMessage("Adjustment saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
@@ -593,7 +618,7 @@ function bindForms() {
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
+    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
@@ -605,6 +630,8 @@ async function loadAll() {
       api("/api/goods-receipts"),
       api("/api/dispatches"),
       api("/api/holding-stock"),
+      api("/api/transfers"),
+      api("/api/usage"),
       api("/api/stock-movements"),
       api("/api/adjustments"),
       api("/api/reports/stock-by-location"),
@@ -614,7 +641,7 @@ async function loadAll() {
       api("/api/migration/import-runs"),
       api("/api/migration/reconciliation"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary }, activity });
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {

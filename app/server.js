@@ -360,6 +360,36 @@ async function initDatabase() {
     FOREIGN KEY (location_id) REFERENCES locations(id)
   )`);
 
+  await run(`CREATE TABLE IF NOT EXISTS transfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    from_location_id INTEGER NOT NULL,
+    to_location_id INTEGER NOT NULL,
+    qty INTEGER NOT NULL DEFAULT 0,
+    serial_numbers TEXT DEFAULT '',
+    reference TEXT DEFAULT '',
+    moved_by TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (from_location_id) REFERENCES locations(id),
+    FOREIGN KEY (to_location_id) REFERENCES locations(id)
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS usage_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    location_id INTEGER,
+    qty INTEGER NOT NULL DEFAULT 0,
+    serial_numbers TEXT DEFAULT '',
+    reference TEXT DEFAULT '',
+    used_by TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (location_id) REFERENCES locations(id)
+  )`);
+
   await run(`CREATE TABLE IF NOT EXISTS activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_type TEXT NOT NULL,
@@ -395,6 +425,9 @@ async function initDatabase() {
     ["BIN-01", "Bin 01", "bin", "Small parts bin"],
     ["DISPATCH", "Dispatch", "dispatch", "Packed orders waiting to leave"],
     ["DAMAGED", "Damaged", "damaged", "Damaged or quarantined stock"],
+    ["CLINIC-MAIN", "Clinic Main", "shelf", "Central clinic stock location"],
+    ["VAN-01", "Van 01", "vehicle", "Mobile veterinarian vehicle stock"],
+    ["KIT-01", "Vet Kit 01", "bin", "Mobile veterinarian bag or kit"],
   ]) {
     await run(`INSERT OR IGNORE INTO locations (code, name, type, notes) VALUES (?, ?, ?, ?)`, [code, name, type, notes]);
   }
@@ -631,6 +664,14 @@ async function getOrderSummaryReport() {
   return { purchase, sales };
 }
 
+async function getTransfersList() {
+  return all(`SELECT t.*, p.sku, p.name AS product_name, lf.code AS from_location_code, lt.code AS to_location_code FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id ORDER BY datetime(t.created_at) DESC, t.id DESC LIMIT 40`);
+}
+
+async function getUsageTransactionsList() {
+  return all(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id ORDER BY datetime(u.created_at) DESC, u.id DESC LIMIT 40`);
+}
+
 async function getImportRuns(limit = 20) {
   return all(`SELECT * FROM import_runs ORDER BY datetime(created_at) DESC, id DESC LIMIT ?`, [limit]);
 }
@@ -817,6 +858,8 @@ app.get("/api/goods-receipts", async (req, res, next) => { try { res.json(await 
 app.get("/api/dispatches", async (req, res, next) => { try { res.json(await getDispatchesList()); } catch (error) { next(error); } });
 app.get("/api/holding-stock", async (req, res, next) => { try { res.json(await getHoldingStock()); } catch (error) { next(error); } });
 app.get("/api/stock-movements", async (req, res, next) => { try { res.json(await getStockMovementsList()); } catch (error) { next(error); } });
+app.get("/api/transfers", async (req, res, next) => { try { res.json(await getTransfersList()); } catch (error) { next(error); } });
+app.get("/api/usage", async (req, res, next) => { try { res.json(await getUsageTransactionsList()); } catch (error) { next(error); } });
 app.get("/api/adjustments", async (req, res, next) => { try { res.json(await getAdjustmentsList()); } catch (error) { next(error); } });
 app.get("/api/reports/stock-by-location", async (req, res, next) => { try { res.json(await getStockByLocationReport()); } catch (error) { next(error); } });
 app.get("/api/reports/order-summary", async (req, res, next) => { try { res.json(await getOrderSummaryReport()); } catch (error) { next(error); } });
@@ -1033,6 +1076,98 @@ app.post("/api/sales-orders/:id/dispatch", async (req, res, next) => {
     await createActivity("dispatch", dispatch.id, "completed", dispatch);
     emitInventoryEvent("dispatch.completed", dispatch);
     res.json(dispatch);
+  } catch (error) { next(error); }
+});
+
+app.post("/api/transfers", async (req, res, next) => {
+  try {
+    const productId = parseInteger(req.body?.product_id, 0);
+    const fromLocationId = parseInteger(req.body?.from_location_id, 0);
+    const toLocationId = parseInteger(req.body?.to_location_id, 0);
+    const qty = parseInteger(req.body?.qty, 0);
+    const serialNumbers = Array.from(new Set(parseSerialNumbers(req.body?.serial_numbers)));
+    const reference = String(req.body?.reference || "").trim();
+    const movedBy = String(req.body?.moved_by || "Transfer").trim();
+    const notes = String(req.body?.notes || "").trim();
+    if (!productId || !fromLocationId || !toLocationId) throw requestError("Product, from location, and to location are required");
+    if (fromLocationId === toLocationId) throw requestError("Transfer locations must be different");
+    const [product, fromLocation, toLocation] = await Promise.all([
+      get(`SELECT * FROM products WHERE id = ?`, [productId]),
+      get(`SELECT * FROM locations WHERE id = ?`, [fromLocationId]),
+      get(`SELECT * FROM locations WHERE id = ?`, [toLocationId]),
+    ]);
+    if (!product) throw requestError("Product not found", 404);
+    if (!fromLocation || !toLocation) throw requestError("Transfer location not found", 404);
+    const transfer = await transaction(async () => {
+      let movedQty = qty;
+      if (Number(product.serial_tracking || 0)) {
+        if (!serialNumbers.length) throw requestError("Serial numbers are required for serial-tracked transfers");
+        const units = await all(`SELECT * FROM inventory_units WHERE product_id = ? AND current_location_id = ? AND status IN ('available','in_holding') AND serial_number IN (${serialNumbers.map(() => '?').join(',')})`, [productId, fromLocationId, ...serialNumbers]);
+        if (units.length !== serialNumbers.length) throw requestError("One or more serial numbers were not found at the from location", 409);
+        movedQty = units.length;
+        for (const unit of units) {
+          await run(`UPDATE inventory_units SET current_location_id = ?, status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [toLocationId, unit.id]);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'transfer', 1, ?, ?, ?, 'transfer', ?, ?, ?)`, [productId, unit.serial_number, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy]);
+        }
+      } else {
+        if (qty <= 0) throw requestError("Quantity must be greater than zero for quantity transfers");
+        const balance = await get(`SELECT * FROM inventory_balances WHERE product_id = ? AND location_id = ?`, [productId, fromLocationId]);
+        const available = Number(balance?.qty_on_hand || 0) - Number(balance?.qty_allocated || 0);
+        if (available < qty) throw requestError(`Only ${available} units are available at the from location`, 409);
+        await updateInventoryBalance(productId, fromLocationId, -qty, 0);
+        await updateInventoryBalance(productId, toLocationId, qty, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'transfer', ?, ?, ?, 'transfer', ?, ?, ?)`, [productId, qty, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy]);
+      }
+      const result = await run(`INSERT INTO transfers (product_id, from_location_id, to_location_id, qty, serial_numbers, reference, moved_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [productId, fromLocationId, toLocationId, movedQty, JSON.stringify(serialNumbers), reference, movedBy, notes]);
+      return get(`SELECT t.*, p.sku, p.name AS product_name, lf.code AS from_location_code, lt.code AS to_location_code FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id WHERE t.id = ?`, [result.id]);
+    });
+    await createActivity("transfer", transfer.id, "created", transfer);
+    emitInventoryEvent("transfer.created", transfer);
+    res.status(201).json(transfer);
+  } catch (error) { next(error); }
+});
+
+app.post("/api/usage", async (req, res, next) => {
+  try {
+    const productId = parseInteger(req.body?.product_id, 0);
+    const locationId = parseInteger(req.body?.location_id, 0);
+    const qty = parseInteger(req.body?.qty, 0);
+    const serialNumbers = Array.from(new Set(parseSerialNumbers(req.body?.serial_numbers)));
+    const reference = String(req.body?.reference || "").trim();
+    const usedBy = String(req.body?.used_by || "Usage").trim();
+    const notes = String(req.body?.notes || "").trim();
+    if (!productId || !locationId) throw requestError("Product and location are required");
+    const [product, location] = await Promise.all([
+      get(`SELECT * FROM products WHERE id = ?`, [productId]),
+      get(`SELECT * FROM locations WHERE id = ?`, [locationId]),
+    ]);
+    if (!product) throw requestError("Product not found", 404);
+    if (!location) throw requestError("Location not found", 404);
+    const usage = await transaction(async () => {
+      let usedQty = qty;
+      if (Number(product.serial_tracking || 0)) {
+        if (!serialNumbers.length) throw requestError("Serial numbers are required for serial-tracked usage");
+        const units = await all(`SELECT * FROM inventory_units WHERE product_id = ? AND current_location_id = ? AND status IN ('available','in_holding') AND serial_number IN (${serialNumbers.map(() => '?').join(',')})`, [productId, locationId, ...serialNumbers]);
+        if (units.length !== serialNumbers.length) throw requestError("One or more serial numbers were not found at the selected location", 409);
+        usedQty = units.length;
+        for (const unit of units) {
+          await run(`UPDATE inventory_units SET current_location_id = NULL, status = 'consumed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [unit.id]);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'usage', 1, ?, ?, NULL, 'usage', ?, ?, ?)`, [productId, unit.serial_number, locationId, reference || `USE-${Date.now()}`, notes, usedBy]);
+        }
+      } else {
+        if (qty <= 0) throw requestError("Quantity must be greater than zero for stock usage");
+        const balance = await get(`SELECT * FROM inventory_balances WHERE product_id = ? AND location_id = ?`, [productId, locationId]);
+        const available = Number(balance?.qty_on_hand || 0) - Number(balance?.qty_allocated || 0);
+        if (available < qty) throw requestError(`Only ${available} units are available at the selected location`, 409);
+        await updateInventoryBalance(productId, locationId, -qty, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'usage', ?, ?, NULL, 'usage', ?, ?, ?)`, [productId, qty, locationId, reference || `USE-${Date.now()}`, notes, usedBy]);
+      }
+      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, used_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, usedBy, notes]);
+      return get(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id WHERE u.id = ?`, [result.id]);
+    });
+    await createActivity("usage", usage.id, "created", usage);
+    emitInventoryEvent("usage.created", usage);
+    res.status(201).json(usage);
   } catch (error) { next(error); }
 });
 
