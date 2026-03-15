@@ -105,8 +105,8 @@ function renderHero() {
       </div>
       <div class="hero-panel">
         <div class="hero-stat"><span>${totals.products || 0}</span><small>Products</small></div>
-        <div class="hero-stat"><span>${totals.customers || 0}</span><small>Customers</small></div>
-        <div class="hero-stat"><span>${totals.openSalesOrders || 0}</span><small>Open sales</small></div>
+        <div class="hero-stat"><span>${state.locations.filter((item) => item.type === 'vehicle').length}</span><small>Vans</small></div>
+        <div class="hero-stat"><span>${state.locations.filter((item) => item.code.startsWith('KIT-')).length}</span><small>Kits</small></div>
         <div class="hero-stat"><span>${totals.adjustments || 0}</span><small>Adjustments</small></div>
       </div>
     </section>
@@ -280,6 +280,30 @@ function renderSalesOrdersList() {
 function renderDispatchesList() {
   return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Outbound feed</p><h2>Recent dispatches</h2></div></div><div class="table-wrap"><table><thead><tr><th>Dispatch</th><th>Order</th><th>Customer</th><th>Product</th><th>Qty</th></tr></thead><tbody>${state.dispatches.map((item) => `<tr><td>${escapeHtml(item.dispatch_number)}</td><td>${escapeHtml(item.order_number)}</td><td>${escapeHtml(item.customer_name)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_dispatched}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No dispatches yet</td></tr>'}</tbody></table></div></section>`;
 }
+
+function mobileLocations() {
+  return state.locations.filter((item) => item.is_active && ["vehicle", "bin", "shelf"].includes(item.type));
+}
+
+function renderTransferForm() {
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 1</p><h2>Move stock to van or kit</h2></div></div><form id="transfer-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From location<select name="from_location_id" required>${optionList(state.locations.filter((item) => item.is_active), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select clinic stock location")}</select></label><label>To location<select name="to_location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select van or kit")}</select></label></div><div class="two-up"><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label><label>Moved by<input name="moved_by" value="Veterinary Transfer" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Reference<input name="reference" placeholder="Van restock, kit refill" /></label><label>Notes<input name="notes" /></label></div><button type="submit">Record transfer</button></form></section>`;
+}
+
+function renderTransfersList() {
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Step 2</p><h2>Recent van and kit transfers</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>From</th><th>To</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.transfers.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.from_location_code)}</td><td>${escapeHtml(item.to_location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No transfers yet</td></tr>'}</tbody></table></div></section>`;
+}
+
+function renderUsageForm() {
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Step 3</p><h2>Record stock used</h2></div></div><form id="usage-form" class="stack-form"><label>Product<select name="product_id" required>${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><div class="two-up"><label>From van or kit<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select mobile location")}</select></label><label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked items"></textarea></label><div class="two-up"><label>Visit or patient ref<input name="reference" placeholder="Visit, patient, or case reference" /></label><label>Used by<input name="used_by" value="Veterinarian" /></label></div><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Record usage</button></form></section>`;
+}
+
+function renderUsageList() {
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Field activity</p><h2>Recent stock usage</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Location</th><th>Reference</th><th>Batch</th><th>Expiry</th></tr></thead><tbody>${state.usageTransactions.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reference || '-')}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No usage transactions yet</td></tr>'}</tbody></table></div></section>`;
+}
+
+function renderBatchStockList() {
+  return `<section class="panel span-12"><div class="panel-header"><div><p class="panel-kicker">Medicine control</p><h2>Batch and expiry stock</h2></div></div><div class="table-wrap"><table><thead><tr><th>Product</th><th>Location</th><th>Batch</th><th>Expiry</th><th>On hand</th><th>Allocated</th></tr></thead><tbody>${state.batchStock.map((item) => `<tr><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.batch_number || '-')}</td><td>${escapeHtml(item.expiry_date || '-')}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No batch-tracked stock yet</td></tr>'}</tbody></table></div></section>`;
+}
 function renderImportedOrderHint(title, copy, templateType, commandType) {
   const template = state.importTemplates.find((item) => item.type === templateType);
   return `
@@ -444,7 +468,7 @@ node scripts/import-data.js sales-orders ./open-sales.csv --apply</pre>
 function renderSectionContent() {
   if (state.activeSection === "overview") {
     return `
-      ${renderSectionHeader("Overview", "Use this as the landing page for the current position. Detailed workflows now live behind focused tabs so the home screen stays readable.")}
+      ${renderSectionHeader("Overview", "Start here. The core veterinary flow is: receive stock, move it to a van or kit, record usage in the field, and review the audit trail.")}
       ${renderOverviewCards()}
       ${renderMilestones()}
       ${renderLowStock()}
@@ -454,7 +478,7 @@ function renderSectionContent() {
 
   if (state.activeSection === "setup") {
     return `
-      ${renderSectionHeader("Setup", "Create and maintain the master data that the rest of the application depends on.")}
+      ${renderSectionHeader("Setup", "Set up products, suppliers, clinic locations, vans, and kits before staff begin using stock in the field.")}
       ${renderProductForm()}
       ${renderProductsTable()}
       ${renderSupplierForm()}
@@ -468,7 +492,7 @@ function renderSectionContent() {
 
   if (state.activeSection === "inbound") {
     return `
-      ${renderSectionHeader("Inbound", "Use imported purchase orders as the inbound workload, then receive stock into HOLDING and complete putaway into live shelf or bin locations.")}
+      ${renderSectionHeader("Inbound", "Receive stock into the clinic, capture batch or expiry details where needed, and move it into live stock locations.")}
       ${renderImportedOrderHint("Import purchase orders", "Purchase orders should be created elsewhere and imported here for warehouse receiving.", "purchase-orders", "purchase-orders")}
       ${renderPurchaseOrdersList()}
       ${renderGoodsInForm()}
@@ -500,7 +524,7 @@ function renderSectionContent() {
 
   if (state.activeSection === "control") {
     return `
-      ${renderSectionHeader("Control", "Use this area for corrections, damage handling, and movement history when you need to explain stock changes.")}
+      ${renderSectionHeader("Control", "Use this area for corrections, damaged or expired stock, and the movement history needed to explain where stock went.")}
       ${renderAdjustmentForm()}
       ${renderAdjustmentsList()}
       ${renderStockMovements()}
