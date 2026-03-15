@@ -413,6 +413,22 @@ async function initDatabase() {
     FOREIGN KEY (location_id) REFERENCES locations(id)
   )`);
 
+  await run(`CREATE TABLE IF NOT EXISTS stock_takes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    expected_qty INTEGER NOT NULL DEFAULT 0,
+    counted_qty INTEGER NOT NULL DEFAULT 0,
+    variance_qty INTEGER NOT NULL DEFAULT 0,
+    batch_number TEXT DEFAULT '',
+    expiry_date TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    counted_by TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations(id),
+    FOREIGN KEY (product_id) REFERENCES products(id)
+  )`);
+
   await run(`CREATE TABLE IF NOT EXISTS activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_type TEXT NOT NULL,
@@ -735,6 +751,10 @@ async function getUsageTransactionsList() {
 
 async function getBatchStockReport() {
   return all(`SELECT sb.*, p.sku, p.name AS product_name, p.controlled_drug, l.code AS location_code FROM stock_batches sb JOIN products p ON p.id = sb.product_id JOIN locations l ON l.id = sb.location_id WHERE sb.qty_on_hand > 0 ORDER BY p.name ASC, sb.expiry_date ASC, sb.batch_number ASC`);
+}
+
+async function getStockTakesList() {
+  return all(`SELECT st.*, p.sku, p.name AS product_name, l.code AS location_code, l.name AS location_name FROM stock_takes st JOIN products p ON p.id = st.product_id JOIN locations l ON l.id = st.location_id ORDER BY datetime(st.created_at) DESC, st.id DESC LIMIT 60`);
 }
 
 async function getControlledDrugReport() {
@@ -1344,6 +1364,45 @@ app.post("/api/adjustments", async (req, res, next) => {
     await createActivity("adjustment", adjustment.id, "created", adjustment);
     emitInventoryEvent("adjustment.created", adjustment);
     res.status(201).json(adjustment);
+  } catch (error) { next(error); }
+});
+
+app.get("/api/stock-takes", async (req, res, next) => { try { res.json(await getStockTakesList()); } catch (error) { next(error); } });
+
+app.post("/api/stock-takes", async (req, res, next) => {
+  try {
+    const locationId = parseInteger(req.body?.location_id, 0);
+    const productId = parseInteger(req.body?.product_id, 0);
+    const countedQty = parseInteger(req.body?.counted_qty, 0);
+    const batchNumber = String(req.body?.batch_number || "").trim();
+    const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
+    const notes = String(req.body?.notes || "").trim();
+    const countedBy = String(req.body?.counted_by || "Stock Take").trim();
+    if (!locationId || !productId) throw requestError("Location and product are required");
+    if (countedQty < 0) throw requestError("Counted quantity cannot be negative");
+    const [location, product] = await Promise.all([
+      get(`SELECT * FROM locations WHERE id = ?`, [locationId]),
+      get(`SELECT * FROM products WHERE id = ?`, [productId]),
+    ]);
+    if (!location) throw requestError("Location not found", 404);
+    if (!product) throw requestError("Product not found", 404);
+    if (!(location.type === 'vehicle' || String(location.code || '').startsWith('KIT-'))) throw requestError("Stock takes are limited to vans and kits in this pilot");
+    if (Number(product.serial_tracking || 0)) throw requestError("Serial-tracked stock takes are not supported yet. Use serial verification instead.");
+    const balance = await get(`SELECT * FROM inventory_balances WHERE product_id = ? AND location_id = ?`, [productId, locationId]);
+    const expectedQty = Number(balance?.qty_on_hand || 0);
+    const varianceQty = countedQty - expectedQty;
+    const stockTake = await transaction(async () => {
+      if (varianceQty !== 0) {
+        await updateInventoryBalance(productId, locationId, varianceQty, 0);
+        await updateStockBatch(productId, locationId, batchNumber, expiryDate, varianceQty, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, 'stock_take', ?, ?, ?, ?, ?)`, [productId, varianceQty > 0 ? 'stock_take_gain' : 'stock_take_loss', Math.abs(varianceQty), varianceQty > 0 ? null : locationId, varianceQty > 0 ? locationId : null, `ST-${Date.now()}`, `Stock take expected ${expectedQty}, counted ${countedQty}${notes ? ` - ${notes}` : ''}`, countedBy, batchNumber, expiryDate]);
+      }
+      const result = await run(`INSERT INTO stock_takes (location_id, product_id, expected_qty, counted_qty, variance_qty, batch_number, expiry_date, notes, counted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [locationId, productId, expectedQty, countedQty, varianceQty, batchNumber, expiryDate, notes, countedBy]);
+      return get(`SELECT st.*, p.sku, p.name AS product_name, l.code AS location_code, l.name AS location_name FROM stock_takes st JOIN products p ON p.id = st.product_id JOIN locations l ON l.id = st.location_id WHERE st.id = ?`, [result.id]);
+    });
+    await createActivity('stock_take', stockTake.id, 'created', stockTake);
+    emitInventoryEvent('stock_take.created', stockTake);
+    res.status(201).json(stockTake);
   } catch (error) { next(error); }
 });
 

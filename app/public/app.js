@@ -15,6 +15,7 @@ const state = {
   batchStock: [],
   stockMovements: [],
   adjustments: [],
+  stockTakes: [],
   importTemplates: [],
   importRuns: [],
   reconciliation: null,
@@ -352,6 +353,14 @@ function renderAdjustmentsList() {
   return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Control log</p><h2>Recent adjustments</h2></div></div><div class="table-wrap"><table><thead><tr><th>Type</th><th>Product</th><th>Qty</th><th>Location</th><th>Reason</th><th>Authorised</th></tr></thead><tbody>${state.adjustments.map((item) => `<tr><td>${escapeHtml(item.adjustment_type)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}${item.controlled_drug ? '<div class="muted">Controlled drug</div>' : ''}</td><td>${item.qty}</td><td>${escapeHtml(item.location_code || '-')}</td><td>${escapeHtml(item.reason)}</td><td><div>${escapeHtml(item.authorised_by || '-')}</div><div class="muted">${escapeHtml(item.witness_name || '-')}</div></td></tr>`).join("") || '<tr><td colspan="6" class="empty">No adjustments yet</td></tr>'}</tbody></table></div></section>`;
 }
 
+function renderStockTakeForm() {
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Stock take</p><h2>Count van or kit stock</h2></div></div><form id="stock-take-form" class="stack-form"><label>Mobile location<select name="location_id" required>${optionList(mobileLocations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select van or kit")}</select></label><label>Product<select name="product_id" required>${optionList(state.products.filter((item) => !item.serial_tracking), (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select quantity product")}</select></label><div class="two-up"><label>Counted qty<input name="counted_qty" type="number" min="0" step="1" value="0" /></label><label>Counted by<input name="counted_by" value="Stock Take" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Optional batch" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Notes<textarea name="notes" rows="2" placeholder="Optional count note"></textarea></label><button type="submit">Record stock take</button></form></section>`;
+}
+
+function renderStockTakesList() {
+  return `<section class="panel span-7"><div class="panel-header"><div><p class="panel-kicker">Count history</p><h2>Recent van and kit stock takes</h2></div></div><div class="table-wrap"><table><thead><tr><th>When</th><th>Location</th><th>Product</th><th>Expected</th><th>Counted</th><th>Variance</th></tr></thead><tbody>${state.stockTakes.map((item) => `<tr><td>${new Date(item.created_at).toLocaleString()}</td><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.expected_qty}</td><td>${item.counted_qty}</td><td>${item.variance_qty}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No stock takes yet</td></tr>'}</tbody></table></div></section>`;
+}
+
 function renderStockByLocationReport() {
   const report = state.reports.stockByLocation;
   const quantityRows = report.quantity.map((item) => `<tr><td>${escapeHtml(item.location_code)}</td><td>${escapeHtml(item.sku)} · ${escapeHtml(item.product_name)}</td><td>${item.qty_on_hand}</td><td>${item.qty_allocated}</td><td>${item.qty_available}</td><td>-</td></tr>`).join("");
@@ -561,9 +570,11 @@ function renderSectionContent() {
 
   if (state.activeSection === "control") {
     return `
-      ${renderSectionHeader("Control", "Use this area for corrections, damaged or expired stock, and the movement history needed to explain where stock went.")}
+      ${renderSectionHeader("Control", "Use this area for corrections, damaged or expired stock, stock takes, and the movement history needed to explain where stock went.")}
       ${renderAdjustmentForm()}
       ${renderAdjustmentsList()}
+      ${renderStockTakeForm()}
+      ${renderStockTakesList()}
       ${renderStockMovements()}
     `;
   }
@@ -611,6 +622,7 @@ function bindForms() {
   const transferForm = document.getElementById("transfer-form");
   const usageForm = document.getElementById("usage-form");
   const adjustmentForm = document.getElementById("adjustment-form");
+  const stockTakeForm = document.getElementById("stock-take-form");
 
   document.querySelectorAll("[data-section]").forEach((button) => button.addEventListener("click", () => {
     state.activeSection = button.getAttribute("data-section");
@@ -671,6 +683,11 @@ function bindForms() {
     try { await api("/api/adjustments", { method: "POST", body: JSON.stringify(formDataToObject(adjustmentForm)) }); adjustmentForm.reset(); adjustmentForm.adjusted_by.value = "Adjustment"; setMessage("Adjustment saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
+  stockTakeForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try { await api("/api/stock-takes", { method: "POST", body: JSON.stringify(formDataToObject(stockTakeForm)) }); stockTakeForm.reset(); stockTakeForm.counted_by.value = "Stock Take"; setMessage("Stock take recorded"); await loadAll(); } catch (error) { setMessage(error.message, true); }
+  });
+
   document.querySelectorAll("[data-allocate-order]").forEach((button) => button.addEventListener("click", async () => {
     try { await api(`/api/sales-orders/${button.getAttribute("data-allocate-order")}/allocate`, { method: "POST", body: JSON.stringify({ allocated_by: "Allocation" }) }); setMessage("Order allocated"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   }));
@@ -681,7 +698,7 @@ function bindForms() {
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockByLocation, orderSummary, controlledDrugs, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
+    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockTakes, stockByLocation, orderSummary, controlledDrugs, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
@@ -698,6 +715,7 @@ async function loadAll() {
       api("/api/batches"),
       api("/api/stock-movements"),
       api("/api/adjustments"),
+      api("/api/stock-takes"),
       api("/api/reports/stock-by-location"),
       api("/api/reports/order-summary"),
       api("/api/reports/controlled-drugs"),
@@ -706,7 +724,7 @@ async function loadAll() {
       api("/api/migration/import-runs"),
       api("/api/migration/reconciliation"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary, controlledDrugs }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockTakes, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary, controlledDrugs }, activity });
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {
