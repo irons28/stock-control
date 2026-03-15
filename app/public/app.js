@@ -12,6 +12,7 @@ const state = {
   holdingStock: [],
   transfers: [],
   usageTransactions: [],
+  batchStock: [],
   stockMovements: [],
   adjustments: [],
   importTemplates: [],
@@ -209,6 +210,7 @@ function renderAdjustmentForm() {
         <label>Qty<input name="qty" type="number" min="1" step="1" value="1" /></label>
         <label>Adjusted by<input name="adjusted_by" value="Adjustment" /></label>
       </div>
+      <div class="two-up"><label>Batch number<input name="batch_number" placeholder="Batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div>
       <label>Serial numbers<textarea name="serial_numbers" rows="3" placeholder="Required for serial-tracked adjustments"></textarea></label>
       <label>Reason<input name="reason" required placeholder="Damaged in transit, stock take correction, found stock" /></label>
       <label>Notes<textarea name="notes" rows="2"></textarea></label>
@@ -256,7 +258,7 @@ function renderPurchaseOrdersList() {
 function renderGoodsInForm() {
   const order = currentPo();
   const pendingLines = (order?.lines || []).filter((line) => Number(line.qty_remaining || 0) > 0);
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Goods in</p><h2>Receive into holding</h2></div></div><form id="goods-in-form" class="stack-form"><label>Purchase order<select id="goods-in-po" name="purchase_order_id" required>${['<option value="">Select PO</option>'].concat(state.purchaseOrders.map((item) => `<option value="${item.id}" ${String(item.id) === String(state.selectedPoId) ? 'selected' : ''}>${escapeHtml(item.po_number)} · ${escapeHtml(item.supplier_name)}</option>`)).join("")}</select></label><label>PO line<select name="purchase_order_line_id" required>${['<option value="">Select PO line</option>'].concat(pendingLines.map((line) => `<option value="${line.id}">${escapeHtml(line.sku)} · ${escapeHtml(line.product_name)} · ${line.qty_remaining} remaining</option>`)).join("")}</select></label><div class="two-up"><label>Qty received<input name="qty_received" type="number" min="1" step="1" value="1" required /></label><label>Received by<input name="received_by" value="Goods In" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3"></textarea></label><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Receive stock</button></form></section>`;
+  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Goods in</p><h2>Receive into holding</h2></div></div><form id="goods-in-form" class="stack-form"><label>Purchase order<select id="goods-in-po" name="purchase_order_id" required>${['<option value="">Select PO</option>'].concat(state.purchaseOrders.map((item) => `<option value="${item.id}" ${String(item.id) === String(state.selectedPoId) ? 'selected' : ''}>${escapeHtml(item.po_number)} · ${escapeHtml(item.supplier_name)}</option>`)).join("")}</select></label><label>PO line<select name="purchase_order_line_id" required>${['<option value="">Select PO line</option>'].concat(pendingLines.map((line) => `<option value="${line.id}">${escapeHtml(line.sku)} · ${escapeHtml(line.product_name)} · ${line.qty_remaining} remaining</option>`)).join("")}</select></label><div class="two-up"><label>Qty received<input name="qty_received" type="number" min="1" step="1" value="1" required /></label><label>Received by<input name="received_by" value="Goods In" /></label></div><div class="two-up"><label>Batch number<input name="batch_number" placeholder="Medicine batch or lot" /></label><label>Expiry date<input name="expiry_date" type="date" /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3"></textarea></label><label>Notes<textarea name="notes" rows="2"></textarea></label><button type="submit">Receive stock</button></form></section>`;
 }
 
 function renderGoodsReceiptsList() {
@@ -492,6 +494,7 @@ function renderSectionContent() {
       ${renderTransfersList()}
       ${renderUsageForm()}
       ${renderUsageList()}
+      ${renderBatchStockList()}
     `;
   }
 
@@ -618,7 +621,7 @@ function bindForms() {
 
 async function loadAll() {
   try {
-    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
+    const [dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, stockByLocation, orderSummary, activity, importTemplates, importRuns, reconciliation] = await Promise.all([
       api("/api/dashboard"),
       api("/api/products"),
       api("/api/suppliers"),
@@ -632,6 +635,7 @@ async function loadAll() {
       api("/api/holding-stock"),
       api("/api/transfers"),
       api("/api/usage"),
+      api("/api/batches"),
       api("/api/stock-movements"),
       api("/api/adjustments"),
       api("/api/reports/stock-by-location"),
@@ -641,7 +645,7 @@ async function loadAll() {
       api("/api/migration/import-runs"),
       api("/api/migration/reconciliation"),
     ]);
-    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary }, activity });
+    Object.assign(state, { dashboard, products, suppliers, customers, locations, categories, purchaseOrders, salesOrders, goodsReceipts, dispatches, holdingStock, transfers, usageTransactions, batchStock, stockMovements, adjustments, importTemplates, importRuns, reconciliation, reports: { stockByLocation, orderSummary }, activity });
     if (!state.selectedPoId && purchaseOrders.length) state.selectedPoId = String(purchaseOrders[0].id);
     render();
   } catch (error) {

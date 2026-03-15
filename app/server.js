@@ -327,6 +327,20 @@ async function initDatabase() {
     FOREIGN KEY (current_location_id) REFERENCES locations(id)
   )`);
 
+  await run(`CREATE TABLE IF NOT EXISTS stock_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    location_id INTEGER NOT NULL,
+    batch_number TEXT NOT NULL DEFAULT '',
+    expiry_date TEXT DEFAULT '',
+    qty_on_hand INTEGER NOT NULL DEFAULT 0,
+    qty_allocated INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, location_id, batch_number, expiry_date),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (location_id) REFERENCES locations(id)
+  )`);
+
   await run(`CREATE TABLE IF NOT EXISTS stock_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
@@ -413,6 +427,19 @@ async function initDatabase() {
     details TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  await run(`ALTER TABLE inventory_units ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE inventory_units ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE goods_receipt_lines ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE goods_receipt_lines ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE transfers ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE transfers ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE usage_transactions ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE usage_transactions ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE adjustments ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE adjustments ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE stock_movements ADD COLUMN batch_number TEXT DEFAULT ''`).catch(() => {});
+  await run(`ALTER TABLE stock_movements ADD COLUMN expiry_date TEXT DEFAULT ''`).catch(() => {});
 
   for (const name of ["EPOS", "Printing", "Scanning", "Payments", "Labels", "Accessories"]) {
     await run(`INSERT OR IGNORE INTO product_categories (name) VALUES (?)`, [name]);
@@ -557,6 +584,21 @@ async function updateInventoryBalance(productId, locationId, qtyDelta, allocated
   await run(`UPDATE inventory_balances SET qty_on_hand = ?, qty_allocated = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextOnHand, nextAllocated, existing.id]);
 }
 
+async function updateStockBatch(productId, locationId, batchNumber, expiryDate, qtyDelta, allocatedDelta = 0) {
+  const keyBatch = String(batchNumber || '').trim();
+  const keyExpiry = String(expiryDate || '').trim();
+  const existing = await get(`SELECT * FROM stock_batches WHERE product_id = ? AND location_id = ? AND batch_number = ? AND expiry_date = ?`, [productId, locationId, keyBatch, keyExpiry]);
+  if (!existing) {
+    if (qtyDelta < 0 || allocatedDelta < 0) throw requestError("Cannot reduce batch stock below zero", 409);
+    await run(`INSERT INTO stock_batches (product_id, location_id, batch_number, expiry_date, qty_on_hand, qty_allocated, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, [productId, locationId, keyBatch, keyExpiry, qtyDelta, allocatedDelta]);
+    return;
+  }
+  const nextOnHand = Number(existing.qty_on_hand || 0) + qtyDelta;
+  const nextAllocated = Number(existing.qty_allocated || 0) + allocatedDelta;
+  if (nextOnHand < 0 || nextAllocated < 0) throw requestError("Cannot reduce batch stock below zero", 409);
+  await run(`UPDATE stock_batches SET qty_on_hand = ?, qty_allocated = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextOnHand, nextAllocated, existing.id]);
+}
+
 async function refreshPurchaseOrderStatus(purchaseOrderId) {
   const stats = await get(`SELECT COALESCE(SUM(qty_ordered),0) AS qty_ordered, COALESCE(SUM(qty_received),0) AS qty_received, COUNT(*) AS line_count FROM purchase_order_lines WHERE purchase_order_id = ?`, [purchaseOrderId]);
   let status = "ordered";
@@ -670,6 +712,10 @@ async function getTransfersList() {
 
 async function getUsageTransactionsList() {
   return all(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id ORDER BY datetime(u.created_at) DESC, u.id DESC LIMIT 40`);
+}
+
+async function getBatchStockReport() {
+  return all(`SELECT sb.*, p.sku, p.name AS product_name, l.code AS location_code FROM stock_batches sb JOIN products p ON p.id = sb.product_id JOIN locations l ON l.id = sb.location_id WHERE sb.qty_on_hand > 0 ORDER BY p.name ASC, sb.expiry_date ASC, sb.batch_number ASC`);
 }
 
 async function getImportRuns(limit = 20) {
@@ -860,6 +906,7 @@ app.get("/api/holding-stock", async (req, res, next) => { try { res.json(await g
 app.get("/api/stock-movements", async (req, res, next) => { try { res.json(await getStockMovementsList()); } catch (error) { next(error); } });
 app.get("/api/transfers", async (req, res, next) => { try { res.json(await getTransfersList()); } catch (error) { next(error); } });
 app.get("/api/usage", async (req, res, next) => { try { res.json(await getUsageTransactionsList()); } catch (error) { next(error); } });
+app.get("/api/batches", async (req, res, next) => { try { res.json(await getBatchStockReport()); } catch (error) { next(error); } });
 app.get("/api/adjustments", async (req, res, next) => { try { res.json(await getAdjustmentsList()); } catch (error) { next(error); } });
 app.get("/api/reports/stock-by-location", async (req, res, next) => { try { res.json(await getStockByLocationReport()); } catch (error) { next(error); } });
 app.get("/api/reports/order-summary", async (req, res, next) => { try { res.json(await getOrderSummaryReport()); } catch (error) { next(error); } });
@@ -892,6 +939,8 @@ app.post("/api/purchase-orders/:id/receive", async (req, res, next) => {
     const qtyReceived = parseInteger(req.body?.qty_received, 0);
     const receivedBy = String(req.body?.received_by || "Goods In").trim();
     const notes = String(req.body?.notes || "").trim();
+    const batchNumber = String(req.body?.batch_number || "").trim();
+    const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
     const serialNumbers = parseSerialNumbers(req.body?.serial_numbers);
     if (!purchaseOrderId || !lineId || qtyReceived <= 0) throw requestError("Purchase order, line, and received quantity are required");
     const order = await get(`SELECT * FROM purchase_orders WHERE id = ?`, [purchaseOrderId]);
@@ -906,16 +955,17 @@ app.post("/api/purchase-orders/:id/receive", async (req, res, next) => {
     const receipt = await transaction(async () => {
       const receiptNumber = `GR-${Date.now()}`;
       const receiptResult = await run(`INSERT INTO goods_receipts (purchase_order_id, receipt_number, received_by, notes) VALUES (?, ?, ?, ?)`, [purchaseOrderId, receiptNumber, receivedBy, notes]);
-      await run(`INSERT INTO goods_receipt_lines (goods_receipt_id, purchase_order_line_id, product_id, qty_received, target_location_id, serial_numbers, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`, [receiptResult.id, lineId, line.product_id, qtyReceived, holdingLocation.id, JSON.stringify(serialNumbers), notes]);
+      await run(`INSERT INTO goods_receipt_lines (goods_receipt_id, purchase_order_line_id, product_id, qty_received, target_location_id, serial_numbers, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptResult.id, lineId, line.product_id, qtyReceived, holdingLocation.id, JSON.stringify(serialNumbers), notes, batchNumber, expiryDate]);
       await run(`UPDATE purchase_order_lines SET qty_received = qty_received + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [qtyReceived, lineId]);
       if (line.serial_tracking) {
         for (const serialNumber of serialNumbers) {
-          await run(`INSERT INTO inventory_units (product_id, serial_number, current_location_id, status, updated_at) VALUES (?, ?, ?, 'in_holding', CURRENT_TIMESTAMP)`, [line.product_id, serialNumber, holdingLocation.id]);
-          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'goods_in', 1, ?, ?, 'goods_receipt', ?, ?, ?)`, [line.product_id, serialNumber, holdingLocation.id, receiptNumber, notes, receivedBy]);
+          await run(`INSERT INTO inventory_units (product_id, serial_number, current_location_id, status, batch_number, expiry_date, updated_at) VALUES (?, ?, ?, 'in_holding', ?, ?, CURRENT_TIMESTAMP)`, [line.product_id, serialNumber, holdingLocation.id, batchNumber, expiryDate]);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'goods_in', 1, ?, ?, 'goods_receipt', ?, ?, ?, ?, ?)`, [line.product_id, serialNumber, holdingLocation.id, receiptNumber, notes, receivedBy, batchNumber, expiryDate]);
         }
       } else {
         await updateInventoryBalance(line.product_id, holdingLocation.id, qtyReceived, 0);
-        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'goods_in', ?, ?, 'goods_receipt', ?, ?, ?)`, [line.product_id, qtyReceived, holdingLocation.id, receiptNumber, notes, receivedBy]);
+        await updateStockBatch(line.product_id, holdingLocation.id, batchNumber, expiryDate, qtyReceived, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'goods_in', ?, ?, 'goods_receipt', ?, ?, ?, ?, ?)`, [line.product_id, qtyReceived, holdingLocation.id, receiptNumber, notes, receivedBy, batchNumber, expiryDate]);
       }
       const status = await refreshPurchaseOrderStatus(purchaseOrderId);
       return { id: receiptResult.id, receipt_number: receiptNumber, received_at: new Date().toISOString(), received_by: receivedBy, notes, po_number: order.po_number, sku: line.sku, product_name: line.product_name, qty_received: qtyReceived, target_location_code: holdingLocation.code, status, purchase_order_line_id: lineId };
@@ -1086,6 +1136,8 @@ app.post("/api/transfers", async (req, res, next) => {
     const toLocationId = parseInteger(req.body?.to_location_id, 0);
     const qty = parseInteger(req.body?.qty, 0);
     const serialNumbers = Array.from(new Set(parseSerialNumbers(req.body?.serial_numbers)));
+    const batchNumber = String(req.body?.batch_number || "").trim();
+    const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
     const reference = String(req.body?.reference || "").trim();
     const movedBy = String(req.body?.moved_by || "Transfer").trim();
     const notes = String(req.body?.notes || "").trim();
@@ -1107,7 +1159,7 @@ app.post("/api/transfers", async (req, res, next) => {
         movedQty = units.length;
         for (const unit of units) {
           await run(`UPDATE inventory_units SET current_location_id = ?, status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [toLocationId, unit.id]);
-          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'transfer', 1, ?, ?, ?, 'transfer', ?, ?, ?)`, [productId, unit.serial_number, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy]);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'transfer', 1, ?, ?, ?, 'transfer', ?, ?, ?, ?, ?)`, [productId, unit.serial_number, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy, unit.batch_number || batchNumber, unit.expiry_date || expiryDate]);
         }
       } else {
         if (qty <= 0) throw requestError("Quantity must be greater than zero for quantity transfers");
@@ -1116,9 +1168,11 @@ app.post("/api/transfers", async (req, res, next) => {
         if (available < qty) throw requestError(`Only ${available} units are available at the from location`, 409);
         await updateInventoryBalance(productId, fromLocationId, -qty, 0);
         await updateInventoryBalance(productId, toLocationId, qty, 0);
-        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'transfer', ?, ?, ?, 'transfer', ?, ?, ?)`, [productId, qty, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy]);
+        await updateStockBatch(productId, fromLocationId, batchNumber, expiryDate, -qty, 0);
+        await updateStockBatch(productId, toLocationId, batchNumber, expiryDate, qty, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'transfer', ?, ?, ?, 'transfer', ?, ?, ?, ?, ?)`, [productId, qty, fromLocationId, toLocationId, reference || `TRF-${Date.now()}`, notes, movedBy, batchNumber, expiryDate]);
       }
-      const result = await run(`INSERT INTO transfers (product_id, from_location_id, to_location_id, qty, serial_numbers, reference, moved_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [productId, fromLocationId, toLocationId, movedQty, JSON.stringify(serialNumbers), reference, movedBy, notes]);
+      const result = await run(`INSERT INTO transfers (product_id, from_location_id, to_location_id, qty, serial_numbers, reference, moved_by, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, fromLocationId, toLocationId, movedQty, JSON.stringify(serialNumbers), reference, movedBy, notes, batchNumber, expiryDate]);
       return get(`SELECT t.*, p.sku, p.name AS product_name, lf.code AS from_location_code, lt.code AS to_location_code FROM transfers t JOIN products p ON p.id = t.product_id JOIN locations lf ON lf.id = t.from_location_id JOIN locations lt ON lt.id = t.to_location_id WHERE t.id = ?`, [result.id]);
     });
     await createActivity("transfer", transfer.id, "created", transfer);
@@ -1152,7 +1206,7 @@ app.post("/api/usage", async (req, res, next) => {
         usedQty = units.length;
         for (const unit of units) {
           await run(`UPDATE inventory_units SET current_location_id = NULL, status = 'consumed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [unit.id]);
-          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'usage', 1, ?, ?, NULL, 'usage', ?, ?, ?)`, [productId, unit.serial_number, locationId, reference || `USE-${Date.now()}`, notes, usedBy]);
+          await run(`INSERT INTO stock_movements (product_id, movement_type, qty, serial_number, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', 1, ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, unit.serial_number, locationId, reference || `USE-${Date.now()}`, notes, usedBy, unit.batch_number || batchNumber, unit.expiry_date || expiryDate]);
         }
       } else {
         if (qty <= 0) throw requestError("Quantity must be greater than zero for stock usage");
@@ -1160,9 +1214,10 @@ app.post("/api/usage", async (req, res, next) => {
         const available = Number(balance?.qty_on_hand || 0) - Number(balance?.qty_allocated || 0);
         if (available < qty) throw requestError(`Only ${available} units are available at the selected location`, 409);
         await updateInventoryBalance(productId, locationId, -qty, 0);
-        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, 'usage', ?, ?, NULL, 'usage', ?, ?, ?)`, [productId, qty, locationId, reference || `USE-${Date.now()}`, notes, usedBy]);
+        await updateStockBatch(productId, locationId, batchNumber, expiryDate, -qty, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, 'usage', ?, ?, NULL, 'usage', ?, ?, ?, ?, ?)`, [productId, qty, locationId, reference || `USE-${Date.now()}`, notes, usedBy, batchNumber, expiryDate]);
       }
-      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, used_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, usedBy, notes]);
+      const result = await run(`INSERT INTO usage_transactions (product_id, location_id, qty, serial_numbers, reference, used_by, notes, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, usedQty, JSON.stringify(serialNumbers), reference, usedBy, notes, batchNumber, expiryDate]);
       return get(`SELECT u.*, p.sku, p.name AS product_name, l.code AS location_code FROM usage_transactions u JOIN products p ON p.id = u.product_id LEFT JOIN locations l ON l.id = u.location_id WHERE u.id = ?`, [result.id]);
     });
     await createActivity("usage", usage.id, "created", usage);
@@ -1179,6 +1234,8 @@ app.post("/api/adjustments", async (req, res, next) => {
     const qty = parseInteger(req.body?.qty, 0);
     const serialNumbers = Array.from(new Set(parseSerialNumbers(req.body?.serial_numbers)));
     const reason = String(req.body?.reason || "").trim();
+    const batchNumber = String(req.body?.batch_number || "").trim();
+    const expiryDate = normalizeOptionalDate(req.body?.expiry_date || "");
     const notes = String(req.body?.notes || "").trim();
     const adjustedBy = String(req.body?.adjusted_by || "Adjustment").trim();
     if (!productId || !adjustmentType || !reason) throw requestError("Product, adjustment type, and reason are required");
@@ -1203,7 +1260,8 @@ app.post("/api/adjustments", async (req, res, next) => {
         if (qty <= 0) throw requestError("Quantity must be greater than zero");
         const qtyDelta = ["increase", "found"].includes(adjustmentType) ? qty : -qty;
         await updateInventoryBalance(productId, locationId, qtyDelta, 0);
-        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by) VALUES (?, ?, ?, ?, ?, 'adjustment', ?, ?, ?)`, [productId, qtyDelta > 0 ? "adjustment_in" : adjustmentType === "damage" ? "damage" : "adjustment_out", Math.abs(qty), qtyDelta > 0 ? null : locationId, qtyDelta > 0 ? locationId : null, `ADJ-${Date.now()}`, reason + (notes ? ` - ${notes}` : ""), adjustedBy]);
+        await updateStockBatch(productId, locationId, batchNumber, expiryDate, qtyDelta, 0);
+        await run(`INSERT INTO stock_movements (product_id, movement_type, qty, from_location_id, to_location_id, reference_type, reference_id, notes, created_by, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, 'adjustment', ?, ?, ?, ?, ?)`, [productId, qtyDelta > 0 ? "adjustment_in" : adjustmentType === "damage" ? "damage" : "adjustment_out", Math.abs(qty), qtyDelta > 0 ? null : locationId, qtyDelta > 0 ? locationId : null, `ADJ-${Date.now()}`, reason + (notes ? ` - ${notes}` : ""), adjustedBy, batchNumber, expiryDate]);
         if (adjustmentType === "damage") {
           const damagedLocation = await getLocationByCode("DAMAGED");
           if (damagedLocation) {
@@ -1211,7 +1269,7 @@ app.post("/api/adjustments", async (req, res, next) => {
           }
         }
       }
-      const result = await run(`INSERT INTO adjustments (product_id, location_id, adjustment_type, qty, serial_numbers, reason, notes, adjusted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, adjustmentType, Number(product.serial_tracking || 0) ? serialNumbers.length : qty, JSON.stringify(serialNumbers), reason, notes, adjustedBy]);
+      const result = await run(`INSERT INTO adjustments (product_id, location_id, adjustment_type, qty, serial_numbers, reason, notes, adjusted_by, batch_number, expiry_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [productId, locationId, adjustmentType, Number(product.serial_tracking || 0) ? serialNumbers.length : qty, JSON.stringify(serialNumbers), reason, notes, adjustedBy, batchNumber, expiryDate]);
       return get(`SELECT a.*, p.sku, p.name AS product_name, l.code AS location_code FROM adjustments a JOIN products p ON p.id = a.product_id LEFT JOIN locations l ON l.id = a.location_id WHERE a.id = ?`, [result.id]);
     });
     await createActivity("adjustment", adjustment.id, "created", adjustment);

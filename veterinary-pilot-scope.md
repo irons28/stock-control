@@ -27,12 +27,21 @@ This branch should prove these workflows:
 - review recent usage transactions
 - audit stock movement history
 
+## Current Pilot Status
+
+This branch now includes:
+
+- clinic, van, and kit locations
+- transfer workflow to mobile locations
+- field usage recording
+- batch / lot capture
+- expiry date capture
+- batch stock report by location
+
 ## Not Yet In This Pilot
 
 These should come after the first pilot review:
 
-- batch / lot tracking
-- expiry dates
 - controlled drug controls
 - patient master records
 - appointment integration
