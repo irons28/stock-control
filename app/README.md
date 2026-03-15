@@ -60,3 +60,5 @@ Recommended import order:
 
 For the full cutover sequence, see `migration-playbook.md`.
 
+
+Phase A rule: purchase orders and sales orders are expected to be imported from the external system. Manual order creation is disabled by default in the app.

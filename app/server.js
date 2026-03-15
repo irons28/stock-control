@@ -10,6 +10,7 @@ const { createImportTools } = require("./import-tools");
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DB_PATH = path.join(__dirname, "stock-control.db");
+const MANUAL_ORDER_ENTRY = process.env.ALLOW_MANUAL_ORDER_ENTRY === "true";
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -824,6 +825,7 @@ app.get("/api/migration/reconciliation", async (req, res, next) => { try { res.j
 
 app.post("/api/purchase-orders", async (req, res, next) => {
   try {
+    if (!MANUAL_ORDER_ENTRY) throw requestError("Manual purchase order creation is disabled in Phase A. Import purchase orders instead.", 410);
     const input = mapPurchaseOrderInput(req.body || {});
     const created = await transaction(async () => {
       const poResult = await run(`INSERT INTO purchase_orders (po_number, supplier_id, status, expected_at, notes, updated_at) VALUES (?, ?, 'ordered', ?, ?, CURRENT_TIMESTAMP)`, [input.po_number, input.supplier_id, input.expected_at, input.notes]);
@@ -928,6 +930,7 @@ app.post("/api/putaway", async (req, res, next) => {
 
 app.post("/api/sales-orders", async (req, res, next) => {
   try {
+    if (!MANUAL_ORDER_ENTRY) throw requestError("Manual sales order creation is disabled in Phase A. Import sales orders instead.", 410);
     const input = mapSalesOrderInput(req.body || {});
     const created = await transaction(async () => {
       const orderResult = await run(`INSERT INTO sales_orders (order_number, customer_id, status, notes, updated_at) VALUES (?, ?, 'draft', ?, CURRENT_TIMESTAMP)`, [input.order_number, input.customer_id, input.notes]);

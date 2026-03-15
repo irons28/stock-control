@@ -65,3 +65,5 @@ Do not start using the app operationally until:
 - serial counts and locations reconcile
 - open purchase orders have been loaded and checked
 - open sales orders have been loaded and checked
+
+Phase A rule: purchase orders and sales orders are expected to be imported from the external system. Manual order creation is disabled by default in the app.

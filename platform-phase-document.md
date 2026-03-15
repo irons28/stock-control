@@ -432,3 +432,5 @@ Recommended strategy:
 - industry-specific extensions only where needed
 
 This gives the best balance between reuse, maintainability, and commercial flexibility.
+
+Phase A rule: purchase orders and sales orders are expected to be imported from the external system. Manual order creation is disabled by default in the app.

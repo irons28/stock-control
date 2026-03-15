@@ -17,8 +17,6 @@ const state = {
   reconciliation: null,
   reports: { stockByLocation: { quantity: [], serialised: [] }, orderSummary: { purchase: [], sales: [] } },
   activity: [],
-  poDraftLines: [],
-  soDraftLines: [],
   selectedPoId: "",
   activeSection: "overview",
   message: "",
@@ -248,14 +246,6 @@ function renderLocationsList() {
   return `<section class="panel span-6"><div class="panel-header"><div><p class="panel-kicker">Storage map</p><h2>Locations</h2></div></div><div class="table-wrap compact"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th></tr></thead><tbody>${state.locations.map((item) => `<tr><td>${escapeHtml(item.code)}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.type)}</td><td><span class="${badgeClass(item.is_active)}">${item.is_active ? "Active" : "Inactive"}</span></td></tr>`).join("") || '<tr><td colspan="4" class="empty">No locations yet</td></tr>'}</tbody></table></div></section>`;
 }
 
-function renderDraftLines(lines, attr, priceKey) {
-  return `<div class="draft-lines">${lines.length ? lines.map((line, index) => `<div class="draft-line"><div><strong>${escapeHtml(line.product_label)}</strong><p class="muted">Qty ${line.qty_ordered} at ${currency(line[priceKey])}</p></div><button type="button" class="ghost-button" data-${attr}="${index}">Remove</button></div>`).join("") : '<p class="empty">Add one or more lines before saving</p>'}</div>`;
-}
-
-function renderPurchaseOrderForm() {
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Purchasing workflow</p><h2>Create purchase order</h2></div></div><form id="purchase-order-form" class="stack-form"><div class="two-up"><label>PO number<input name="po_number" required /></label><label>Supplier<select name="supplier_id" required>${optionList(state.suppliers, (item) => escapeHtml(item.name), "Select supplier")}</select></label></div><div class="two-up"><label>Expected date<input name="expected_at" type="date" /></label><label>Notes<input name="notes" /></label></div><div class="line-builder"><div class="line-builder-grid"><label>Product<select id="po-line-product">${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)}`, "Select product")}</select></label><label>Qty ordered<input id="po-line-qty" type="number" min="1" step="1" value="1" /></label><label>Unit cost<input id="po-line-cost" type="number" min="0" step="0.01" value="0" /></label><label>Line notes<input id="po-line-notes" /></label></div><button type="button" id="add-po-line" class="secondary-button">Add line</button></div>${renderDraftLines(state.poDraftLines, "remove-po-line", "unit_cost")}<button type="submit">Save purchase order</button></form></section>`;
-}
-
 function renderPurchaseOrdersList() {
   return renderListPanel("Imported purchase orders", "Inbound queue", state.purchaseOrders, (order) => `<article class="list-card"><div class="list-card-top"><div><h3>${escapeHtml(order.po_number)}</h3><p class="muted">${escapeHtml(order.supplier_name)} · ${order.total_received}/${order.total_ordered} received</p></div><span class="${orderStatusClass(order.status)}">${escapeHtml(order.status)}</span></div><div class="line-pill-row">${(order.lines || []).map((line) => `<span class="chip">${escapeHtml(line.sku)} · ${line.qty_received}/${line.qty_ordered}</span>`).join("")}</div></article>`, "span-7");
 }
@@ -276,10 +266,6 @@ function renderHoldingStock() {
 
 function renderPutawayForm() {
   return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Putaway</p><h2>Move stock out of holding</h2></div></div><form id="putaway-form" class="stack-form"><label>Holding item<select name="product_id" required>${optionList(state.holdingStock, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)} · ${item.qty_in_holding} in holding`, "Select item from holding")}</select></label><div class="two-up"><label>Destination<select name="destination_location_id" required>${optionList(putawayDestinations(), (item) => `${escapeHtml(item.code)} · ${escapeHtml(item.name)}`, "Select destination")}</select></label><label>Qty<input name="qty" type="number" min="1" step="1" value="1" required /></label></div><label>Serial numbers<textarea name="serial_numbers" rows="3"></textarea></label><div class="two-up"><label>Moved by<input name="moved_by" value="Putaway" /></label><label>Notes<input name="notes" /></label></div><button type="submit">Complete putaway</button></form></section>`;
-}
-
-function renderSalesOrderForm() {
-  return `<section class="panel span-5"><div class="panel-header"><div><p class="panel-kicker">Outbound workflow</p><h2>Create sales order</h2></div></div><form id="sales-order-form" class="stack-form"><div class="two-up"><label>Order number<input name="order_number" required /></label><label>Customer<select name="customer_id" required>${optionList(state.customers, (item) => escapeHtml(item.name), "Select customer")}</select></label></div><label>Notes<input name="notes" /></label><div class="line-builder"><div class="line-builder-grid"><label>Product<select id="so-line-product">${optionList(state.products, (item) => `${escapeHtml(item.sku)} · ${escapeHtml(item.name)} · ${item.qty_available} available`, "Select product")}</select></label><label>Qty ordered<input id="so-line-qty" type="number" min="1" step="1" value="1" /></label><label>Unit price<input id="so-line-price" type="number" min="0" step="0.01" value="0" /></label><label>Line notes<input id="so-line-notes" /></label></div><button type="button" id="add-so-line" class="secondary-button">Add line</button></div>${renderDraftLines(state.soDraftLines, "remove-so-line", "unit_price")}<button type="submit">Save sales order</button></form></section>`;
 }
 
 function renderSalesOrdersList() {
@@ -543,22 +529,13 @@ function formDataToObject(form) {
   return result;
 }
 
-function buildDraftLine({ productSelectId, qtyId, priceId, notesId, priceKey }) {
-  const product = state.products.find((item) => String(item.id) === String(document.getElementById(productSelectId)?.value));
-  const qty = Number(document.getElementById(qtyId)?.value || 0);
-  if (!product || qty <= 0) throw new Error("Choose a product and quantity first");
-  return { product_id: product.id, product_label: `${product.sku} · ${product.name}`, qty_ordered: qty, [priceKey]: Number(document.getElementById(priceId)?.value || 0), notes: document.getElementById(notesId)?.value || "" };
-}
-
 function bindForms() {
   const productForm = document.getElementById("product-form");
   const supplierForm = document.getElementById("supplier-form");
   const customerForm = document.getElementById("customer-form");
   const locationForm = document.getElementById("location-form");
-  const purchaseOrderForm = document.getElementById("purchase-order-form");
   const goodsInForm = document.getElementById("goods-in-form");
   const putawayForm = document.getElementById("putaway-form");
-  const salesOrderForm = document.getElementById("sales-order-form");
   const adjustmentForm = document.getElementById("adjustment-form");
 
   document.querySelectorAll("[data-section]").forEach((button) => button.addEventListener("click", () => {
@@ -583,29 +560,6 @@ function bindForms() {
     try { await api("/api/locations", { method: "POST", body: JSON.stringify(formDataToObject(locationForm)) }); locationForm.reset(); setMessage("Location saved"); await loadAll(); } catch (error) { setMessage(error.message, true); }
   });
 
-  document.getElementById("add-po-line")?.addEventListener("click", () => {
-    try { state.poDraftLines = state.poDraftLines.concat(buildDraftLine({ productSelectId: "po-line-product", qtyId: "po-line-qty", priceId: "po-line-cost", notesId: "po-line-notes", priceKey: "unit_cost" })); render(); } catch (error) { setMessage(error.message, true); }
-  });
-  document.getElementById("add-so-line")?.addEventListener("click", () => {
-    try { state.soDraftLines = state.soDraftLines.concat(buildDraftLine({ productSelectId: "so-line-product", qtyId: "so-line-qty", priceId: "so-line-price", notesId: "so-line-notes", priceKey: "unit_price" })); render(); } catch (error) { setMessage(error.message, true); }
-  });
-
-  document.querySelectorAll("[data-remove-po-line]").forEach((button) => button.addEventListener("click", () => { state.poDraftLines = state.poDraftLines.filter((_, index) => index !== Number(button.getAttribute("data-remove-po-line"))); render(); }));
-  document.querySelectorAll("[data-remove-so-line]").forEach((button) => button.addEventListener("click", () => { state.soDraftLines = state.soDraftLines.filter((_, index) => index !== Number(button.getAttribute("data-remove-so-line"))); render(); }));
-
-  purchaseOrderForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      if (!state.poDraftLines.length) state.poDraftLines = [buildDraftLine({ productSelectId: "po-line-product", qtyId: "po-line-qty", priceId: "po-line-cost", notesId: "po-line-notes", priceKey: "unit_cost" })];
-      const payload = formDataToObject(purchaseOrderForm);
-      payload.lines = state.poDraftLines.map(({ product_id, qty_ordered, unit_cost, notes }) => ({ product_id, qty_ordered, unit_cost, notes }));
-      await api("/api/purchase-orders", { method: "POST", body: JSON.stringify(payload) });
-      state.poDraftLines = [];
-      purchaseOrderForm.reset();
-      setMessage("Purchase order created");
-      await loadAll();
-    } catch (error) { setMessage(error.message, true); }
-  });
 
   document.getElementById("goods-in-po")?.addEventListener("change", (event) => { state.selectedPoId = event.target.value; render(); });
   goodsInForm?.addEventListener("submit", async (event) => {
@@ -622,20 +576,6 @@ function bindForms() {
   putawayForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     try { await api("/api/putaway", { method: "POST", body: JSON.stringify(formDataToObject(putawayForm)) }); putawayForm.reset(); setMessage("Putaway completed"); await loadAll(); } catch (error) { setMessage(error.message, true); }
-  });
-
-  salesOrderForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      if (!state.soDraftLines.length) state.soDraftLines = [buildDraftLine({ productSelectId: "so-line-product", qtyId: "so-line-qty", priceId: "so-line-price", notesId: "so-line-notes", priceKey: "unit_price" })];
-      const payload = formDataToObject(salesOrderForm);
-      payload.lines = state.soDraftLines.map(({ product_id, qty_ordered, unit_price, notes }) => ({ product_id, qty_ordered, unit_price, notes }));
-      await api("/api/sales-orders", { method: "POST", body: JSON.stringify(payload) });
-      state.soDraftLines = [];
-      salesOrderForm.reset();
-      setMessage("Sales order created");
-      await loadAll();
-    } catch (error) { setMessage(error.message, true); }
   });
 
   adjustmentForm?.addEventListener("submit", async (event) => {
