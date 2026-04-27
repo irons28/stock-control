@@ -8,3 +8,7 @@ app/__MACOSX/
 app/public/.DS_Store
 app/.DS_Store
 app/ssl/
+frontend/node_modules/
+frontend/dist/
+node_modules/
+dist/
