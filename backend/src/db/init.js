@@ -1,4 +1,4 @@
-const { all, run } = require("./connection");
+const { all, get, run } = require("./connection");
 
 async function hasColumn(tableName, columnName) {
   const columns = await all(`PRAGMA table_info(${tableName})`);
@@ -13,6 +13,17 @@ async function addColumnIfMissing(tableName, columnDefinition) {
   }
 
   await run(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`);
+}
+
+async function ensureRecord({ selectSql, selectParams = [], insertSql, insertParams = [] }) {
+  const existing = await get(selectSql, selectParams);
+
+  if (existing?.id) {
+    return existing.id;
+  }
+
+  const result = await run(insertSql, insertParams);
+  return result.id;
 }
 
 async function createCoreTables() {
@@ -244,6 +255,19 @@ async function createCoreTables() {
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
     FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stock_item_id INTEGER,
+    serial_number TEXT,
+    activity_type TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    reference_type TEXT DEFAULT '',
+    reference_id INTEGER,
+    payload_json TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stock_item_id) REFERENCES stock_items(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -267,6 +291,8 @@ async function applySchemaMigrations() {
 
   await addColumnIfMissing("sales_orders", "linked_purchase_order_id INTEGER REFERENCES purchase_orders(id)");
   await addColumnIfMissing("sales_order_lines", "linked_purchase_order_line_id INTEGER REFERENCES purchase_order_lines(id)");
+
+  await addColumnIfMissing("goods_receipts", "delivery_number TEXT DEFAULT ''");
 
   await addColumnIfMissing("stock_movements", "stock_item_id INTEGER REFERENCES stock_items(id)");
   await addColumnIfMissing("stock_movements", "actual_source_location_id INTEGER REFERENCES stock_locations(id)");
@@ -485,6 +511,556 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_stock_item_id ON stock_movements(stock_item_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_purchase_order_id ON stock_movements(linked_purchase_order_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_sales_order_id ON stock_movements(linked_sales_order_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_serial_number ON activity_log(serial_number)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_stock_item_id ON activity_log(stock_item_id)`);
+}
+
+async function seedOperationalData() {
+  const po1001Id = await ensureRecord({
+    selectSql: "SELECT id FROM purchase_orders WHERE order_number = ?",
+    selectParams: ["PO-1001"],
+    insertSql: `
+      INSERT INTO purchase_orders (
+        order_number, supplier_id, status, ordered_at, expected_at, notes
+      ) VALUES (
+        'PO-1001',
+        (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+        'received',
+        '2026-04-08T09:00:00.000Z',
+        '2026-04-12T09:00:00.000Z',
+        'Seeded hardware receipt for allocation testing.'
+      )
+    `,
+  });
+
+  const po1002Id = await ensureRecord({
+    selectSql: "SELECT id FROM purchase_orders WHERE order_number = ?",
+    selectParams: ["PO-1002"],
+    insertSql: `
+      INSERT INTO purchase_orders (
+        order_number, supplier_id, status, ordered_at, expected_at, notes
+      ) VALUES (
+        'PO-1002',
+        (SELECT id FROM suppliers WHERE code = 'SUP-CONSUMIX'),
+        'received',
+        '2026-04-09T10:30:00.000Z',
+        '2026-04-13T10:30:00.000Z',
+        'Seeded consumables receipt for allocation testing.'
+      )
+    `,
+  });
+
+  const so1001Id = await ensureRecord({
+    selectSql: "SELECT id FROM sales_orders WHERE order_number = ?",
+    selectParams: ["SO-1001"],
+    insertSql: `
+      INSERT INTO sales_orders (
+        order_number, customer_id, linked_purchase_order_id, status, requested_at, dispatch_due_at, notes
+      ) VALUES (
+        'SO-1001',
+        (SELECT id FROM customers WHERE code = 'CUST-ALPHA'),
+        ?,
+        'awaiting_stock',
+        '2026-04-14T08:00:00.000Z',
+        '2026-04-29T15:00:00.000Z',
+        'Seeded mixed serial and consumable order.'
+      )
+    `,
+    insertParams: [po1001Id],
+  });
+
+  const so1002Id = await ensureRecord({
+    selectSql: "SELECT id FROM sales_orders WHERE order_number = ?",
+    selectParams: ["SO-1002"],
+    insertSql: `
+      INSERT INTO sales_orders (
+        order_number, customer_id, linked_purchase_order_id, status, requested_at, dispatch_due_at, notes
+      ) VALUES (
+        'SO-1002',
+        (SELECT id FROM customers WHERE code = 'CUST-HARBOR'),
+        ?,
+        'awaiting_stock',
+        '2026-04-16T08:30:00.000Z',
+        '2026-05-02T12:00:00.000Z',
+        'Seeded shortage scenario for validation checks.'
+      )
+    `,
+    insertParams: [po1002Id],
+  });
+
+  const po1001TillLineId = await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM purchase_order_lines
+      WHERE purchase_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'TILL-001')
+    `,
+    selectParams: [po1001Id],
+    insertSql: `
+      INSERT INTO purchase_order_lines (
+        purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        2,
+        2,
+        325
+      )
+    `,
+    insertParams: [po1001Id],
+  });
+
+  const po1001PrinterLineId = await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM purchase_order_lines
+      WHERE purchase_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'PRINTER-001')
+    `,
+    selectParams: [po1001Id],
+    insertSql: `
+      INSERT INTO purchase_order_lines (
+        purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+        1,
+        1,
+        110
+      )
+    `,
+    insertParams: [po1001Id],
+  });
+
+  const po1002RollLineId = await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM purchase_order_lines
+      WHERE purchase_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+    `,
+    selectParams: [po1002Id],
+    insertSql: `
+      INSERT INTO purchase_order_lines (
+        purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'ROLL-001'),
+        50,
+        50,
+        1.1
+      )
+    `,
+    insertParams: [po1002Id],
+  });
+
+  const po1002LabelLineId = await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM purchase_order_lines
+      WHERE purchase_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'LABEL-001')
+    `,
+    selectParams: [po1002Id],
+    insertSql: `
+      INSERT INTO purchase_order_lines (
+        purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'LABEL-001'),
+        12,
+        12,
+        3.2
+      )
+    `,
+    insertParams: [po1002Id],
+  });
+
+  await ensureRecord({
+    selectSql: "SELECT id FROM goods_receipts WHERE receipt_number = ?",
+    selectParams: ["GR-1001"],
+    insertSql: `
+      INSERT INTO goods_receipts (
+        purchase_order_id, receipt_number, delivery_number, received_at, received_by, notes
+      ) VALUES (
+        ?,
+        'GR-1001',
+        'DEL-1001',
+        '2026-04-12T11:15:00.000Z',
+        'Warehouse Team',
+        'Seeded hardware receipt.'
+      )
+    `,
+    insertParams: [po1001Id],
+  });
+
+  const gr1002Id = await ensureRecord({
+    selectSql: "SELECT id FROM goods_receipts WHERE receipt_number = ?",
+    selectParams: ["GR-1002"],
+    insertSql: `
+      INSERT INTO goods_receipts (
+        purchase_order_id, receipt_number, delivery_number, received_at, received_by, notes
+      ) VALUES (
+        ?,
+        'GR-1002',
+        'DEL-1002',
+        '2026-04-13T14:20:00.000Z',
+        'Warehouse Team',
+        'Seeded consumables receipt.'
+      )
+    `,
+    insertParams: [po1002Id],
+  });
+
+  const gr1001Id = await get(
+    "SELECT id FROM goods_receipts WHERE receipt_number = ?",
+    ["GR-1001"],
+  );
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM goods_receipt_lines
+      WHERE goods_receipt_id = ? AND purchase_order_line_id = ?
+    `,
+    selectParams: [gr1001Id.id, po1001TillLineId],
+    insertSql: `
+      INSERT INTO goods_receipt_lines (
+        goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+      ) VALUES (
+        ?,
+        ?,
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        2
+      )
+    `,
+    insertParams: [gr1001Id.id, po1001TillLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM goods_receipt_lines
+      WHERE goods_receipt_id = ? AND purchase_order_line_id = ?
+    `,
+    selectParams: [gr1001Id.id, po1001PrinterLineId],
+    insertSql: `
+      INSERT INTO goods_receipt_lines (
+        goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+      ) VALUES (
+        ?,
+        ?,
+        (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        1
+      )
+    `,
+    insertParams: [gr1001Id.id, po1001PrinterLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM goods_receipt_lines
+      WHERE goods_receipt_id = ? AND purchase_order_line_id = ?
+    `,
+    selectParams: [gr1002Id, po1002RollLineId],
+    insertSql: `
+      INSERT INTO goods_receipt_lines (
+        goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+      ) VALUES (
+        ?,
+        ?,
+        (SELECT id FROM products WHERE sku = 'ROLL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        50
+      )
+    `,
+    insertParams: [gr1002Id, po1002RollLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM goods_receipt_lines
+      WHERE goods_receipt_id = ? AND purchase_order_line_id = ?
+    `,
+    selectParams: [gr1002Id, po1002LabelLineId],
+    insertSql: `
+      INSERT INTO goods_receipt_lines (
+        goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+      ) VALUES (
+        ?,
+        ?,
+        (SELECT id FROM products WHERE sku = 'LABEL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        12
+      )
+    `,
+    insertParams: [gr1002Id, po1002LabelLineId],
+  });
+
+  const so1001TillSalesLineId = await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM sales_order_lines
+      WHERE sales_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'TILL-001')
+    `,
+    selectParams: [so1001Id],
+    insertSql: `
+      INSERT INTO sales_order_lines (
+        sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        ?,
+        2
+      )
+    `,
+    insertParams: [so1001Id, po1001TillLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM sales_order_lines
+      WHERE sales_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+    `,
+    selectParams: [so1001Id],
+    insertSql: `
+      INSERT INTO sales_order_lines (
+        sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'ROLL-001'),
+        ?,
+        20
+      )
+    `,
+    insertParams: [so1001Id, po1002RollLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM sales_order_lines
+      WHERE sales_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'PRINTER-001')
+    `,
+    selectParams: [so1002Id],
+    insertSql: `
+      INSERT INTO sales_order_lines (
+        sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+        ?,
+        2
+      )
+    `,
+    insertParams: [so1002Id, po1001PrinterLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM sales_order_lines
+      WHERE sales_order_id = ? AND product_id = (SELECT id FROM products WHERE sku = 'LABEL-001')
+    `,
+    selectParams: [so1002Id],
+    insertSql: `
+      INSERT INTO sales_order_lines (
+        sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered
+      ) VALUES (
+        ?,
+        (SELECT id FROM products WHERE sku = 'LABEL-001'),
+        ?,
+        30
+      )
+    `,
+    insertParams: [so1002Id, po1002LabelLineId],
+  });
+
+  await ensureRecord({
+    selectSql: "SELECT id FROM stock_items WHERE serial_number = ?",
+    selectParams: ["TILL-SN-1001"],
+    insertSql: `
+      INSERT INTO stock_items (
+        product_id,
+        stock_location_id,
+        actual_location_id,
+        serial_number,
+        quantity_on_hand,
+        quantity_allocated,
+        hold_status,
+        linked_purchase_order_id,
+        linked_purchase_order_line_id
+      ) VALUES (
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        'TILL-SN-1001',
+        1,
+        0,
+        'available',
+        ?,
+        ?
+      )
+    `,
+    insertParams: [po1001Id, po1001TillLineId],
+  });
+
+  await ensureRecord({
+    selectSql: "SELECT id FROM stock_items WHERE serial_number = ?",
+    selectParams: ["TILL-SN-1002"],
+    insertSql: `
+      INSERT INTO stock_items (
+        product_id,
+        stock_location_id,
+        actual_location_id,
+        serial_number,
+        quantity_on_hand,
+        quantity_allocated,
+        hold_status,
+        linked_purchase_order_id,
+        linked_purchase_order_line_id
+      ) VALUES (
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        'TILL-SN-1002',
+        1,
+        0,
+        'available',
+        ?,
+        ?
+      )
+    `,
+    insertParams: [po1001Id, po1001TillLineId],
+  });
+
+  await ensureRecord({
+    selectSql: "SELECT id FROM stock_items WHERE serial_number = ?",
+    selectParams: ["PRINTER-SN-2001"],
+    insertSql: `
+      INSERT INTO stock_items (
+        product_id,
+        stock_location_id,
+        actual_location_id,
+        serial_number,
+        quantity_on_hand,
+        quantity_allocated,
+        hold_status,
+        linked_purchase_order_id,
+        linked_purchase_order_line_id
+      ) VALUES (
+        (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        'PRINTER-SN-2001',
+        1,
+        0,
+        'available',
+        ?,
+        ?
+      )
+    `,
+    insertParams: [po1001Id, po1001PrinterLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM stock_items
+      WHERE product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+        AND serial_number IS NULL
+        AND linked_purchase_order_line_id = ?
+        AND hold_status = 'available'
+    `,
+    selectParams: [po1002RollLineId],
+    insertSql: `
+      INSERT INTO stock_items (
+        product_id,
+        stock_location_id,
+        actual_location_id,
+        quantity_on_hand,
+        quantity_allocated,
+        hold_status,
+        linked_purchase_order_id,
+        linked_purchase_order_line_id
+      ) VALUES (
+        (SELECT id FROM products WHERE sku = 'ROLL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        50,
+        0,
+        'available',
+        ?,
+        ?
+      )
+    `,
+    insertParams: [po1002Id, po1002RollLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM stock_items
+      WHERE product_id = (SELECT id FROM products WHERE sku = 'LABEL-001')
+        AND serial_number IS NULL
+        AND linked_purchase_order_line_id = ?
+        AND hold_status = 'available'
+    `,
+    selectParams: [po1002LabelLineId],
+    insertSql: `
+      INSERT INTO stock_items (
+        product_id,
+        stock_location_id,
+        actual_location_id,
+        quantity_on_hand,
+        quantity_allocated,
+        hold_status,
+        linked_purchase_order_id,
+        linked_purchase_order_line_id
+      ) VALUES (
+        (SELECT id FROM products WHERE sku = 'LABEL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        12,
+        0,
+        'available',
+        ?,
+        ?
+      )
+    `,
+    insertParams: [po1002Id, po1002LabelLineId],
+  });
+
+  await run(
+    `
+      UPDATE purchase_orders
+      SET linked_sales_order_id = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND IFNULL(linked_sales_order_id, 0) != ?
+    `,
+    [so1001Id, po1001Id, so1001Id],
+  );
+
+  await run(
+    `
+      UPDATE purchase_orders
+      SET linked_sales_order_id = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND IFNULL(linked_sales_order_id, 0) != ?
+    `,
+    [so1002Id, po1002Id, so1002Id],
+  );
+
+  await run(
+    `
+      UPDATE sales_order_lines
+      SET linked_purchase_order_line_id = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [po1001TillLineId, so1001TillSalesLineId],
+  );
 }
 
 async function initDatabase() {
@@ -494,6 +1070,7 @@ async function initDatabase() {
   await applySchemaMigrations();
   await createIndexes();
   await seedReferenceData();
+  await seedOperationalData();
 }
 
 module.exports = {
