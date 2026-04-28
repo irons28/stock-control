@@ -3,7 +3,7 @@ import { apiFetch } from "../lib/api";
 
 export function useApiResource(endpoint) {
   const [state, setState] = useState({
-    status: "loading",
+    status: endpoint ? "loading" : "idle",
     data: null,
     error: "",
   });
@@ -11,6 +11,17 @@ export function useApiResource(endpoint) {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!endpoint) {
+      setState({
+        status: "idle",
+        data: null,
+        error: "",
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function load() {
       setState({
