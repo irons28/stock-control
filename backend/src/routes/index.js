@@ -1,6 +1,7 @@
 const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
+const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
 
 const router = express.Router();
 
@@ -14,12 +15,6 @@ const resourceQueries = {
     FROM purchase_orders po
     JOIN suppliers s ON s.id = po.supplier_id
     ORDER BY po.created_at DESC
-  `,
-  "sales-orders": `
-    SELECT so.*, c.name AS customer_name
-    FROM sales_orders so
-    JOIN customers c ON c.id = so.customer_id
-    ORDER BY so.created_at DESC
   `,
   "stock-movements": `
     SELECT sm.*,
@@ -66,6 +61,17 @@ router.get("/navigation", (_req, res) => {
   res.json({
     items: moduleDefinitions,
   });
+});
+
+router.use("/sales-orders", salesOrdersRouter);
+
+router.get("/allocation/available-stock/:productId", async (req, res, next) => {
+  try {
+    const payload = await fetchAvailableStockByProduct(Number(req.params.productId));
+    res.json(payload);
+  } catch (error) {
+    next(error);
+  }
 });
 
 Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
