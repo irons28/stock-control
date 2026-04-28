@@ -10,9 +10,11 @@ const columns = [
   { key: "name", header: "Product" },
   { key: "category", header: "Category" },
   {
-    key: "tracking_mode",
-    header: "Tracking",
-    render: (row) => <span className="pill subtle">{formatLabel(row.tracking_mode)}</span>,
+    key: "serial_number_required",
+    header: "Serials",
+    render: (row) => (
+      <span className="pill subtle">{row.serial_number_required ? "Required" : "Not Required"}</span>
+    ),
   },
   {
     key: "cost_price",

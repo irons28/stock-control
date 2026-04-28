@@ -2,10 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 
-const dataDirectory = path.join(__dirname, "..", "..", "data");
-const databasePath = path.join(dataDirectory, "stock-control.sqlite");
+const defaultDatabasePath = path.join(__dirname, "..", "..", "data", "stock-control.sqlite");
+const databasePath = process.env.DATABASE_PATH
+  ? path.resolve(__dirname, "..", "..", process.env.DATABASE_PATH)
+  : defaultDatabasePath;
 
-fs.mkdirSync(dataDirectory, { recursive: true });
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
 const db = new sqlite3.Database(databasePath);
 

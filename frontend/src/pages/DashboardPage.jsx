@@ -1,8 +1,7 @@
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
-import { useApiResource } from "../hooks/useApiResource";
-import { formatDate, formatDateTime, formatLabel } from "../lib/formatters";
+import { formatLabel } from "../lib/formatters";
 
 function SummaryCard({ title, value, detail, status, error }) {
   return (
@@ -16,58 +15,31 @@ function SummaryCard({ title, value, detail, status, error }) {
   );
 }
 
-function DashboardPage() {
-  const health = useApiResource("/health");
-  const purchaseOrders = useApiResource("/purchase-orders");
-  const salesOrders = useApiResource("/sales-orders");
-  const products = useApiResource("/products");
-  const stockMovements = useApiResource("/stock-movements");
-  const locations = useApiResource("/stock-locations");
+function DashboardPage({ health }) {
+  const schema = health.data?.schema;
+  const tableCounts = schema?.tables || {};
+  const serialStatusRows = schema?.serialStatusCounts || [];
+  const requiredTableRows = (schema?.requiredTables || []).map((tableName) => ({
+    tableName,
+    rowCount: tableCounts[tableName] ?? 0,
+  }));
 
-  const purchaseRows = purchaseOrders.data?.items || [];
-  const salesRows = salesOrders.data?.items || [];
-  const productRows = products.data?.items || [];
-  const movementRows = stockMovements.data?.items || [];
-  const locationRows = locations.data?.items || [];
-
-  const pendingPurchaseOrders = purchaseRows.filter((item) => item.status !== "received").length;
-  const openSalesOrders = salesRows.filter((item) => item.status !== "dispatched").length;
-  const activeProducts = productRows.filter((item) => item.status === "active").length;
-  const activeLocations = locationRows.filter((item) => item.status === "active").length;
-
-  const purchaseColumns = [
-    { key: "order_number", header: "PO Number" },
-    { key: "supplier_name", header: "Supplier" },
+  const tableColumns = [
+    { key: "tableName", header: "Table" },
     {
-      key: "status",
-      header: "Status",
-      render: (row) => <span className="pill">{formatLabel(row.status)}</span>,
-    },
-    {
-      key: "expected_at",
-      header: "Expected",
-      render: (row) => formatDate(row.expected_at),
+      key: "rowCount",
+      header: "Rows",
+      render: (row) => row.rowCount,
     },
   ];
 
-  const movementColumns = [
+  const serialColumns = [
     {
-      key: "movement_type",
-      header: "Type",
-      render: (row) => <span className="pill subtle">{formatLabel(row.movement_type)}</span>,
+      key: "status",
+      header: "Serial Status",
+      render: (row) => <span className="pill subtle">{formatLabel(row.status)}</span>,
     },
-    { key: "product_name", header: "Product" },
-    {
-      key: "route",
-      header: "Route",
-      render: (row) =>
-        `${row.source_location_code || "External"} → ${row.destination_location_code || "External"}`,
-    },
-    {
-      key: "created_at",
-      header: "Recorded",
-      render: (row) => formatDateTime(row.created_at),
-    },
+    { key: "count", header: "Count" },
   ];
 
   return (
@@ -80,32 +52,32 @@ function DashboardPage() {
 
       <section className="summary-grid">
         <SummaryCard
-          title="Purchase Orders"
-          value={purchaseRows.length}
-          detail={`${pendingPurchaseOrders} still in progress`}
-          status={purchaseOrders.status}
-          error={purchaseOrders.error}
-        />
-        <SummaryCard
-          title="Sales Orders"
-          value={salesRows.length}
-          detail={`${openSalesOrders} still awaiting dispatch`}
-          status={salesOrders.status}
-          error={salesOrders.error}
+          title="Required Tables"
+          value={schema?.requiredTables?.length || 0}
+          detail={schema?.ready ? "Schema is fully present" : `${schema?.missingTables?.length || 0} missing`}
+          status={health.status}
+          error={health.error}
         />
         <SummaryCard
           title="Products"
-          value={productRows.length}
-          detail={`${activeProducts} currently active`}
-          status={products.status}
-          error={products.error}
+          value={tableCounts.products || 0}
+          detail={`${tableCounts.serial_numbers || 0} serial numbers loaded`}
+          status={health.status}
+          error={health.error}
         />
         <SummaryCard
-          title="Locations"
-          value={locationRows.length}
-          detail={`${activeLocations} active stock locations`}
-          status={locations.status}
-          error={locations.error}
+          title="Purchase Orders"
+          value={tableCounts.purchase_orders || 0}
+          detail={`${tableCounts.received_goods || 0} receipts recorded`}
+          status={health.status}
+          error={health.error}
+        />
+        <SummaryCard
+          title="Sales Orders"
+          value={tableCounts.sales_orders || 0}
+          detail={`${tableCounts.dispatches || 0} dispatches created`}
+          status={health.status}
+          error={health.error}
         />
       </section>
 
@@ -125,39 +97,39 @@ function DashboardPage() {
               <dd>{health.data?.database?.database_time || "—"}</dd>
             </div>
             <div>
-              <dt>Movement Records</dt>
-              <dd>{stockMovements.status === "success" ? movementRows.length : "—"}</dd>
+              <dt>Schema Status</dt>
+              <dd>{schema?.ready ? "Ready" : "Incomplete"}</dd>
             </div>
           </dl>
         </Card>
 
         <Card
-          title="Recent Purchase Orders"
-          subtitle="Inbound"
+          title="Table Row Counts"
+          subtitle="Database"
           className="dashboard-panel"
         >
           <DataTable
-            columns={purchaseColumns}
-            rows={purchaseRows.slice(0, 5)}
-            loading={purchaseOrders.status === "loading"}
-            error={purchaseOrders.status === "error" ? purchaseOrders.error : ""}
-            emptyMessage="No purchase orders have been created yet."
-            onRetry={purchaseOrders.reload}
+            columns={tableColumns}
+            rows={requiredTableRows}
+            loading={health.status === "loading"}
+            error={health.status === "error" ? health.error : ""}
+            emptyMessage="Database status will appear here once the backend responds."
+            onRetry={health.reload}
           />
         </Card>
 
         <Card
-          title="Latest Stock Activity"
-          subtitle="Inventory"
+          title="Serial Status Summary"
+          subtitle="Tracking"
           className="dashboard-panel dashboard-panel-wide"
         >
           <DataTable
-            columns={movementColumns}
-            rows={movementRows.slice(0, 6)}
-            loading={stockMovements.status === "loading"}
-            error={stockMovements.status === "error" ? stockMovements.error : ""}
-            emptyMessage="Stock movements will appear here once receiving or dispatch starts."
-            onRetry={stockMovements.reload}
+            columns={serialColumns}
+            rows={serialStatusRows}
+            loading={health.status === "loading"}
+            error={health.status === "error" ? health.error : ""}
+            emptyMessage="Serial status counts will appear once seed data is loaded."
+            onRetry={health.reload}
           />
         </Card>
       </section>

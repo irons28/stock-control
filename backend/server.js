@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { initDatabase } = require("./src/db/init");
+const { initializeDatabase } = require("./src/db/init");
 const { closeDatabase } = require("./src/db/connection");
 const apiRouter = require("./src/routes");
 
@@ -32,7 +32,7 @@ app.use((err, _req, res, _next) => {
 });
 
 async function start() {
-  await initDatabase();
+  await initializeDatabase();
 
   const server = app.listen(PORT, () => {
     console.log(`Stock Control API listening on http://localhost:${PORT}`);

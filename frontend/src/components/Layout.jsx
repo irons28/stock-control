@@ -1,6 +1,7 @@
 function Layout({ navigationItems, activePath, onNavigate, health, children }) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
+  const ready = backendOnline ? health.data?.schema?.ready : false;
 
   return (
     <div className="app-shell">
@@ -31,7 +32,9 @@ function Layout({ navigationItems, activePath, onNavigate, health, children }) {
           <div className={backendOnline ? "system-status online" : "system-status"}>
             <span className="status-dot" aria-hidden="true" />
             <div>
-              <strong>{backendOnline ? "API Connected" : "API Unavailable"}</strong>
+              <strong>
+                {backendOnline ? (ready ? "Database Ready" : "Schema Incomplete") : "API Unavailable"}
+              </strong>
               <p>
                 {backendOnline
                   ? `Database time: ${timestamp}`
