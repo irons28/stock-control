@@ -1,6 +1,7 @@
 const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
+const { receivePurchaseOrder } = require("../services/purchase-orders");
 
 const router = express.Router();
 
@@ -273,6 +274,15 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
           : [],
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/purchase-orders/:poNumber/receive", async (req, res, next) => {
+  try {
+    const receipt = await receivePurchaseOrder(req.params.poNumber, req.body);
+    res.status(201).json(receipt);
   } catch (error) {
     next(error);
   }

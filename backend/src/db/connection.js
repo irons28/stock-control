@@ -53,6 +53,19 @@ function all(sql, params = []) {
   });
 }
 
+function exec(sql) {
+  return new Promise((resolve, reject) => {
+    db.exec(sql, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
 function closeDatabase() {
   return new Promise((resolve, reject) => {
     db.close((error) => {
@@ -71,6 +84,7 @@ module.exports = {
   closeDatabase,
   databasePath,
   db,
+  exec,
   get,
   run,
 };
