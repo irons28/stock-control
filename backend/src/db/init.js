@@ -244,6 +244,7 @@ async function createCoreTables() {
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
     FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id)
   )`);
+
 }
 
 async function applySchemaMigrations() {

@@ -385,6 +385,123 @@ textarea {
   margin-top: 0.9rem;
 }
 
+/* ── Imports page ──────────────────────────────────────────────────────────── */
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-select,
+.form-textarea,
+.form-file {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: #1c2836;
+  font-size: 0.875rem;
+}
+
+.form-textarea {
+  resize: vertical;
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.8rem;
+}
+
+.form-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.column-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.input-mode-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.toggle-btn {
+  padding: 0.45rem 1rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggle-btn + .toggle-btn {
+  border-left: 1px solid var(--border);
+}
+
+.toggle-btn.active {
+  background: var(--navy-800);
+  color: #fff;
+}
+
+.import-error {
+  padding: 0.6rem 0.85rem;
+  background: #fdf2f2;
+  border: 1px solid #f0c0c0;
+  border-radius: 6px;
+  color: #a53d3d;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.import-summary-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.pill.success {
+  background: #dff4e8;
+  color: #1a6b3a;
+}
+
+.pill.error {
+  background: #fde8e8;
+  color: #a53d3d;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
 @media (max-width: 1100px) {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

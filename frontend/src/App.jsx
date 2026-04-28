@@ -6,6 +6,7 @@ import SalesOrdersPage from "./pages/SalesOrdersPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
+import ImportsPage from "./pages/ImportsPage";
 import { useApiResource } from "./hooks/useApiResource";
 
 const navigationItems = [
@@ -45,6 +46,12 @@ const navigationItems = [
     path: "/locations",
     description: "Define holding, shelf, bin, dispatch, and damaged locations.",
   },
+  {
+    key: "imports",
+    label: "Imports",
+    path: "/imports",
+    description: "Import customers, suppliers, products, and orders from CSV files.",
+  },
 ];
 
 const pageComponents = {
@@ -54,6 +61,7 @@ const pageComponents = {
   products: ProductsPage,
   stock: StockPage,
   locations: LocationsPage,
+  imports: ImportsPage,
 };
 
 function getItemByPath(pathname) {
