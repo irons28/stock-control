@@ -4,6 +4,7 @@ import DashboardPage from "./pages/DashboardPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
 import ProductsPage from "./pages/ProductsPage";
+import SerialTrackerPage from "./pages/SerialTrackerPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
 import { useApiResource } from "./hooks/useApiResource";
@@ -40,6 +41,12 @@ const navigationItems = [
     description: "Track movements, receiving flow, and stock handling activity.",
   },
   {
+    key: "serial-tracker",
+    label: "Serial Tracker",
+    path: "/serial-tracker",
+    description: "Find where a serial came from, where it went, and what happened next.",
+  },
+  {
     key: "locations",
     label: "Locations",
     path: "/locations",
@@ -53,6 +60,7 @@ const pageComponents = {
   "sales-orders": SalesOrdersPage,
   products: ProductsPage,
   stock: StockPage,
+  "serial-tracker": SerialTrackerPage,
   locations: LocationsPage,
 };
 

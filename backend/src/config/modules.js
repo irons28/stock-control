@@ -48,6 +48,12 @@ const moduleDefinitions = [
     path: "/stock-movements",
   },
   {
+    key: "serial-tracker",
+    label: "Serial Tracker",
+    description: "Trace serialised items from inbound receipt through allocation and dispatch.",
+    path: "/serial-tracker",
+  },
+  {
     key: "goods-receiving",
     label: "Goods Receiving",
     description: "Receive stock against purchase orders into holding locations.",

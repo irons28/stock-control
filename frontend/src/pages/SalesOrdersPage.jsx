@@ -2,6 +2,7 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import ScannerInput from "../components/ScannerInput";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatDate, formatLabel } from "../lib/formatters";
 
@@ -46,6 +47,28 @@ function SalesOrdersPage() {
           </Button>
         }
       />
+
+      <Card title="Dispatch Check" subtitle="Placeholder">
+        <ScannerInput
+          label="Scan item for dispatch checking"
+          placeholder="Scan outbound barcode or QR"
+          helperText="This placeholder keeps the dispatch screen scanner-friendly while the full outbound validation workflow is still being built."
+          submitLabel="Add Check"
+          preventDuplicates
+          duplicateMessage="That outbound item has already been scanned in this check."
+          successMessage="Dispatch check recorded."
+          listTitle="Scanned Dispatch Checks"
+          emptyListMessage="Scanned outbound items will appear here."
+          normalizeValue={(value) => value.trim().toUpperCase()}
+          onSubmit={async (value) => ({
+            item: {
+              key: value,
+              label: value,
+              meta: "Ready for dispatch validation.",
+            },
+          })}
+        />
+      </Card>
 
       <Card title="All Sales Orders" subtitle="Live Data">
         <DataTable
