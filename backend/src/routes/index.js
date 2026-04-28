@@ -2,6 +2,7 @@ const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
 const { receivePurchaseOrder } = require("../services/purchase-orders");
+const serialsRouter = require("./serials");
 
 const router = express.Router();
 
@@ -287,6 +288,8 @@ router.post("/purchase-orders/:poNumber/receive", async (req, res, next) => {
     next(error);
   }
 });
+
+router.use("/serials", serialsRouter);
 
 Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
   router.get(`/${resourceKey}`, async (_req, res, next) => {
