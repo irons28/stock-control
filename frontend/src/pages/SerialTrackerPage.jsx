@@ -1,7 +1,7 @@
 import { useState } from "react";
-import Button from "../components/Button";
 import Card from "../components/Card";
 import PageHeader from "../components/PageHeader";
+import ScannerInput from "../components/ScannerInput";
 import { apiFetch } from "../lib/api";
 import { formatDate, formatDateTime, formatLabel } from "../lib/formatters";
 
@@ -161,7 +161,6 @@ function SerialTimeline({ items }) {
 }
 
 function SerialTrackerPage() {
-  const [searchInput, setSearchInput] = useState("");
   const [searchState, setSearchState] = useState({
     status: "idle",
     items: [],
@@ -197,14 +196,7 @@ function SerialTrackerPage() {
     }
   }
 
-  async function handleSearch(event) {
-    event.preventDefault();
-
-    const nextSearch = searchInput.trim().toUpperCase();
-    if (!nextSearch) {
-      return;
-    }
-
+  async function handleSearch(nextSearch) {
     setSearchState({
       status: "loading",
       items: [],
@@ -230,12 +222,22 @@ function SerialTrackerPage() {
 
       if (exactMatch) {
         await loadSerialDetail(exactMatch.serialNumber);
-        return;
-      }
-
-      if (data.items.length === 1) {
+      } else if (data.items.length === 1) {
         await loadSerialDetail(data.items[0].serialNumber);
       }
+
+      return {
+        item: {
+          key: nextSearch,
+          label: nextSearch,
+          meta: data.items.length
+            ? `${data.items.length} possible ${data.items.length === 1 ? "match" : "matches"} found`
+            : "No matching serials found yet",
+        },
+        successMessage: data.items.length
+          ? `Lookup submitted for ${nextSearch}.`
+          : `No serial matched ${nextSearch}.`,
+      };
     } catch (error) {
       setSearchState({
         status: "error",
@@ -243,11 +245,14 @@ function SerialTrackerPage() {
         error: error.message || "Unable to search serials.",
         searchedFor: nextSearch,
       });
+
+      return {
+        errorMessage: error.message || "Unable to search serials.",
+      };
     }
   }
 
   function handleClear() {
-    setSearchInput("");
     setSearchState({
       status: "idle",
       items: [],
@@ -270,33 +275,23 @@ function SerialTrackerPage() {
       />
 
       <Card title="Search Serial Number" subtitle="Scanner Ready">
-        <form className="serial-search-form" onSubmit={handleSearch}>
-          <label className="serial-search-label" htmlFor="serial-search-input">
-            Scan or enter serial number
-          </label>
-          <div className="serial-search-row">
-            <input
-              id="serial-search-input"
-              className="serial-search-input"
-              type="text"
-              autoFocus
-              inputMode="text"
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCapitalize="characters"
-              spellCheck={false}
-              placeholder="e.g. PRN-2026-0001"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value.toUpperCase())}
-            />
-            <Button type="submit" disabled={searchState.status === "loading" || detailState.status === "loading"}>
-              {searchState.status === "loading" ? "Searching…" : "Search"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={handleClear}>
-              Clear
-            </Button>
-          </div>
-        </form>
+        <ScannerInput
+          label="Scan or enter serial number"
+          placeholder="e.g. PRN-2026-0001"
+          helperText="Most handheld scanners behave like keyboards. Keep the cursor here and let the scanner submit with Enter."
+          submitLabel="Search"
+          preventDuplicates
+          duplicateMessage="That serial has already been searched in this session."
+          successMessage="Serial lookup queued."
+          listTitle="Recent Serial Lookups"
+          emptyListMessage="Recent scans will build up here as you search serials."
+          normalizeValue={(value) => value.trim().toUpperCase()}
+          secondaryAction={{
+            label: "Clear Results",
+            onClick: handleClear,
+          }}
+          onSubmit={handleSearch}
+        />
       </Card>
 
       {searchState.status === "loading" || detailState.status === "loading" ? (
