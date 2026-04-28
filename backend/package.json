@@ -6,7 +6,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "check": "node --check server.js && node --check src/db/init.js && node --check src/routes/index.js",
+    "db:init": "node scripts/init-db.js",
+    "db:reset": "node scripts/reset-seed-db.js"
   },
   "engines": {
     "node": ">=18"
