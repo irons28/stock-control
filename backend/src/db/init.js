@@ -1,4 +1,4 @@
-const { all, run } = require("./connection");
+const { all, get, run } = require("./connection");
 
 async function hasColumn(tableName, columnName) {
   const columns = await all(`PRAGMA table_info(${tableName})`);
@@ -467,6 +467,356 @@ async function seedReferenceData() {
   )`);
 }
 
+async function seedOperationalData() {
+  const existingOperationalOrder = await get(
+    "SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'",
+  );
+
+  if (existingOperationalOrder) {
+    return;
+  }
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, customer_id, linked_sales_order_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1001',
+    (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+    (SELECT id FROM customers WHERE code = 'CUST-ALPHA'),
+    NULL,
+    'ordered',
+    '2026-04-10T09:00:00.000Z',
+    '2026-04-18T12:00:00.000Z',
+    'Overdue inbound hardware order.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, customer_id, linked_sales_order_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1002',
+    (SELECT id FROM suppliers WHERE code = 'SUP-CONSUMIX'),
+    (SELECT id FROM customers WHERE code = 'CUST-HARBOR'),
+    NULL,
+    'partially_received',
+    '2026-04-16T10:30:00.000Z',
+    '2026-04-30T15:00:00.000Z',
+    'Consumables received in stages.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, customer_id, linked_sales_order_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1003',
+    (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+    NULL,
+    NULL,
+    'received',
+    '2026-04-05T08:00:00.000Z',
+    '2026-04-12T11:00:00.000Z',
+    'Completed replenishment order.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_orders (
+    order_number, customer_id, linked_purchase_order_id, status, requested_at, dispatch_due_at, notes
+  ) VALUES (
+    'SO-2001',
+    (SELECT id FROM customers WHERE code = 'CUST-ALPHA'),
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    'awaiting_stock',
+    '2026-04-12T09:15:00.000Z',
+    '2026-04-28T17:00:00.000Z',
+    'Urgent replacement till rollout.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_orders (
+    order_number, customer_id, linked_purchase_order_id, status, requested_at, dispatch_due_at, notes
+  ) VALUES (
+    'SO-2002',
+    (SELECT id FROM customers WHERE code = 'CUST-HARBOR'),
+    NULL,
+    'ready_to_dispatch',
+    '2026-04-20T08:45:00.000Z',
+    '2026-04-29T15:30:00.000Z',
+    'Allocated and staged for dispatch.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_orders (
+    order_number, customer_id, linked_purchase_order_id, status, requested_at, dispatch_due_at, notes
+  ) VALUES (
+    'SO-2003',
+    (SELECT id FROM customers WHERE code = 'CUST-HARBOR'),
+    NULL,
+    'processing',
+    '2026-04-14T13:00:00.000Z',
+    '2026-05-02T12:00:00.000Z',
+    'Standard replenishment order.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost, linked_sales_order_line_id
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    4,
+    0,
+    325.00,
+    NULL
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost, linked_sales_order_line_id
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+    2,
+    0,
+    110.00,
+    NULL
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost, linked_sales_order_line_id
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    120,
+    75,
+    1.10,
+    NULL
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost, linked_sales_order_line_id
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (SELECT id FROM products WHERE sku = 'LABEL-001'),
+    40,
+    0,
+    3.20,
+    NULL
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost, linked_sales_order_line_id
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    10,
+    10,
+    58.00,
+    NULL
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_order_lines (
+    sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  ) VALUES (
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2001'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    NULL,
+    3,
+    1,
+    0
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_order_lines (
+    sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  ) VALUES (
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2001'),
+    (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+    NULL,
+    2,
+    0,
+    0
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_order_lines (
+    sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  ) VALUES (
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2002'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    NULL,
+    25,
+    25,
+    0
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_order_lines (
+    sales_order_id, product_id, linked_purchase_order_line_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  ) VALUES (
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2003'),
+    (SELECT id FROM products WHERE sku = 'LABEL-001'),
+    NULL,
+    8,
+    8,
+    4
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipts (
+    purchase_order_id, receipt_number, received_at, received_by, notes
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    'GR-3001',
+    '2026-04-22T10:00:00.000Z',
+    'Warehouse Team',
+    'First partial intake for consumables.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipts (
+    purchase_order_id, receipt_number, received_at, received_by, notes
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    'GR-3002',
+    '2026-04-11T09:20:00.000Z',
+    'Warehouse Team',
+    'Full receipt complete.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  ) VALUES (
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-3001'),
+    (
+      SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1002' AND p.sku = 'ROLL-001'
+    ),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    (SELECT id FROM stock_locations WHERE code = 'HOLD'),
+    75
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  ) VALUES (
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-3002'),
+    (
+      SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1003' AND p.sku = 'SCANNER-001'
+    ),
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+    10
+  )`);
+
+  await run(`INSERT OR IGNORE INTO stock_items (
+    product_id,
+    stock_location_id,
+    actual_location_id,
+    serial_number,
+    quantity_on_hand,
+    quantity_allocated,
+    hold_status,
+    hold_reason,
+    linked_purchase_order_id,
+    linked_purchase_order_line_id,
+    linked_sales_order_id,
+    linked_sales_order_line_id,
+    customer_id,
+    status
+  ) VALUES (
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    (SELECT id FROM stock_locations WHERE code = 'HOLD'),
+    (SELECT id FROM stock_locations WHERE code = 'HOLD'),
+    NULL,
+    75,
+    25,
+    'pending_allocation',
+    'Received stock awaiting assignment to open demand.',
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (
+      SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1002' AND p.sku = 'ROLL-001'
+    ),
+    NULL,
+    NULL,
+    NULL,
+    'active'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO stock_items (
+    product_id,
+    stock_location_id,
+    actual_location_id,
+    serial_number,
+    quantity_on_hand,
+    quantity_allocated,
+    hold_status,
+    hold_reason,
+    linked_purchase_order_id,
+    linked_purchase_order_line_id,
+    linked_sales_order_id,
+    linked_sales_order_line_id,
+    customer_id,
+    status
+  ) VALUES (
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    (SELECT id FROM stock_locations WHERE code = 'DISPATCH'),
+    (SELECT id FROM stock_locations WHERE code = 'DISPATCH'),
+    NULL,
+    25,
+    25,
+    'reserved',
+    'Picked and staged for outbound shipment.',
+    NULL,
+    NULL,
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2002'),
+    (
+      SELECT sol.id
+      FROM sales_order_lines sol
+      JOIN sales_orders so ON so.id = sol.sales_order_id
+      JOIN products p ON p.id = sol.product_id
+      WHERE so.order_number = 'SO-2002' AND p.sku = 'ROLL-001'
+    ),
+    (SELECT id FROM customers WHERE code = 'CUST-HARBOR'),
+    'active'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO stock_items (
+    product_id,
+    stock_location_id,
+    actual_location_id,
+    serial_number,
+    quantity_on_hand,
+    quantity_allocated,
+    hold_status,
+    hold_reason,
+    linked_purchase_order_id,
+    linked_purchase_order_line_id,
+    linked_sales_order_id,
+    linked_sales_order_line_id,
+    customer_id,
+    status
+  ) VALUES (
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+    (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+    'SCN-10001',
+    1,
+    0,
+    'available',
+    '',
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    (
+      SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1003' AND p.sku = 'SCANNER-001'
+    ),
+    NULL,
+    NULL,
+    NULL,
+    'active'
+  )`);
+}
+
 async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_products_default_supplier_id ON products(default_supplier_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_products_tracking_flags ON products(is_serial_tracked, is_consumable)`);
@@ -494,6 +844,7 @@ async function initDatabase() {
   await applySchemaMigrations();
   await createIndexes();
   await seedReferenceData();
+  await seedOperationalData();
 }
 
 module.exports = {
