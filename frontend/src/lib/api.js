@@ -18,3 +18,32 @@ export async function apiFetch(endpoint, options = {}) {
 
   return payload;
 }
+
+export async function apiPost(endpoint, body) {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function apiPostFile(endpoint, formData) {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
