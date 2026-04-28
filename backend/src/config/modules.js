@@ -36,6 +36,12 @@ const moduleDefinitions = [
     path: "/sales-orders",
   },
   {
+    key: "dispatch",
+    label: "Dispatch",
+    description: "Review fully allocated orders and confirm outbound dispatch.",
+    path: "/dispatch",
+  },
+  {
     key: "stock-locations",
     label: "Stock Locations",
     description: "Define holding, shelf, bin, dispatch, and damaged locations.",

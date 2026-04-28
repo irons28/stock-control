@@ -2,6 +2,7 @@ const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
 const { receivePurchaseOrder } = require("../services/purchase-orders");
+const { router: dispatchRouter } = require("./dispatch");
 const serialsRouter = require("./serials");
 const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
 
@@ -179,6 +180,7 @@ router.get("/dashboard/summary", async (_req, res, next) => {
 });
 
 router.use("/sales-orders", salesOrdersRouter);
+router.use("/dispatch", dispatchRouter);
 
 router.get("/allocation/available-stock/:productId", async (req, res, next) => {
   try {
