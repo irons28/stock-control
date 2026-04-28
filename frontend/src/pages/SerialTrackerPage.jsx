@@ -2,344 +2,148 @@ import { useState } from "react";
 import Card from "../components/Card";
 import PageHeader from "../components/PageHeader";
 import ScannerInput from "../components/ScannerInput";
+import StatusPill from "../components/StatusPill";
 import { apiFetch } from "../lib/api";
-import { formatDate, formatDateTime, formatLabel } from "../lib/formatters";
-
-function StatusBadge({ status }) {
-  const toneClass = `status-badge ${status || "available"}`;
-
-  return <span className={toneClass}>{formatLabel(status)}</span>;
-}
-
-function SearchMatchList({ items, onSelect }) {
-  return (
-    <Card title="Matching Serials" subtitle="Search Results">
-      <div className="serial-match-list">
-        {items.map((item) => (
-          <button
-            key={item.serialNumber}
-            type="button"
-            className="serial-match-item"
-            onClick={() => onSelect(item.serialNumber)}
-          >
-            <div>
-              <strong>{item.serialNumber}</strong>
-              <p>
-                {item.product.name}
-                {item.salesOrder ? ` • ${item.salesOrder}` : ""}
-              </p>
-            </div>
-            <StatusBadge status={item.currentStatus} />
-          </button>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function SerialDetailCard({ detail }) {
-  return (
-    <Card title={detail.serialNumber} subtitle="Serial Detail">
-      <div className="serial-detail-grid">
-        <div>
-          <span className="detail-label">Current Status</span>
-          <div className="detail-value-row">
-            <StatusBadge status={detail.currentStatus} />
-          </div>
-        </div>
-        <div>
-          <span className="detail-label">Product</span>
-          <strong>{detail.product.name}</strong>
-          <p className="detail-meta">{detail.product.sku}</p>
-        </div>
-        <div>
-          <span className="detail-label">Supplier</span>
-          <strong>{detail.supplier.name}</strong>
-          <p className="detail-meta">{detail.supplier.code}</p>
-        </div>
-        <div>
-          <span className="detail-label">Current Location</span>
-          <strong>
-            {detail.currentLocation
-              ? `${detail.currentLocation.code} • ${detail.currentLocation.name}`
-              : "Out of warehouse"}
-          </strong>
-        </div>
-        <div>
-          <span className="detail-label">Purchase Order</span>
-          <strong>{detail.purchaseOrder.orderNumber || "—"}</strong>
-          <p className="detail-meta">Received {formatDateTime(detail.purchaseOrderReceivedDate)}</p>
-        </div>
-        <div>
-          <span className="detail-label">Delivery Number</span>
-          <strong>{detail.deliveryNumber || "—"}</strong>
-          <p className="detail-meta">Receipt {detail.receiptNumber || "—"}</p>
-        </div>
-        <div>
-          <span className="detail-label">Allocated Customer</span>
-          <strong>{detail.allocatedCustomer?.name || "Not allocated"}</strong>
-          <p className="detail-meta">
-            {detail.salesOrder?.orderNumber ? `Sales Order ${detail.salesOrder.orderNumber}` : "No active sales order"}
-          </p>
-        </div>
-        <div>
-          <span className="detail-label">Dispatch Date</span>
-          <strong>{formatDateTime(detail.dispatchDate)}</strong>
-          <p className="detail-meta">{detail.holdReason || "No active hold reason recorded."}</p>
-        </div>
-      </div>
-
-      <div className="serial-answer-grid">
-        <div className="serial-answer-card">
-          <span className="detail-label">Where did it come from?</span>
-          <strong>{detail.supplier.name}</strong>
-          <p className="detail-meta">
-            Delivered on {formatDate(detail.purchaseOrderReceivedDate)} under {detail.deliveryNumber || detail.receiptNumber || "the recorded receipt"}.
-          </p>
-        </div>
-        <div className="serial-answer-card">
-          <span className="detail-label">Which PO did it arrive on?</span>
-          <strong>{detail.purchaseOrder.orderNumber || "—"}</strong>
-          <p className="detail-meta">
-            Ordered {formatDate(detail.purchaseOrder.orderedAt)} and received {formatDate(detail.purchaseOrderReceivedDate)}.
-          </p>
-        </div>
-        <div className="serial-answer-card">
-          <span className="detail-label">Which customer/SO was it allocated to?</span>
-          <strong>{detail.allocatedCustomer?.name || "No allocation recorded"}</strong>
-          <p className="detail-meta">{detail.salesOrder?.orderNumber || "No sales order linked"}</p>
-        </div>
-        <div className="serial-answer-card">
-          <span className="detail-label">Has it been dispatched?</span>
-          <strong>{detail.dispatchDate ? "Yes" : "No"}</strong>
-          <p className="detail-meta">
-            {detail.dispatchDate ? `Dispatched on ${formatDateTime(detail.dispatchDate)}.` : "No dispatch movement has been recorded yet."}
-          </p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function SerialTimeline({ items }) {
-  return (
-    <Card title="Movement History" subtitle="Timeline">
-      {!items.length ? (
-        <div className="table-state">
-          <strong>No movement history</strong>
-          <p>This serial does not yet have any stock or activity log entries.</p>
-        </div>
-      ) : (
-        <ol className="timeline-list">
-          {items.map((item) => (
-            <li key={item.id} className="timeline-item">
-              <div className="timeline-marker" aria-hidden="true" />
-              <div className="timeline-content">
-                <div className="timeline-header">
-                  <strong>{formatLabel(item.event_type)}</strong>
-                  <span>{formatDateTime(item.occurred_at)}</span>
-                </div>
-                <p className="timeline-summary">{item.summary || "No note recorded."}</p>
-                <div className="timeline-meta">
-                  <span>Source: {item.source === "activity_log" ? "Activity log" : "Stock movement"}</span>
-                  {item.source_location_code || item.destination_location_code ? (
-                    <span>
-                      Route: {item.source_location_code || "External"} → {item.destination_location_code || "External"}
-                    </span>
-                  ) : null}
-                  {item.purchase_order_number ? <span>PO: {item.purchase_order_number}</span> : null}
-                  {item.sales_order_number ? <span>SO: {item.sales_order_number}</span> : null}
-                  {item.customer_name ? <span>Customer: {item.customer_name}</span> : null}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-    </Card>
-  );
-}
+import { formatDateTime, formatLabel } from "../lib/formatters";
 
 function SerialTrackerPage() {
-  const [searchState, setSearchState] = useState({
-    status: "idle",
-    items: [],
-    error: "",
-    searchedFor: "",
-  });
-  const [detailState, setDetailState] = useState({
-    status: "idle",
-    data: null,
-    error: "",
-  });
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null); // { item, movements }
 
-  async function loadSerialDetail(serialNumber) {
-    setDetailState({
-      status: "loading",
-      data: null,
-      error: "",
-    });
+  async function handleSearch(term) {
+    setLoading(true);
+    setError(null);
+    setResult(null);
 
     try {
-      const data = await apiFetch(`/serials/${encodeURIComponent(serialNumber)}`);
-      setDetailState({
-        status: "success",
-        data,
-        error: "",
-      });
-    } catch (error) {
-      setDetailState({
-        status: "error",
-        data: null,
-        error: error.message || "Unable to load serial detail.",
-      });
-    }
-  }
-
-  async function handleSearch(nextSearch) {
-    setSearchState({
-      status: "loading",
-      items: [],
-      error: "",
-      searchedFor: nextSearch,
-    });
-    setDetailState({
-      status: "idle",
-      data: null,
-      error: "",
-    });
-
-    try {
-      const data = await apiFetch(`/serials?search=${encodeURIComponent(nextSearch)}`);
-      const exactMatch = data.items.find((item) => item.serialNumber.toUpperCase() === nextSearch);
-
-      setSearchState({
-        status: "success",
-        items: data.items,
-        error: "",
-        searchedFor: nextSearch,
-      });
-
-      if (exactMatch) {
-        await loadSerialDetail(exactMatch.serialNumber);
-      } else if (data.items.length === 1) {
-        await loadSerialDetail(data.items[0].serialNumber);
+      const data = await apiFetch(`/serials/${encodeURIComponent(term)}`);
+      setResult(data);
+    } catch (err) {
+      if (err.message.includes("404")) {
+        setError(`No serial record found for "${term}".`);
+      } else {
+        setError(err.message || "Unable to look up serial.");
       }
-
-      return {
-        item: {
-          key: nextSearch,
-          label: nextSearch,
-          meta: data.items.length
-            ? `${data.items.length} possible ${data.items.length === 1 ? "match" : "matches"} found`
-            : "No matching serials found yet",
-        },
-        successMessage: data.items.length
-          ? `Lookup submitted for ${nextSearch}.`
-          : `No serial matched ${nextSearch}.`,
-      };
-    } catch (error) {
-      setSearchState({
-        status: "error",
-        items: [],
-        error: error.message || "Unable to search serials.",
-        searchedFor: nextSearch,
-      });
-
-      return {
-        errorMessage: error.message || "Unable to search serials.",
-      };
+    } finally {
+      setLoading(false);
     }
   }
 
   function handleClear() {
-    setSearchState({
-      status: "idle",
-      items: [],
-      error: "",
-      searchedFor: "",
-    });
-    setDetailState({
-      status: "idle",
-      data: null,
-      error: "",
-    });
+    setQuery("");
+    setError(null);
+    setResult(null);
   }
+
+  const item = result?.item;
+  const movements = result?.movements || [];
 
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Traceability"
+        eyebrow="Inventory"
         title="Serial Tracker"
-        description="Scan or type a serial number to see where it was received, who it was allocated to, and whether it has been dispatched, returned, or quarantined."
+        description="Scan a barcode or enter a serial number to see its current location, hold status, and full movement history."
       />
 
-      <Card title="Search Serial Number" subtitle="Scanner Ready">
-        <ScannerInput
-          label="Scan or enter serial number"
-          placeholder="e.g. PRN-2026-0001"
-          helperText="Most handheld scanners behave like keyboards. Keep the cursor here and let the scanner submit with Enter."
-          submitLabel="Search"
-          preventDuplicates
-          duplicateMessage="That serial has already been searched in this session."
-          successMessage="Serial lookup queued."
-          listTitle="Recent Serial Lookups"
-          emptyListMessage="Recent scans will build up here as you search serials."
-          normalizeValue={(value) => value.trim().toUpperCase()}
-          secondaryAction={{
-            label: "Clear Results",
-            onClick: handleClear,
-          }}
-          onSubmit={handleSearch}
-        />
+      <Card title="Serial Lookup" subtitle="Scan or Type">
+        <div className="tracker-search-area">
+          <ScannerInput
+            value={query}
+            onChange={setQuery}
+            onSubmit={handleSearch}
+            placeholder="Scan barcode or enter serial number…"
+            autoFocus
+            disabled={loading}
+          />
+          {(result || error) && (
+            <button type="button" className="button secondary" onClick={handleClear}>
+              Clear
+            </button>
+          )}
+        </div>
+        {loading && <p className="tracker-state">Looking up serial…</p>}
+        {error && <p className="tracker-state tracker-error">{error}</p>}
       </Card>
 
-      {searchState.status === "loading" || detailState.status === "loading" ? (
-        <Card title="Loading Serial" subtitle="Lookup">
-          <div className="table-state">
-            <strong>Looking up serial activity</strong>
-            <p>Checking inbound receipt, allocation, dispatch, and movement history.</p>
-          </div>
+      {item && (
+        <Card title={item.serial_number} subtitle="Serial Record">
+          <dl className="definition-list">
+            <div>
+              <dt>Product</dt>
+              <dd>{item.product_name}</dd>
+            </div>
+            <div>
+              <dt>SKU</dt>
+              <dd>{item.sku}</dd>
+            </div>
+            <div>
+              <dt>Current Location</dt>
+              <dd>{item.location_code ? `${item.location_code} — ${item.location_name}` : "Not located"}</dd>
+            </div>
+            <div>
+              <dt>Hold Status</dt>
+              <dd>
+                <StatusPill value={item.hold_status} />
+              </dd>
+            </div>
+            <div>
+              <dt>Record Status</dt>
+              <dd>
+                <StatusPill value={item.status} />
+              </dd>
+            </div>
+            {item.hold_reason && (
+              <div>
+                <dt>Hold Reason</dt>
+                <dd>{item.hold_reason}</dd>
+              </div>
+            )}
+          </dl>
         </Card>
-      ) : null}
+      )}
 
-      {searchState.status === "error" ? (
-        <Card title="Search Error" subtitle="Lookup">
-          <div className="table-state error">
-            <strong>Unable to search serials</strong>
-            <p>{searchState.error}</p>
-          </div>
+      {item && (
+        <Card
+          title={`Movement History — ${movements.length} event${movements.length !== 1 ? "s" : ""}`}
+          subtitle="Timeline"
+        >
+          {movements.length === 0 ? (
+            <p className="tracker-state">No movement records for this serial.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Qty</th>
+                    <th>Notes</th>
+                    <th>Recorded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.map((mv) => (
+                    <tr key={mv.id}>
+                      <td>
+                        <StatusPill value={mv.movement_type} subtle />
+                      </td>
+                      <td>{mv.source_code || "—"}</td>
+                      <td>{mv.destination_code || "—"}</td>
+                      <td>{mv.quantity}</td>
+                      <td>{mv.notes || "—"}</td>
+                      <td>{formatDateTime(mv.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
-      ) : null}
-
-      {searchState.status === "success" && !searchState.items.length ? (
-        <Card title="No Result" subtitle="Lookup">
-          <div className="table-state">
-            <strong>No serial found</strong>
-            <p>No serial matched {searchState.searchedFor}. Check the scan and try again.</p>
-          </div>
-        </Card>
-      ) : null}
-
-      {searchState.status === "success" && searchState.items.length > 1 && detailState.status !== "success" ? (
-        <SearchMatchList items={searchState.items} onSelect={loadSerialDetail} />
-      ) : null}
-
-      {detailState.status === "error" ? (
-        <Card title="Serial Error" subtitle="Lookup">
-          <div className="table-state error">
-            <strong>Unable to load serial detail</strong>
-            <p>{detailState.error}</p>
-          </div>
-        </Card>
-      ) : null}
-
-      {detailState.status === "success" ? (
-        <>
-          <SerialDetailCard detail={detailState.data} />
-          <SerialTimeline items={detailState.data.movementHistory || []} />
-        </>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -69,3 +69,25 @@ export function formatLabel(value) {
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
 }
+
+// Maps a status string to a semantic pill variant class name.
+// Used by StatusPill to apply the correct colour without duplicating logic.
+export function getStatusVariant(status) {
+  switch (String(status || "").toLowerCase()) {
+    case "active":
+    case "received":
+    case "dispatched":
+    case "completed":
+      return "positive";
+    case "ordered":
+    case "confirmed":
+    case "allocated":
+    case "partial":
+      return "info";
+    case "cancelled":
+    case "inactive":
+      return "negative";
+    default:
+      return "neutral";
+  }
+}

@@ -321,6 +321,5 @@ Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
   });
 });
 
-router.use("/import", importsRouter);
 
 module.exports = router;
