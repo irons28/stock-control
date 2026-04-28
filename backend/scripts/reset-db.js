@@ -13,7 +13,7 @@ if (fs.existsSync(dbPath)) {
   console.log("No existing database found, will create fresh.");
 }
 
-const { initDatabase } = require("../src/db/init");
+const { initializeDatabase: initDatabase } = require("../src/db/init");
 const { closeDatabase } = require("../src/db/connection");
 
 initDatabase()
