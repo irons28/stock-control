@@ -156,6 +156,7 @@ async function createCoreTables() {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     purchase_order_id INTEGER NOT NULL,
     receipt_number TEXT NOT NULL UNIQUE,
+    delivery_number TEXT DEFAULT '',
     received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     received_by TEXT DEFAULT '',
     notes TEXT DEFAULT '',
@@ -170,6 +171,7 @@ async function createCoreTables() {
     product_id INTEGER NOT NULL,
     holding_location_id INTEGER NOT NULL,
     quantity_received REAL NOT NULL DEFAULT 0,
+    serial_numbers_json TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (goods_receipt_id) REFERENCES goods_receipts(id),
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
@@ -244,6 +246,15 @@ async function createCoreTables() {
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
     FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -267,6 +278,8 @@ async function applySchemaMigrations() {
 
   await addColumnIfMissing("sales_orders", "linked_purchase_order_id INTEGER REFERENCES purchase_orders(id)");
   await addColumnIfMissing("sales_order_lines", "linked_purchase_order_line_id INTEGER REFERENCES purchase_order_lines(id)");
+  await addColumnIfMissing("goods_receipts", "delivery_number TEXT DEFAULT ''");
+  await addColumnIfMissing("goods_receipt_lines", "serial_numbers_json TEXT DEFAULT ''");
 
   await addColumnIfMissing("stock_movements", "stock_item_id INTEGER REFERENCES stock_items(id)");
   await addColumnIfMissing("stock_movements", "actual_source_location_id INTEGER REFERENCES stock_locations(id)");
@@ -464,6 +477,119 @@ async function seedReferenceData() {
     'RACK-A1',
     'Rack A1',
     'rack'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1001',
+    (SELECT id FROM suppliers WHERE code = 'SUP-CONSUMIX'),
+    'open',
+    '2026-04-20',
+    '2026-05-02',
+    'Consumables top-up for the receiving workflow'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1002',
+    (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+    'open',
+    '2026-04-22',
+    '2026-05-04',
+    'Serial-tracked hardware for rollout'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1003',
+    (SELECT id FROM suppliers WHERE code = 'SUP-CONSUMIX'),
+    'open',
+    '2026-04-10',
+    '2026-04-18',
+    'Overdue consumables order for dashboard visibility'
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    10,
+    0,
+    1.1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001')
+      AND product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    (SELECT id FROM products WHERE sku = 'LABEL-001'),
+    4,
+    0,
+    3.2
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001')
+      AND product_id = (SELECT id FROM products WHERE sku = 'LABEL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    2,
+    0,
+    325
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002')
+      AND product_id = (SELECT id FROM products WHERE sku = 'TILL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    1,
+    0,
+    58
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002')
+      AND product_id = (SELECT id FROM products WHERE sku = 'SCANNER-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    6,
+    0,
+    1.1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003')
+      AND product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
   )`);
 }
 

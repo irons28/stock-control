@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
+import ReceiveGoodsPage from "./pages/ReceiveGoodsPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
@@ -20,6 +21,12 @@ const navigationItems = [
     label: "Purchase Orders",
     path: "/purchase-orders",
     description: "Raise, receive, and reconcile purchase orders from suppliers.",
+  },
+  {
+    key: "receive-goods",
+    label: "Receive Goods",
+    path: "/receive-goods",
+    description: "Receive partial or complete deliveries and capture serial numbers.",
   },
   {
     key: "sales-orders",
@@ -50,25 +57,31 @@ const navigationItems = [
 const pageComponents = {
   dashboard: DashboardPage,
   "purchase-orders": PurchaseOrdersPage,
+  "receive-goods": ReceiveGoodsPage,
   "sales-orders": SalesOrdersPage,
   products: ProductsPage,
   stock: StockPage,
   locations: LocationsPage,
 };
 
-function getItemByPath(pathname) {
+function getCurrentLocation() {
+  return `${window.location.pathname || "/"}${window.location.search || ""}`;
+}
+
+function getItemByLocation(locationValue) {
+  const pathname = locationValue.split("?")[0] || "/";
   return navigationItems.find((item) => item.path === pathname) || navigationItems[0];
 }
 
 function App() {
-  const [pathname, setPathname] = useState(() => window.location.pathname || "/");
-  const currentItem = getItemByPath(pathname);
+  const [locationValue, setLocationValue] = useState(getCurrentLocation);
+  const currentItem = getItemByLocation(locationValue);
   const ActivePage = pageComponents[currentItem.key] || DashboardPage;
   const health = useApiResource("/health");
 
   useEffect(() => {
     function handlePopState() {
-      setPathname(window.location.pathname || "/");
+      setLocationValue(getCurrentLocation());
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -78,12 +91,12 @@ function App() {
   }, []);
 
   function handleNavigate(nextPath) {
-    if (nextPath === pathname) {
+    if (nextPath === locationValue) {
       return;
     }
 
     window.history.pushState({}, "", nextPath);
-    setPathname(nextPath);
+    setLocationValue(nextPath);
   }
 
   return (

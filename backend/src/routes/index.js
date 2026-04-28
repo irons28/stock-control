@@ -1,6 +1,11 @@
 const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
+const {
+  getPurchaseOrderByNumber,
+  getPurchaseOrders,
+  receivePurchaseOrder,
+} = require("../services/purchase-orders");
 
 const router = express.Router();
 
@@ -9,12 +14,6 @@ const resourceQueries = {
   suppliers: "SELECT * FROM suppliers ORDER BY name ASC",
   products: "SELECT * FROM products ORDER BY name ASC",
   "stock-locations": "SELECT * FROM stock_locations ORDER BY code ASC",
-  "purchase-orders": `
-    SELECT po.*, s.name AS supplier_name
-    FROM purchase_orders po
-    JOIN suppliers s ON s.id = po.supplier_id
-    ORDER BY po.created_at DESC
-  `,
   "sales-orders": `
     SELECT so.*, c.name AS customer_name
     FROM sales_orders so
@@ -66,6 +65,36 @@ router.get("/navigation", (_req, res) => {
   res.json({
     items: moduleDefinitions,
   });
+});
+
+router.get("/purchase-orders", async (_req, res, next) => {
+  try {
+    const items = await getPurchaseOrders();
+    res.json({
+      resource: "purchase-orders",
+      items,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/purchase-orders/:poNumber", async (req, res, next) => {
+  try {
+    const payload = await getPurchaseOrderByNumber(req.params.poNumber);
+    res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/purchase-orders/:poNumber/receive", async (req, res, next) => {
+  try {
+    const receipt = await receivePurchaseOrder(req.params.poNumber, req.body);
+    res.status(201).json(receipt);
+  } catch (error) {
+    next(error);
+  }
 });
 
 Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
