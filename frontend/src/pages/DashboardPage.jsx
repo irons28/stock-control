@@ -32,6 +32,9 @@ function DashboardPage() {
 
   const pendingPurchaseOrders = purchaseRows.filter((item) => item.status !== "received").length;
   const openSalesOrders = salesRows.filter((item) => item.status !== "dispatched").length;
+  const dispatchReadyCount = salesRows.filter(
+    (item) => item.summary?.allocationStatus === "Ready to Dispatch",
+  ).length;
   const activeProducts = productRows.filter((item) => item.status === "active").length;
   const activeLocations = locationRows.filter((item) => item.status === "active").length;
 
@@ -89,7 +92,7 @@ function DashboardPage() {
         <SummaryCard
           title="Sales Orders"
           value={salesRows.length}
-          detail={`${openSalesOrders} still awaiting dispatch`}
+          detail={`${openSalesOrders} still awaiting dispatch, ${dispatchReadyCount} dispatch-ready`}
           status={salesOrders.status}
           error={salesOrders.error}
         />

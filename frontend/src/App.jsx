@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
+import DispatchPage from "./pages/DispatchPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
 import ProductsPage from "./pages/ProductsPage";
@@ -27,6 +28,12 @@ const navigationItems = [
     label: "Sales Orders",
     path: "/sales-orders",
     description: "Create customer orders, allocate stock, and dispatch goods.",
+  },
+  {
+    key: "dispatch",
+    label: "Dispatch",
+    path: "/dispatch",
+    description: "Review dispatch-ready orders, verify serials, and confirm shipment.",
   },
   {
     key: "products",
@@ -56,6 +63,7 @@ const navigationItems = [
 
 const pageComponents = {
   dashboard: DashboardPage,
+  dispatch: DispatchPage,
   "purchase-orders": PurchaseOrdersPage,
   "sales-orders": SalesOrdersPage,
   products: ProductsPage,

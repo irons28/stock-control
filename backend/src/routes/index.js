@@ -1,6 +1,7 @@
 const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
+const { router: dispatchRouter } = require("./dispatch");
 const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
 const serialsRouter = require("./serials");
 
@@ -65,6 +66,7 @@ router.get("/navigation", (_req, res) => {
 });
 
 router.use("/sales-orders", salesOrdersRouter);
+router.use("/dispatch", dispatchRouter);
 router.use("/serials", serialsRouter);
 
 router.get("/allocation/available-stock/:productId", async (req, res, next) => {

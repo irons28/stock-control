@@ -11,6 +11,7 @@ const BADGE_CLASS_BY_STATUS = {
   "Part Allocated": "badge-partial",
   "Fully Allocated": "badge-full",
   "Ready to Dispatch": "badge-ready",
+  Dispatched: "badge-dispatched",
 };
 
 function StatusBadge({ value }) {

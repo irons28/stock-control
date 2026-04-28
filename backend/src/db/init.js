@@ -268,6 +268,31 @@ async function createCoreTables() {
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (stock_item_id) REFERENCES stock_items(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS dispatches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sales_order_id INTEGER NOT NULL,
+    dispatch_reference TEXT NOT NULL,
+    dispatched_by TEXT NOT NULL,
+    dispatched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sales_order_id) REFERENCES sales_orders(id)
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS dispatch_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dispatch_id INTEGER NOT NULL,
+    sales_order_line_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    stock_item_id INTEGER,
+    serial_number TEXT,
+    quantity_dispatched REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (dispatch_id) REFERENCES dispatches(id),
+    FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (stock_item_id) REFERENCES stock_items(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -513,6 +538,10 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_sales_order_id ON stock_movements(linked_sales_order_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_serial_number ON activity_log(serial_number)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_stock_item_id ON activity_log(stock_item_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_dispatches_sales_order_id ON dispatches(sales_order_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_dispatches_dispatched_at ON dispatches(dispatched_at)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_dispatch_lines_dispatch_id ON dispatch_lines(dispatch_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_dispatch_lines_sales_order_line_id ON dispatch_lines(sales_order_line_id)`);
 }
 
 async function seedOperationalData() {
@@ -817,7 +846,7 @@ async function seedOperationalData() {
     insertParams: [so1001Id, po1001TillLineId],
   });
 
-  await ensureRecord({
+  const so1001RollSalesLineId = await ensureRecord({
     selectSql: `
       SELECT id
       FROM sales_order_lines
@@ -1061,6 +1090,223 @@ async function seedOperationalData() {
     `,
     [po1001TillLineId, so1001TillSalesLineId],
   );
+
+  await run(
+    `
+      UPDATE sales_order_lines
+      SET quantity_allocated = quantity_ordered,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE sales_order_id = ?
+    `,
+    [so1001Id],
+  );
+
+  await run(
+    `
+      UPDATE sales_orders
+      SET status = 'ready_to_dispatch',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [so1001Id],
+  );
+
+  await run(
+    `
+      UPDATE stock_items
+      SET quantity_allocated = 1,
+          hold_status = 'allocated',
+          linked_sales_order_id = ?,
+          linked_sales_order_line_id = ?,
+          customer_id = (SELECT customer_id FROM sales_orders WHERE id = ?),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE serial_number IN ('TILL-SN-1001', 'TILL-SN-1002')
+    `,
+    [so1001Id, so1001TillSalesLineId, so1001Id],
+  );
+
+  await run(
+    `
+      UPDATE stock_items
+      SET quantity_on_hand = 30,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+        AND serial_number IS NULL
+        AND linked_purchase_order_line_id = ?
+        AND hold_status = 'available'
+    `,
+    [po1002RollLineId],
+  );
+
+  const allocatedRollStockItemId = await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM stock_items
+      WHERE linked_sales_order_line_id = ?
+        AND serial_number IS NULL
+        AND hold_status = 'allocated'
+    `,
+    selectParams: [so1001RollSalesLineId],
+    insertSql: `
+      INSERT INTO stock_items (
+        product_id,
+        stock_location_id,
+        actual_location_id,
+        quantity_on_hand,
+        quantity_allocated,
+        hold_status,
+        hold_reason,
+        linked_purchase_order_id,
+        linked_purchase_order_line_id,
+        linked_sales_order_id,
+        linked_sales_order_line_id,
+        customer_id
+      ) VALUES (
+        (SELECT id FROM products WHERE sku = 'ROLL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        20,
+        20,
+        'allocated',
+        'seed-ready-dispatch',
+        ?,
+        ?,
+        ?,
+        ?,
+        (SELECT customer_id FROM sales_orders WHERE id = ?)
+      )
+    `,
+    insertParams: [po1002Id, po1002RollLineId, so1001Id, so1001RollSalesLineId, so1001Id],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM stock_movements
+      WHERE stock_item_id = (SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1001')
+        AND movement_type = 'allocation'
+        AND reference_id = ?
+    `,
+    selectParams: [so1001TillSalesLineId],
+    insertSql: `
+      INSERT INTO stock_movements (
+        movement_type,
+        stock_item_id,
+        product_id,
+        source_location_id,
+        destination_location_id,
+        actual_source_location_id,
+        actual_destination_location_id,
+        quantity,
+        linked_sales_order_id,
+        customer_id,
+        reference_type,
+        reference_id,
+        notes
+      ) VALUES (
+        'allocation',
+        (SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1001'),
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        1,
+        ?,
+        (SELECT customer_id FROM sales_orders WHERE id = ?),
+        'sales_order_line',
+        ?,
+        'Seeded allocation for ready dispatch order'
+      )
+    `,
+    insertParams: [so1001Id, so1001Id, so1001TillSalesLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM stock_movements
+      WHERE stock_item_id = (SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1002')
+        AND movement_type = 'allocation'
+        AND reference_id = ?
+    `,
+    selectParams: [so1001TillSalesLineId],
+    insertSql: `
+      INSERT INTO stock_movements (
+        movement_type,
+        stock_item_id,
+        product_id,
+        source_location_id,
+        destination_location_id,
+        actual_source_location_id,
+        actual_destination_location_id,
+        quantity,
+        linked_sales_order_id,
+        customer_id,
+        reference_type,
+        reference_id,
+        notes
+      ) VALUES (
+        'allocation',
+        (SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1002'),
+        (SELECT id FROM products WHERE sku = 'TILL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        (SELECT id FROM stock_locations WHERE code = 'RACK-A1'),
+        1,
+        ?,
+        (SELECT customer_id FROM sales_orders WHERE id = ?),
+        'sales_order_line',
+        ?,
+        'Seeded allocation for ready dispatch order'
+      )
+    `,
+    insertParams: [so1001Id, so1001Id, so1001TillSalesLineId],
+  });
+
+  await ensureRecord({
+    selectSql: `
+      SELECT id
+      FROM stock_movements
+      WHERE stock_item_id = ?
+        AND movement_type = 'allocation'
+        AND reference_id = ?
+    `,
+    selectParams: [allocatedRollStockItemId, so1001RollSalesLineId],
+    insertSql: `
+      INSERT INTO stock_movements (
+        movement_type,
+        stock_item_id,
+        product_id,
+        source_location_id,
+        destination_location_id,
+        actual_source_location_id,
+        actual_destination_location_id,
+        quantity,
+        linked_sales_order_id,
+        customer_id,
+        reference_type,
+        reference_id,
+        notes
+      ) VALUES (
+        'allocation',
+        ?,
+        (SELECT id FROM products WHERE sku = 'ROLL-001'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+        20,
+        ?,
+        (SELECT customer_id FROM sales_orders WHERE id = ?),
+        'sales_order_line',
+        ?,
+        'Seeded allocation for ready dispatch order'
+      )
+    `,
+    insertParams: [allocatedRollStockItemId, so1001Id, so1001Id, so1001RollSalesLineId],
+  });
 }
 
 async function initDatabase() {

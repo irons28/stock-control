@@ -14,6 +14,11 @@ function getRemainingQuantity(line) {
 function deriveLineAllocationStatus(line) {
   const ordered = Number(line.quantity_ordered || 0);
   const allocated = Number(line.quantity_allocated || 0);
+  const dispatched = Number(line.quantity_dispatched || 0);
+
+  if (ordered > 0 && dispatched >= ordered) {
+    return "Dispatched";
+  }
 
   if (ordered <= 0 || allocated <= 0) {
     return "Awaiting Stock";
@@ -31,8 +36,15 @@ function deriveOrderAllocationStatus(lines) {
     return "Awaiting Stock";
   }
 
+  const fullyDispatched = lines.every(
+    (line) => Number(line.quantity_dispatched || 0) >= Number(line.quantity_ordered || 0),
+  );
   const hasRemaining = lines.some((line) => getRemainingQuantity(line) > 0);
   const hasAllocated = lines.some((line) => Number(line.quantity_allocated || 0) > 0);
+
+  if (fullyDispatched) {
+    return "Dispatched";
+  }
 
   if (!hasRemaining) {
     return "Ready to Dispatch";
