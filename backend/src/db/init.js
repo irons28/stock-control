@@ -465,6 +465,518 @@ async function seedReferenceData() {
     'Rack A1',
     'rack'
   )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1001',
+    (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+    'open',
+    '2026-04-25',
+    '2026-05-06',
+    'Inbound smart till replenishment for the next install window.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1002',
+    (SELECT id FROM suppliers WHERE code = 'SUP-CONSUMIX'),
+    'open',
+    '2026-04-18',
+    '2026-05-01',
+    'Consumables top-up for active retail and support queues.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1003',
+    (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+    'received',
+    '2026-04-10',
+    '2026-04-24',
+    'Scanner and printer order already fully booked in.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO purchase_orders (
+    order_number, supplier_id, status, ordered_at, expected_at, notes
+  ) VALUES (
+    'PO-1004',
+    (SELECT id FROM suppliers WHERE code = 'SUP-NEXUS'),
+    'open',
+    '2026-04-09',
+    '2026-04-20',
+    'Customer-linked hardware order now slipping past its receipt date.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_orders (
+    order_number, customer_id, status, requested_at, dispatch_due_at, notes
+  ) VALUES (
+    'SO-2001',
+    (SELECT id FROM customers WHERE code = 'CUST-ALPHA'),
+    'allocated',
+    '2026-04-21',
+    '2026-05-03',
+    'Hardware bundle reserved for a veterinary rollout.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO sales_orders (
+    order_number, customer_id, status, requested_at, dispatch_due_at, notes
+  ) VALUES (
+    'SO-2002',
+    (SELECT id FROM customers WHERE code = 'CUST-HARBOR'),
+    'picking',
+    '2026-04-22',
+    '2026-05-02',
+    'Consumables order ready to complete once the final PO quantity lands.'
+  )`);
+
+  await run(`INSERT INTO sales_order_lines (
+    sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  )
+  SELECT
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2001'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    3,
+    1,
+    0
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM sales_order_lines
+    WHERE sales_order_id = (SELECT id FROM sales_orders WHERE order_number = 'SO-2001')
+      AND product_id = (SELECT id FROM products WHERE sku = 'TILL-001')
+  )`);
+
+  await run(`INSERT INTO sales_order_lines (
+    sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  )
+  SELECT
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2001'),
+    (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+    1,
+    1,
+    0
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM sales_order_lines
+    WHERE sales_order_id = (SELECT id FROM sales_orders WHERE order_number = 'SO-2001')
+      AND product_id = (SELECT id FROM products WHERE sku = 'PRINTER-001')
+  )`);
+
+  await run(`INSERT INTO sales_order_lines (
+    sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched
+  )
+  SELECT
+    (SELECT id FROM sales_orders WHERE order_number = 'SO-2002'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    40,
+    30,
+    0
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM sales_order_lines
+    WHERE sales_order_id = (SELECT id FROM sales_orders WHERE order_number = 'SO-2002')
+      AND product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    2,
+    0,
+    325.00
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001')
+      AND product_id = (SELECT id FROM products WHERE sku = 'TILL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001'),
+    (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+    2,
+    0,
+    110.00
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1001')
+      AND product_id = (SELECT id FROM products WHERE sku = 'PRINTER-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    60,
+    30,
+    1.10
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002')
+      AND product_id = (SELECT id FROM products WHERE sku = 'ROLL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    (SELECT id FROM products WHERE sku = 'LABEL-001'),
+    20,
+    20,
+    3.20
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002')
+      AND product_id = (SELECT id FROM products WHERE sku = 'LABEL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    5,
+    5,
+    58.00
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003')
+      AND product_id = (SELECT id FROM products WHERE sku = 'SCANNER-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+    1,
+    1,
+    110.00
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003')
+      AND product_id = (SELECT id FROM products WHERE sku = 'PRINTER-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1004'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    3,
+    1,
+    325.00
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1004')
+      AND product_id = (SELECT id FROM products WHERE sku = 'TILL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_order_lines (
+    purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost
+  )
+  SELECT
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1004'),
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    4,
+    0,
+    58.00
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_order_lines
+    WHERE purchase_order_id = (SELECT id FROM purchase_orders WHERE order_number = 'PO-1004')
+      AND product_id = (SELECT id FROM products WHERE sku = 'SCANNER-001')
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipts (
+    purchase_order_id, receipt_number, received_at, received_by, notes
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1002'),
+    'GR-1002-1',
+    '2026-04-27T09:15:00Z',
+    'Leah Carter',
+    'First consumables delivery received and checked into hold.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipts (
+    purchase_order_id, receipt_number, received_at, received_by, notes
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1003'),
+    'GR-1003-1',
+    '2026-04-24T11:40:00Z',
+    'Marcus Shah',
+    'Complete hardware receipt processed on arrival.'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO goods_receipts (
+    purchase_order_id, receipt_number, received_at, received_by, notes
+  ) VALUES (
+    (SELECT id FROM purchase_orders WHERE order_number = 'PO-1004'),
+    'GR-1004-1',
+    '2026-04-18T14:10:00Z',
+    'Marcus Shah',
+    'Short receipt booked before supplier chase-up.'
+  )`);
+
+  await run(`INSERT INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  )
+  SELECT
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1002-1'),
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1002' AND p.sku = 'ROLL-001'),
+    (SELECT id FROM products WHERE sku = 'ROLL-001'),
+    (SELECT id FROM stock_locations WHERE code = 'HOLD'),
+    30
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM goods_receipt_lines
+    WHERE goods_receipt_id = (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1002-1')
+      AND purchase_order_line_id = (SELECT pol.id
+        FROM purchase_order_lines pol
+        JOIN purchase_orders po ON po.id = pol.purchase_order_id
+        JOIN products p ON p.id = pol.product_id
+        WHERE po.order_number = 'PO-1002' AND p.sku = 'ROLL-001')
+  )`);
+
+  await run(`INSERT INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  )
+  SELECT
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1002-1'),
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1002' AND p.sku = 'LABEL-001'),
+    (SELECT id FROM products WHERE sku = 'LABEL-001'),
+    (SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'),
+    20
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM goods_receipt_lines
+    WHERE goods_receipt_id = (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1002-1')
+      AND purchase_order_line_id = (SELECT pol.id
+        FROM purchase_order_lines pol
+        JOIN purchase_orders po ON po.id = pol.purchase_order_id
+        JOIN products p ON p.id = pol.product_id
+        WHERE po.order_number = 'PO-1002' AND p.sku = 'LABEL-001')
+  )`);
+
+  await run(`INSERT INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  )
+  SELECT
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1003-1'),
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1003' AND p.sku = 'SCANNER-001'),
+    (SELECT id FROM products WHERE sku = 'SCANNER-001'),
+    (SELECT id FROM stock_locations WHERE code = 'RECEIVING'),
+    5
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM goods_receipt_lines
+    WHERE goods_receipt_id = (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1003-1')
+      AND purchase_order_line_id = (SELECT pol.id
+        FROM purchase_order_lines pol
+        JOIN purchase_orders po ON po.id = pol.purchase_order_id
+        JOIN products p ON p.id = pol.product_id
+        WHERE po.order_number = 'PO-1003' AND p.sku = 'SCANNER-001')
+  )`);
+
+  await run(`INSERT INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  )
+  SELECT
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1003-1'),
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1003' AND p.sku = 'PRINTER-001'),
+    (SELECT id FROM products WHERE sku = 'PRINTER-001'),
+    (SELECT id FROM stock_locations WHERE code = 'RECEIVING'),
+    1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM goods_receipt_lines
+    WHERE goods_receipt_id = (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1003-1')
+      AND purchase_order_line_id = (SELECT pol.id
+        FROM purchase_order_lines pol
+        JOIN purchase_orders po ON po.id = pol.purchase_order_id
+        JOIN products p ON p.id = pol.product_id
+        WHERE po.order_number = 'PO-1003' AND p.sku = 'PRINTER-001')
+  )`);
+
+  await run(`INSERT INTO goods_receipt_lines (
+    goods_receipt_id, purchase_order_line_id, product_id, holding_location_id, quantity_received
+  )
+  SELECT
+    (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1004-1'),
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1004' AND p.sku = 'TILL-001'),
+    (SELECT id FROM products WHERE sku = 'TILL-001'),
+    (SELECT id FROM stock_locations WHERE code = 'HOLD'),
+    1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM goods_receipt_lines
+    WHERE goods_receipt_id = (SELECT id FROM goods_receipts WHERE receipt_number = 'GR-1004-1')
+      AND purchase_order_line_id = (SELECT pol.id
+        FROM purchase_order_lines pol
+        JOIN purchase_orders po ON po.id = pol.purchase_order_id
+        JOIN products p ON p.id = pol.product_id
+        WHERE po.order_number = 'PO-1004' AND p.sku = 'TILL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_sales_links (
+    purchase_order_line_id, sales_order_line_id, quantity_linked
+  )
+  SELECT
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1001' AND p.sku = 'TILL-001'),
+    (SELECT sol.id
+      FROM sales_order_lines sol
+      JOIN sales_orders so ON so.id = sol.sales_order_id
+      JOIN products p ON p.id = sol.product_id
+      WHERE so.order_number = 'SO-2001' AND p.sku = 'TILL-001'),
+    2
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_sales_links
+    WHERE purchase_order_line_id = (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1001' AND p.sku = 'TILL-001')
+      AND sales_order_line_id = (SELECT sol.id
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON so.id = sol.sales_order_id
+        JOIN products p ON p.id = sol.product_id
+        WHERE so.order_number = 'SO-2001' AND p.sku = 'TILL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_sales_links (
+    purchase_order_line_id, sales_order_line_id, quantity_linked
+  )
+  SELECT
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1002' AND p.sku = 'ROLL-001'),
+    (SELECT sol.id
+      FROM sales_order_lines sol
+      JOIN sales_orders so ON so.id = sol.sales_order_id
+      JOIN products p ON p.id = sol.product_id
+      WHERE so.order_number = 'SO-2002' AND p.sku = 'ROLL-001'),
+    40
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_sales_links
+    WHERE purchase_order_line_id = (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1002' AND p.sku = 'ROLL-001')
+      AND sales_order_line_id = (SELECT sol.id
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON so.id = sol.sales_order_id
+        JOIN products p ON p.id = sol.product_id
+        WHERE so.order_number = 'SO-2002' AND p.sku = 'ROLL-001')
+  )`);
+
+  await run(`INSERT INTO purchase_sales_links (
+    purchase_order_line_id, sales_order_line_id, quantity_linked
+  )
+  SELECT
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1003' AND p.sku = 'PRINTER-001'),
+    (SELECT sol.id
+      FROM sales_order_lines sol
+      JOIN sales_orders so ON so.id = sol.sales_order_id
+      JOIN products p ON p.id = sol.product_id
+      WHERE so.order_number = 'SO-2001' AND p.sku = 'PRINTER-001'),
+    1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_sales_links
+    WHERE purchase_order_line_id = (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1003' AND p.sku = 'PRINTER-001')
+      AND sales_order_line_id = (SELECT sol.id
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON so.id = sol.sales_order_id
+        JOIN products p ON p.id = sol.product_id
+        WHERE so.order_number = 'SO-2001' AND p.sku = 'PRINTER-001')
+  )`);
+
+  await run(`INSERT INTO purchase_sales_links (
+    purchase_order_line_id, sales_order_line_id, quantity_linked
+  )
+  SELECT
+    (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1004' AND p.sku = 'TILL-001'),
+    (SELECT sol.id
+      FROM sales_order_lines sol
+      JOIN sales_orders so ON so.id = sol.sales_order_id
+      JOIN products p ON p.id = sol.product_id
+      WHERE so.order_number = 'SO-2001' AND p.sku = 'TILL-001'),
+    1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchase_sales_links
+    WHERE purchase_order_line_id = (SELECT pol.id
+      FROM purchase_order_lines pol
+      JOIN purchase_orders po ON po.id = pol.purchase_order_id
+      JOIN products p ON p.id = pol.product_id
+      WHERE po.order_number = 'PO-1004' AND p.sku = 'TILL-001')
+      AND sales_order_line_id = (SELECT sol.id
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON so.id = sol.sales_order_id
+        JOIN products p ON p.id = sol.product_id
+        WHERE so.order_number = 'SO-2001' AND p.sku = 'TILL-001')
+  )`);
 }
 
 async function createIndexes() {

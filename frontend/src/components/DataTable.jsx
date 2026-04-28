@@ -8,6 +8,8 @@ function DataTable({
   emptyMessage,
   onRetry,
   getRowKey,
+  onRowClick,
+  getRowClassName,
 }) {
   if (loading) {
     return (
@@ -57,7 +59,11 @@ function DataTable({
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => (
-            <tr key={getRowKey ? getRowKey(row, rowIndex) : row.id || rowIndex}>
+            <tr
+              key={getRowKey ? getRowKey(row, rowIndex) : row.id || rowIndex}
+              className={getRowClassName ? getRowClassName(row, rowIndex) : ""}
+              onClick={onRowClick ? () => onRowClick(row, rowIndex) : undefined}
+            >
               {columns.map((column) => (
                 <td key={column.key}>
                   {column.render ? column.render(row) : row[column.key] ?? "—"}

@@ -30,7 +30,7 @@ function DashboardPage() {
   const movementRows = stockMovements.data?.items || [];
   const locationRows = locations.data?.items || [];
 
-  const pendingPurchaseOrders = purchaseRows.filter((item) => item.status !== "received").length;
+  const pendingPurchaseOrders = purchaseRows.filter((item) => item.status !== "Fully Received").length;
   const openSalesOrders = salesRows.filter((item) => item.status !== "dispatched").length;
   const activeProducts = productRows.filter((item) => item.status === "active").length;
   const activeLocations = locationRows.filter((item) => item.status === "active").length;

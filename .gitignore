@@ -10,5 +10,7 @@ app/.DS_Store
 app/ssl/
 frontend/node_modules/
 frontend/dist/
+backend/node_modules/
+backend/data/
 node_modules/
 dist/

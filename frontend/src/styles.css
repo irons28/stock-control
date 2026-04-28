@@ -366,6 +366,14 @@ textarea {
   background: rgba(237, 244, 251, 0.72);
 }
 
+.data-table tbody tr.selectable {
+  cursor: pointer;
+}
+
+.data-table tbody tr.selected {
+  background: rgba(143, 194, 255, 0.2);
+}
+
 .table-state {
   padding: 1rem 0.2rem 0.3rem;
   color: var(--text-muted);
@@ -385,6 +393,206 @@ textarea {
   margin-top: 0.9rem;
 }
 
+.search-form {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.search-field {
+  display: flex;
+  flex: 1 1 280px;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: var(--navy-900);
+  font-weight: 600;
+}
+
+.search-field input {
+  min-height: 46px;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(22, 50, 79, 0.16);
+  border-radius: 14px;
+  color: var(--navy-900);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.search-field input:focus {
+  outline: 2px solid rgba(50, 93, 136, 0.24);
+  outline-offset: 1px;
+}
+
+.search-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.search-summary {
+  margin: 1rem 0 0;
+  color: var(--text-muted);
+}
+
+.purchase-orders-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.15fr);
+  gap: 1rem;
+}
+
+.purchase-orders-results,
+.purchase-orders-detail {
+  min-height: 100%;
+}
+
+.result-meta {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+}
+
+.detail-state {
+  padding: 0.15rem 0;
+  color: var(--text-muted);
+}
+
+.detail-state strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--navy-900);
+}
+
+.detail-state.error strong {
+  color: #a53d3d;
+}
+
+.detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.detail-header h3,
+.po-meta-grid dt,
+.po-meta-grid dd,
+.receipt-progress strong,
+.receipt-progress span {
+  margin: 0;
+}
+
+.detail-header p {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+}
+
+.po-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.po-meta-grid div {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(22, 50, 79, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.po-meta-grid dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.po-meta-grid dd {
+  margin-top: 0.45rem;
+  color: var(--navy-900);
+  font-weight: 600;
+}
+
+.receipt-progress {
+  padding: 1rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(143, 194, 255, 0.12), rgba(255, 255, 255, 0.75));
+}
+
+.receipt-progress div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.receipt-progress span {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.receipt-progress strong {
+  color: var(--navy-900);
+}
+
+.receipt-progress-bar {
+  height: 0.8rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(22, 50, 79, 0.1);
+}
+
+.receipt-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f7cc0, #63b893);
+}
+
+.pill.open {
+  background: rgba(50, 93, 136, 0.14);
+}
+
+.pill.part-received {
+  background: rgba(231, 165, 37, 0.18);
+  color: #7a4b00;
+}
+
+.pill.fully-received {
+  background: rgba(82, 177, 133, 0.18);
+  color: #1f6a45;
+}
+
+.pill.overdue {
+  background: rgba(201, 74, 74, 0.16);
+  color: #8b2020;
+}
+
+.pill.serial-required {
+  background: rgba(94, 61, 194, 0.14);
+  color: #4b2d9a;
+}
+
+.line-remaining {
+  color: #8b2020;
+  font-weight: 700;
+}
+
+.line-complete {
+  color: #1f6a45;
+  font-weight: 700;
+}
+
+.data-table tbody tr.line-needs-receiving {
+  background: rgba(255, 242, 229, 0.65);
+}
+
 @media (max-width: 1100px) {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -392,6 +600,14 @@ textarea {
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .purchase-orders-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .po-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -405,6 +621,11 @@ textarea {
   }
 
   .page-header {
+    flex-direction: column;
+  }
+
+  .detail-header,
+  .receipt-progress div:first-child {
     flex-direction: column;
   }
 }
@@ -423,5 +644,9 @@ textarea {
   .nav-item.active,
   .button:hover:not(:disabled) {
     transform: none;
+  }
+
+  .po-meta-grid {
+    grid-template-columns: 1fr;
   }
 }
