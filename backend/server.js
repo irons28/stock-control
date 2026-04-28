@@ -1,38 +1,13 @@
-const express = require("express");
-const cors = require("cors");
+const { createApp } = require("./src/app");
 const { initDatabase } = require("./src/db/init");
 const { closeDatabase } = require("./src/db/connection");
-const apiRouter = require("./src/routes");
 
 const PORT = Number(process.env.PORT || 3001);
-const app = express();
-
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-  }),
-);
-app.use(express.json());
-
-app.get("/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    service: "stock-control-backend",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.use("/api", apiRouter);
-
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    error: err.message || "Unexpected server error",
-  });
-});
 
 async function start() {
   await initDatabase();
+
+  const app = createApp();
 
   const server = app.listen(PORT, () => {
     console.log(`Stock Control API listening on http://localhost:${PORT}`);

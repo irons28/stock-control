@@ -2,6 +2,7 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import StatusPill from "../components/StatusPill";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatCurrency, formatLabel } from "../lib/formatters";
 
@@ -12,7 +13,7 @@ const columns = [
   {
     key: "tracking_mode",
     header: "Tracking",
-    render: (row) => <span className="pill subtle">{formatLabel(row.tracking_mode)}</span>,
+    render: (row) => <span className="pill neutral">{formatLabel(row.tracking_mode)}</span>,
   },
   {
     key: "cost_price",
@@ -27,7 +28,7 @@ const columns = [
   {
     key: "status",
     header: "Status",
-    render: (row) => <span className="pill">{formatLabel(row.status)}</span>,
+    render: (row) => <StatusPill value={row.status} />,
   },
 ];
 

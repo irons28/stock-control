@@ -1,9 +1,11 @@
+import { useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import StatusPill from "../components/StatusPill";
 import { useApiResource } from "../hooks/useApiResource";
-import { formatDate, formatLabel } from "../lib/formatters";
+import { formatDate } from "../lib/formatters";
 
 const columns = [
   { key: "order_number", header: "SO Number" },
@@ -11,7 +13,7 @@ const columns = [
   {
     key: "status",
     header: "Status",
-    render: (row) => <span className="pill">{formatLabel(row.status)}</span>,
+    render: (row) => <StatusPill value={row.status} />,
   },
   {
     key: "requested_at",
@@ -32,7 +34,19 @@ const columns = [
 
 function SalesOrdersPage() {
   const salesOrders = useApiResource("/sales-orders");
-  const rows = salesOrders.data?.items || [];
+  const [search, setSearch] = useState("");
+  const allRows = salesOrders.data?.items || [];
+
+  const rows = search.trim()
+    ? allRows.filter((r) => {
+        const term = search.toLowerCase();
+        return (
+          r.order_number?.toLowerCase().includes(term) ||
+          r.customer_name?.toLowerCase().includes(term) ||
+          r.status?.toLowerCase().includes(term)
+        );
+      })
+    : allRows;
 
   return (
     <div className="page-stack">
@@ -48,12 +62,27 @@ function SalesOrdersPage() {
       />
 
       <Card title="All Sales Orders" subtitle="Live Data">
+        <div className="table-search-bar">
+          <input
+            type="search"
+            className="table-search-input"
+            placeholder="Filter by SO number, customer, or status…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Filter sales orders"
+          />
+          {search && (
+            <span className="table-search-count">
+              {rows.length} of {allRows.length}
+            </span>
+          )}
+        </div>
         <DataTable
           columns={columns}
           rows={rows}
           loading={salesOrders.status === "loading"}
           error={salesOrders.status === "error" ? salesOrders.error : ""}
-          emptyMessage="No sales orders are available in the current dataset."
+          emptyMessage={search ? `No sales orders match "${search}".` : "No sales orders are available in the current dataset."}
           onRetry={salesOrders.reload}
         />
       </Card>

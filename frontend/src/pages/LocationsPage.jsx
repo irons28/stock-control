@@ -2,6 +2,7 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import StatusPill from "../components/StatusPill";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatDate, formatLabel } from "../lib/formatters";
 
@@ -11,12 +12,12 @@ const columns = [
   {
     key: "location_type",
     header: "Type",
-    render: (row) => <span className="pill subtle">{formatLabel(row.location_type)}</span>,
+    render: (row) => <span className="pill neutral">{formatLabel(row.location_type)}</span>,
   },
   {
     key: "status",
     header: "Status",
-    render: (row) => <span className="pill">{formatLabel(row.status)}</span>,
+    render: (row) => <StatusPill value={row.status} />,
   },
   {
     key: "updated_at",

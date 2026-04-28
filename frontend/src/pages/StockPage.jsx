@@ -2,14 +2,15 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import StatusPill from "../components/StatusPill";
 import { useApiResource } from "../hooks/useApiResource";
-import { formatDateTime, formatLabel, formatNumber } from "../lib/formatters";
+import { formatDateTime, formatNumber } from "../lib/formatters";
 
 const columns = [
   {
     key: "movement_type",
     header: "Movement",
-    render: (row) => <span className="pill">{formatLabel(row.movement_type)}</span>,
+    render: (row) => <StatusPill value={row.movement_type} subtle />,
   },
   { key: "product_name", header: "Product" },
   {
@@ -20,13 +21,13 @@ const columns = [
   },
   {
     key: "quantity",
-    header: "Quantity",
+    header: "Qty",
     render: (row) => formatNumber(row.quantity),
   },
   {
     key: "reference_type",
     header: "Reference",
-    render: (row) => formatLabel(row.reference_type),
+    render: (row) => (row.reference_type ? <StatusPill value={row.reference_type} subtle /> : "—"),
   },
   {
     key: "created_at",

@@ -6,6 +6,7 @@ import SalesOrdersPage from "./pages/SalesOrdersPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
+import SerialTrackerPage from "./pages/SerialTrackerPage";
 import { useApiResource } from "./hooks/useApiResource";
 
 const navigationItems = [
@@ -45,6 +46,12 @@ const navigationItems = [
     path: "/locations",
     description: "Define holding, shelf, bin, dispatch, and damaged locations.",
   },
+  {
+    key: "serial-tracker",
+    label: "Serial Tracker",
+    path: "/serial-tracker",
+    description: "Look up any serial number to see its location and movement history.",
+  },
 ];
 
 const pageComponents = {
@@ -54,6 +61,7 @@ const pageComponents = {
   products: ProductsPage,
   stock: StockPage,
   locations: LocationsPage,
+  "serial-tracker": SerialTrackerPage,
 };
 
 function getItemByPath(pathname) {
@@ -86,6 +94,9 @@ function App() {
     setPathname(nextPath);
   }
 
+  // Pass health to Dashboard so it can show system readiness without a duplicate fetch.
+  const pageProps = currentItem.key === "dashboard" ? { health } : {};
+
   return (
     <Layout
       navigationItems={navigationItems}
@@ -93,7 +104,7 @@ function App() {
       onNavigate={handleNavigate}
       health={health}
     >
-      <ActivePage />
+      <ActivePage {...pageProps} />
     </Layout>
   );
 }

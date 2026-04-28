@@ -1,6 +1,7 @@
 const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
+const serialsRouter = require("./serials");
 
 const router = express.Router();
 
@@ -81,5 +82,7 @@ Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
     }
   });
 });
+
+router.use("/serials", serialsRouter);
 
 module.exports = router;

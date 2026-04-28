@@ -1,8 +1,9 @@
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import StatusPill from "../components/StatusPill";
 import { useApiResource } from "../hooks/useApiResource";
-import { formatDate, formatDateTime, formatLabel } from "../lib/formatters";
+import { formatDate, formatDateTime } from "../lib/formatters";
 
 function SummaryCard({ title, value, detail, status, error }) {
   return (
@@ -16,8 +17,9 @@ function SummaryCard({ title, value, detail, status, error }) {
   );
 }
 
-function DashboardPage() {
-  const health = useApiResource("/health");
+// Health data is already fetched in App.jsx and used for the sidebar status.
+// Accept it as a prop so we avoid a duplicate request.
+function DashboardPage({ health = {} }) {
   const purchaseOrders = useApiResource("/purchase-orders");
   const salesOrders = useApiResource("/sales-orders");
   const products = useApiResource("/products");
@@ -30,10 +32,10 @@ function DashboardPage() {
   const movementRows = stockMovements.data?.items || [];
   const locationRows = locations.data?.items || [];
 
-  const pendingPurchaseOrders = purchaseRows.filter((item) => item.status !== "received").length;
-  const openSalesOrders = salesRows.filter((item) => item.status !== "dispatched").length;
-  const activeProducts = productRows.filter((item) => item.status === "active").length;
-  const activeLocations = locationRows.filter((item) => item.status === "active").length;
+  const pendingPurchaseOrders = purchaseRows.filter((r) => r.status !== "received").length;
+  const openSalesOrders = salesRows.filter((r) => r.status !== "dispatched").length;
+  const activeProducts = productRows.filter((r) => r.status === "active").length;
+  const activeLocations = locationRows.filter((r) => r.status === "active").length;
 
   const purchaseColumns = [
     { key: "order_number", header: "PO Number" },
@@ -41,7 +43,7 @@ function DashboardPage() {
     {
       key: "status",
       header: "Status",
-      render: (row) => <span className="pill">{formatLabel(row.status)}</span>,
+      render: (row) => <StatusPill value={row.status} />,
     },
     {
       key: "expected_at",
@@ -54,7 +56,7 @@ function DashboardPage() {
     {
       key: "movement_type",
       header: "Type",
-      render: (row) => <span className="pill subtle">{formatLabel(row.movement_type)}</span>,
+      render: (row) => <StatusPill value={row.movement_type} subtle />,
     },
     { key: "product_name", header: "Product" },
     {
@@ -110,11 +112,7 @@ function DashboardPage() {
       </section>
 
       <section className="dashboard-grid">
-        <Card
-          title="System Readiness"
-          subtitle="Platform"
-          className="dashboard-panel"
-        >
+        <Card title="System Readiness" subtitle="Platform" className="dashboard-panel">
           <dl className="definition-list">
             <div>
               <dt>Backend</dt>
@@ -131,11 +129,7 @@ function DashboardPage() {
           </dl>
         </Card>
 
-        <Card
-          title="Recent Purchase Orders"
-          subtitle="Inbound"
-          className="dashboard-panel"
-        >
+        <Card title="Recent Purchase Orders" subtitle="Inbound" className="dashboard-panel">
           <DataTable
             columns={purchaseColumns}
             rows={purchaseRows.slice(0, 5)}
