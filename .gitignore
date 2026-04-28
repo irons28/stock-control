@@ -10,5 +10,12 @@ app/.DS_Store
 app/ssl/
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+frontend/.env
+backend/node_modules/
+backend/.env
+backend/data/*.sqlite
+backend/data/*.sqlite-shm
+backend/data/*.sqlite-wal
 node_modules/
 dist/

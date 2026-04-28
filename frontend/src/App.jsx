@@ -1,100 +1,86 @@
 import { useEffect, useState } from "react";
-import Layout from "./components/Layout";
-import DashboardPage from "./pages/DashboardPage";
-import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
-import SalesOrdersPage from "./pages/SalesOrdersPage";
-import ProductsPage from "./pages/ProductsPage";
-import StockPage from "./pages/StockPage";
-import LocationsPage from "./pages/LocationsPage";
-import { useApiResource } from "./hooks/useApiResource";
+import AppShell from "./components/AppShell";
+import ModulePanel from "./components/ModulePanel";
+import { modules } from "./pages/modules";
 
-const navigationItems = [
-  {
-    key: "dashboard",
-    label: "Dashboard",
-    path: "/",
-    description: "Operational overview for inventory, orders, and exceptions.",
-  },
-  {
-    key: "purchase-orders",
-    label: "Purchase Orders",
-    path: "/purchase-orders",
-    description: "Raise, receive, and reconcile purchase orders from suppliers.",
-  },
-  {
-    key: "sales-orders",
-    label: "Sales Orders",
-    path: "/sales-orders",
-    description: "Create customer orders, allocate stock, and dispatch goods.",
-  },
-  {
-    key: "products",
-    label: "Products",
-    path: "/products",
-    description: "Maintain SKUs, pricing, tracking mode, and supplier defaults.",
-  },
-  {
-    key: "stock",
-    label: "Stock",
-    path: "/stock",
-    description: "Track movements, receiving flow, and stock handling activity.",
-  },
-  {
-    key: "locations",
-    label: "Locations",
-    path: "/locations",
-    description: "Define holding, shelf, bin, dispatch, and damaged locations.",
-  },
-];
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
-const pageComponents = {
-  dashboard: DashboardPage,
-  "purchase-orders": PurchaseOrdersPage,
-  "sales-orders": SalesOrdersPage,
-  products: ProductsPage,
-  stock: StockPage,
-  locations: LocationsPage,
-};
-
-function getItemByPath(pathname) {
-  return navigationItems.find((item) => item.path === pathname) || navigationItems[0];
+function getInitialModuleKey() {
+  const hash = window.location.hash.replace("#", "");
+  return modules.some((item) => item.key === hash) ? hash : modules[0].key;
 }
 
 function App() {
-  const [pathname, setPathname] = useState(() => window.location.pathname || "/");
-  const currentItem = getItemByPath(pathname);
-  const ActivePage = pageComponents[currentItem.key] || DashboardPage;
-  const health = useApiResource("/health");
+  const [activeKey, setActiveKey] = useState(getInitialModuleKey);
+  const [health, setHealth] = useState({
+    isHealthy: false,
+    message: "Checking backend connection...",
+    detail: apiBaseUrl,
+  });
 
   useEffect(() => {
-    function handlePopState() {
-      setPathname(window.location.pathname || "/");
+    async function loadHealth() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/health`);
+        if (!response.ok) {
+          throw new Error(`Health check failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        setHealth({
+          isHealthy: true,
+          message: `${payload.status.toUpperCase()} · ${payload.service}`,
+          detail: `SQLite ${payload.database.status} at ${payload.database.timestamp}`,
+        });
+      } catch (error) {
+        setHealth({
+          isHealthy: false,
+          message: "Backend unavailable",
+          detail: error.message,
+        });
+      }
     }
 
-    window.addEventListener("popstate", handlePopState);
+    loadHealth();
+  }, []);
+
+  useEffect(() => {
+    function handleHashChange() {
+      setActiveKey(getInitialModuleKey());
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
     };
   }, []);
 
-  function handleNavigate(nextPath) {
-    if (nextPath === pathname) {
-      return;
-    }
+  const activeModule = modules.find((item) => item.key === activeKey) || modules[0];
 
-    window.history.pushState({}, "", nextPath);
-    setPathname(nextPath);
+  function handleNavigate(nextKey) {
+    window.location.hash = nextKey;
+    setActiveKey(nextKey);
   }
 
   return (
-    <Layout
-      navigationItems={navigationItems}
-      activePath={currentItem.path}
+    <AppShell
+      navigation={modules}
+      activeKey={activeModule.key}
       onNavigate={handleNavigate}
       health={health}
     >
-      <ActivePage />
-    </Layout>
+      <header className="hero">
+        <p className="eyebrow">Warehouse Platform Blueprint</p>
+        <h2>Full-stack foundation for stock control operations</h2>
+        <p className="hero-copy">
+          This first phase creates the technical base for purchase order receiving,
+          allocation workflows, serial tracking, partial delivery handling, dashboards, and
+          barcode or QR-assisted activity.
+        </p>
+      </header>
+
+      <ModulePanel title={activeModule.title} description={activeModule.description} />
+    </AppShell>
   );
 }
 

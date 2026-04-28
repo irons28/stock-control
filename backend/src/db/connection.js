@@ -1,29 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
+const { env } = require("../config/env");
 
-const dataDirectory = path.join(__dirname, "..", "..", "data");
-const databasePath = path.join(dataDirectory, "stock-control.sqlite");
+const databasePath = path.isAbsolute(env.databasePath)
+  ? env.databasePath
+  : path.resolve(__dirname, "../../", env.databasePath);
 
-fs.mkdirSync(dataDirectory, { recursive: true });
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
 const db = new sqlite3.Database(databasePath);
-
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function onRun(error) {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve({
-        id: this.lastID,
-        changes: this.changes,
-      });
-    });
-  });
-}
 
 function get(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -38,37 +24,8 @@ function get(sql, params = []) {
   });
 }
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (error, rows) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve(rows);
-    });
-  });
-}
-
-function closeDatabase() {
-  return new Promise((resolve, reject) => {
-    db.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
 module.exports = {
-  all,
-  closeDatabase,
-  databasePath,
   db,
   get,
-  run,
+  databasePath,
 };
