@@ -3,6 +3,7 @@ const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
 const { receivePurchaseOrder } = require("../services/purchase-orders");
 const serialsRouter = require("./serials");
+const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
 
 const router = express.Router();
 
@@ -172,6 +173,17 @@ router.get("/dashboard/summary", async (_req, res, next) => {
       urgentCustomerOrders: Number(summary?.urgentCustomerOrders || 0),
       dispatchReadyItems: Number(summary?.dispatchReadyItems || 0),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.use("/sales-orders", salesOrdersRouter);
+
+router.get("/allocation/available-stock/:productId", async (req, res, next) => {
+  try {
+    const payload = await fetchAvailableStockByProduct(Number(req.params.productId));
+    res.json(payload);
   } catch (error) {
     next(error);
   }
