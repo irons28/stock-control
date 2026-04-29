@@ -7,9 +7,9 @@ function Layout({ navigationItems, activePath, onNavigate, health, children }) {
       <aside className="sidebar">
         <div className="sidebar-section">
           <p className="eyebrow">Stock Control</p>
-          <h1>Operations Workspace</h1>
+          <h1>Operations</h1>
           <p className="sidebar-copy">
-            A modern shell for purchasing, stock handling, and sales order control.
+            Purchasing, stock handling, and sales order fulfilment.
           </p>
         </div>
 
@@ -34,8 +34,8 @@ function Layout({ navigationItems, activePath, onNavigate, health, children }) {
               <strong>{backendOnline ? "API Connected" : "API Unavailable"}</strong>
               <p>
                 {backendOnline
-                  ? `Database time: ${timestamp}`
-                  : "Start the backend on port 3001 to load live operational data."}
+                  ? `DB time: ${timestamp}`
+                  : "Start the backend on port 3001 to load live data."}
               </p>
             </div>
           </div>

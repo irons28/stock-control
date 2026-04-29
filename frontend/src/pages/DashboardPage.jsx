@@ -10,7 +10,7 @@ const dashboardCards = [
     title: "Overdue Purchase Orders",
     badge: "Attention",
     emptyMessage: "No overdue supplier orders.",
-    detail: "Supplier orders past due and still not fully received.",
+    detail: "Supplier orders past their expected delivery date with outstanding lines.",
     actionLabel: "Open Purchase Orders",
     path: "/purchase-orders",
   },
@@ -19,7 +19,7 @@ const dashboardCards = [
     title: "Partially Received Orders",
     badge: "In Progress",
     emptyMessage: "No partially received orders.",
-    detail: "Purchase orders with inbound stock received but still outstanding.",
+    detail: "Purchase orders with some inbound stock received but still outstanding.",
     actionLabel: "Review Receiving",
     path: "/purchase-orders",
   },
@@ -27,8 +27,8 @@ const dashboardCards = [
     key: "stockAwaitingAllocation",
     title: "Stock Awaiting Allocation",
     badge: "Queue",
-    emptyMessage: "No stock is waiting to be allocated.",
-    detail: "Available units sitting in stock before assignment to demand.",
+    emptyMessage: "No stock waiting to be allocated.",
+    detail: "Units received into stock not yet assigned to any customer demand.",
     actionLabel: "View Stock",
     path: "/stock",
   },
@@ -37,7 +37,7 @@ const dashboardCards = [
     title: "Urgent Customer Orders",
     badge: "Priority",
     emptyMessage: "No urgent customer orders.",
-    detail: "Orders due now or within one day that still have outstanding dispatch.",
+    detail: "Customer orders due today or tomorrow with outstanding dispatch lines.",
     actionLabel: "Open Sales Orders",
     path: "/sales-orders",
   },
@@ -45,8 +45,8 @@ const dashboardCards = [
     key: "dispatchReadyItems",
     title: "Dispatch-Ready Items",
     badge: "Ready",
-    emptyMessage: "No items are staged for dispatch.",
-    detail: "Allocated order quantity that is ready to leave the warehouse.",
+    emptyMessage: "No items staged for dispatch.",
+    detail: "Allocated order quantity fully staged and ready to leave the warehouse.",
     actionLabel: "Review Dispatch",
     path: "/sales-orders",
   },
@@ -87,7 +87,7 @@ function DashboardCard({ config, value }) {
       className="dashboard-summary-card"
       onClick={() => navigateTo(config.path)}
     >
-      <Card className="dashboard-summary-card-shell">
+      <Card className={`dashboard-summary-card-shell tone-${tone}`}>
         <div className="dashboard-card-topline">
           <p className="dashboard-card-label">{config.title}</p>
           <span className={`status-badge ${tone}`}>{config.badge}</span>
@@ -104,15 +104,17 @@ function DashboardLoadingState() {
   return (
     <section className="dashboard-card-grid" aria-label="Loading dashboard summary">
       {dashboardCards.map((card) => (
-        <Card key={card.key} className="dashboard-summary-card-shell dashboard-loading-card">
-          <div className="dashboard-card-topline">
-            <div className="loading-block loading-label" />
-            <div className="loading-block loading-badge" />
+        <div key={card.key} className="card dashboard-loading-card">
+          <div className="card-body">
+            <div className="dashboard-card-topline">
+              <div className="loading-block loading-label" />
+              <div className="loading-block loading-badge" />
+            </div>
+            <div className="loading-block loading-value" />
+            <div className="loading-block loading-detail" />
+            <div className="loading-block loading-link" />
           </div>
-          <div className="loading-block loading-value" />
-          <div className="loading-block loading-detail" />
-          <div className="loading-block loading-link" />
-        </Card>
+        </div>
       ))}
     </section>
   );
@@ -127,7 +129,7 @@ function DashboardErrorState({ message, onRetry }) {
         <p>{message}</p>
         <div className="dashboard-state-actions">
           <Button variant="secondary" onClick={onRetry}>
-            Retry Summary
+            Retry
           </Button>
         </div>
       </div>
@@ -139,11 +141,11 @@ function DashboardEmptyState() {
   return (
     <Card className="dashboard-state-card">
       <div className="dashboard-state">
-        <span className="status-badge neutral">Empty</span>
-        <h3>No operational exceptions yet</h3>
+        <span className="status-badge neutral">All Clear</span>
+        <h3>No operational exceptions</h3>
         <p>
-          The dashboard is connected, but there are no overdue, urgent, or dispatch-ready items in
-          the current dataset.
+          The dashboard is connected. There are no overdue orders, urgent dispatch items, or
+          unallocated stock in the current dataset.
         </p>
       </div>
     </Card>
@@ -165,7 +167,7 @@ function DashboardPage() {
       <PageHeader
         eyebrow="Overview"
         title="Dashboard"
-        description="Monitor purchasing exceptions, unallocated stock, urgent customer demand, and dispatch readiness from one focused operational view."
+        description="Monitor purchasing exceptions, unallocated stock, urgent customer demand, and dispatch readiness in one operational view."
         actions={
           <Button variant="secondary" onClick={summary.reload}>
             Refresh
@@ -177,7 +179,7 @@ function DashboardPage() {
 
       {summary.status === "error" ? (
         <DashboardErrorState
-          message={`${summary.error} Confirm the backend is running on port 3001, then retry.`}
+          message={`${summary.error} Confirm the backend is running on port 3001.`}
           onRetry={summary.reload}
         />
       ) : null}
