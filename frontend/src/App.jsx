@@ -7,6 +7,7 @@ import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
 import SerialTrackerPage from "./pages/SerialTrackerPage";
+import ExceptionDashboardPage from "./pages/ExceptionDashboardPage";
 import { useApiResource } from "./hooks/useApiResource";
 
 const navigationItems = [
@@ -52,6 +53,12 @@ const navigationItems = [
     path: "/serial-tracker",
     description: "Look up any serial number to see its location and movement history.",
   },
+  {
+    key: "exceptions",
+    label: "Exceptions",
+    path: "/exceptions",
+    description: "Management view of overdue orders, stalled stock, and urgent customer deadlines.",
+  },
 ];
 
 const pageComponents = {
@@ -62,6 +69,7 @@ const pageComponents = {
   stock: StockPage,
   locations: LocationsPage,
   "serial-tracker": SerialTrackerPage,
+  exceptions: ExceptionDashboardPage,
 };
 
 function getItemByPath(pathname) {
