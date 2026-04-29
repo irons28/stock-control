@@ -274,6 +274,46 @@ async function createCoreTables() {
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
     FOREIGN KEY (location_id) REFERENCES stock_locations(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS customer_returns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_reference TEXT NOT NULL UNIQUE,
+    stock_item_id INTEGER NOT NULL,
+    serial_number TEXT NOT NULL DEFAULT '',
+    customer_id INTEGER,
+    original_sales_order_id INTEGER,
+    return_reason TEXT NOT NULL DEFAULT '',
+    condition TEXT NOT NULL DEFAULT 'unknown',
+    quarantine_decision INTEGER NOT NULL DEFAULT 0,
+    quarantine_reason TEXT NOT NULL DEFAULT '',
+    returned_by TEXT NOT NULL DEFAULT '',
+    returned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (original_sales_order_id) REFERENCES sales_orders(id)
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS warranty_replacements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    warranty_reference TEXT NOT NULL UNIQUE,
+    original_stock_item_id INTEGER NOT NULL,
+    replacement_stock_item_id INTEGER,
+    original_serial_number TEXT NOT NULL DEFAULT '',
+    replacement_serial_number TEXT NOT NULL DEFAULT '',
+    customer_id INTEGER,
+    customer_return_id INTEGER,
+    warranty_reason TEXT NOT NULL DEFAULT '',
+    replaced_by TEXT NOT NULL DEFAULT '',
+    replaced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (original_stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (replacement_stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (customer_return_id) REFERENCES customer_returns(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -545,6 +585,11 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_serial_lifecycle_events_stock_item_id ON serial_lifecycle_events(stock_item_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_serial_lifecycle_events_serial_number ON serial_lifecycle_events(serial_number)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_serial_lifecycle_events_event_at ON serial_lifecycle_events(event_at)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_stock_item_id ON customer_returns(stock_item_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_customer_id ON customer_returns(customer_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_return_reference ON customer_returns(return_reference)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_warranty_replacements_original_stock_item_id ON warranty_replacements(original_stock_item_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_warranty_replacements_customer_return_id ON warranty_replacements(customer_return_id)`);
 }
 
 async function initDatabase() {

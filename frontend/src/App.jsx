@@ -8,6 +8,7 @@ import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
 import SerialTrackerPage from "./pages/SerialTrackerPage";
 import SearchPage from "./pages/SearchPage";
+import ReturnsPage from "./pages/ReturnsPage";
 import { useApiResource } from "./hooks/useApiResource";
 
 const navigationItems = [
@@ -59,6 +60,12 @@ const navigationItems = [
     path: "/serial-tracker",
     description: "Look up any serial number to see its location and movement history.",
   },
+  {
+    key: "returns",
+    label: "Returns",
+    path: "/returns",
+    description: "Log customer returns, quarantine goods, and raise warranty replacements.",
+  },
 ];
 
 const pageComponents = {
@@ -70,6 +77,7 @@ const pageComponents = {
   stock: StockPage,
   locations: LocationsPage,
   "serial-tracker": SerialTrackerPage,
+  returns: ReturnsPage,
 };
 
 function getItemByPath(pathname) {

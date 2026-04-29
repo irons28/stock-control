@@ -6,6 +6,7 @@ const { router: dispatchRouter } = require("./dispatch");
 const importsRouter = require("./imports");
 const serialsRouter = require("./serials");
 const searchRouter = require("./search");
+const returnsRouter = require("./returns");
 const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
 
 const router = express.Router();
@@ -308,6 +309,7 @@ router.post("/purchase-orders/:poNumber/receive", async (req, res, next) => {
 
 router.use("/serials", serialsRouter);
 router.use("/search", searchRouter);
+router.use("/returns", returnsRouter);
 
 Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
   router.get(`/${resourceKey}`, async (_req, res, next) => {
