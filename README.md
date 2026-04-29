@@ -49,6 +49,53 @@ Copy `.env.example` to `.env` if you want to override the defaults.
 - `DATABASE_PATH`: SQLite file location
 - `VITE_API_BASE_URL`: frontend API base URL
 
+## Resetting the Demo Database
+
+Wipe and rebuild the database with realistic Phase 1 demo data:
+
+```bash
+cd backend
+npm run db:reset
+```
+
+This seeds the following demo records:
+
+### Purchase Orders
+
+| Order   | Status         | Notes                                  |
+|---------|----------------|----------------------------------------|
+| PO-1001 | Overdue        | 5× TILL-001, 3× PRINTER-001 outstanding |
+| PO-1002 | Part Received  | 1 of 3 tills received; rest due shortly |
+| PO-1003 | Open           | Consumables restock, future delivery   |
+| PO-1004 | Fully Received | 3× TILL-001, 30× LABEL-001 archived    |
+
+### Sales Orders
+
+| Order   | Status         | Notes                                  |
+|---------|----------------|----------------------------------------|
+| SO-2001 | Urgent         | Dispatch was due yesterday (Alpha Vet) |
+| SO-2002 | Dispatch Ready | TILL-SN-1002 allocated, due tomorrow   |
+| SO-2003 | Open           | Awaiting label stock allocation        |
+
+### Serial Numbers
+
+| Serial      | Status    |
+|-------------|-----------|
+| TILL-SN-1001 | Available  |
+| TILL-SN-1002 | Allocated (SO-2002) |
+| TILL-SN-1003 | Dispatched |
+| TILL-SN-1004 | Received – awaiting allocation |
+
+### Key Endpoints (after reset)
+
+```
+GET /api/dashboard/summary        — KPIs: overdue POs, urgent SOs, dispatch-ready items
+GET /api/purchase-orders          — all four PO states
+GET /api/sales-orders             — all three SO states
+GET /api/serials/TILL-SN-1001     — available serial detail + movement history
+GET /api/dispatch/ready           — SO-2002 ready to dispatch with TILL-SN-1002
+```
+
 ## Current Scope
 
-This phase only delivers the platform foundation, navigation shell, health checks, environment wiring, and documentation. Business workflows and transactional logic will be added in later phases.
+Phase 1 delivers the full stock control workflow: purchase order receiving, sales order allocation, serial number tracking, partial deliveries, goods receipt, dispatch, CSV imports, and a live dashboard.
