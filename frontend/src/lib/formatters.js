@@ -76,17 +76,25 @@ export function getStatusVariant(status) {
   switch (String(status || "").toLowerCase()) {
     case "active":
     case "received":
-    case "dispatched":
+    case "available":
     case "completed":
       return "positive";
+    case "dispatched":
     case "ordered":
     case "confirmed":
     case "allocated":
     case "partial":
+    case "warranty_replacement":
       return "info";
     case "cancelled":
     case "inactive":
+    case "scrapped":
       return "negative";
+    case "returned":
+    case "pending_allocation":
+      return "warning";
+    case "quarantined":
+      return "danger";
     default:
       return "neutral";
   }
