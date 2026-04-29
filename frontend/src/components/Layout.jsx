@@ -1,6 +1,23 @@
-function Layout({ navigationItems, activePath, onNavigate, health, children }) {
+import { useRef, useState } from "react";
+
+function Layout({ navigationItems, activePath, onNavigate, onSearch, health, children }) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
+
+  const [quickQuery, setQuickQuery] = useState("");
+  const quickRef = useRef(null);
+
+  function handleQuickKeyDown(e) {
+    if (e.key === "Enter" && quickQuery.trim()) {
+      onSearch(quickQuery.trim());
+      setQuickQuery("");
+      quickRef.current?.blur();
+    }
+    if (e.key === "Escape") {
+      setQuickQuery("");
+      quickRef.current?.blur();
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -11,6 +28,33 @@ function Layout({ navigationItems, activePath, onNavigate, health, children }) {
           <p className="sidebar-copy">
             Purchasing, stock handling, and sales order fulfilment.
           </p>
+        </div>
+
+        {/* Quick search */}
+        <div className="sidebar-search">
+          <span className="sidebar-search-icon" aria-hidden="true">⌕</span>
+          <input
+            ref={quickRef}
+            type="text"
+            className="sidebar-search-input"
+            value={quickQuery}
+            onChange={(e) => setQuickQuery(e.target.value)}
+            onKeyDown={handleQuickKeyDown}
+            placeholder="Quick search…"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="Quick search — press Enter to search"
+          />
+          {quickQuery && (
+            <button
+              type="button"
+              className="sidebar-search-clear"
+              onClick={() => { setQuickQuery(""); quickRef.current?.focus(); }}
+              aria-label="Clear"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <nav className="nav-list" aria-label="Primary">

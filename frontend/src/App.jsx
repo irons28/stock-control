@@ -7,6 +7,7 @@ import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
 import SerialTrackerPage from "./pages/SerialTrackerPage";
+import SearchPage from "./pages/SearchPage";
 import { useApiResource } from "./hooks/useApiResource";
 
 const navigationItems = [
@@ -15,6 +16,12 @@ const navigationItems = [
     label: "Dashboard",
     path: "/",
     description: "Operational overview for inventory, orders, and exceptions.",
+  },
+  {
+    key: "search",
+    label: "Search",
+    path: "/search",
+    description: "Global search across orders, serials, customers, and products.",
   },
   {
     key: "purchase-orders",
@@ -56,6 +63,7 @@ const navigationItems = [
 
 const pageComponents = {
   dashboard: DashboardPage,
+  search: SearchPage,
   "purchase-orders": PurchaseOrdersPage,
   "sales-orders": SalesOrdersPage,
   products: ProductsPage,
@@ -70,6 +78,7 @@ function getItemByPath(pathname) {
 
 function App() {
   const [pathname, setPathname] = useState(() => window.location.pathname || "/");
+  const [searchQuery, setSearchQuery] = useState("");
   const currentItem = getItemByPath(pathname);
   const ActivePage = pageComponents[currentItem.key] || DashboardPage;
   const health = useApiResource("/health");
@@ -89,19 +98,33 @@ function App() {
     if (nextPath === pathname) {
       return;
     }
-
     window.history.pushState({}, "", nextPath);
     setPathname(nextPath);
   }
 
-  // Pass health to Dashboard so it can show system readiness without a duplicate fetch.
-  const pageProps = currentItem.key === "dashboard" ? { health } : {};
+  // Called by the sidebar quick-search: navigate to /search and carry the query
+  function handleSearch(term) {
+    setSearchQuery(term);
+    if (pathname !== "/search") {
+      window.history.pushState({}, "", "/search");
+      setPathname("/search");
+    }
+  }
+
+  // Build page-specific props
+  let pageProps = {};
+  if (currentItem.key === "dashboard") {
+    pageProps = { health };
+  } else if (currentItem.key === "search") {
+    pageProps = { initialQuery: searchQuery, onNavigate: handleNavigate };
+  }
 
   return (
     <Layout
       navigationItems={navigationItems}
       activePath={currentItem.path}
       onNavigate={handleNavigate}
+      onSearch={handleSearch}
       health={health}
     >
       <ActivePage {...pageProps} />
