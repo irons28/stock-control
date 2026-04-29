@@ -244,6 +244,46 @@ async function createCoreTables() {
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
     FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS customer_returns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_reference TEXT NOT NULL UNIQUE,
+    stock_item_id INTEGER NOT NULL,
+    serial_number TEXT NOT NULL DEFAULT '',
+    customer_id INTEGER,
+    original_sales_order_id INTEGER,
+    return_reason TEXT NOT NULL DEFAULT '',
+    condition TEXT NOT NULL DEFAULT 'unknown',
+    quarantine_decision INTEGER NOT NULL DEFAULT 0,
+    quarantine_reason TEXT NOT NULL DEFAULT '',
+    returned_by TEXT NOT NULL DEFAULT '',
+    returned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (original_sales_order_id) REFERENCES sales_orders(id)
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS warranty_replacements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    warranty_reference TEXT NOT NULL UNIQUE,
+    original_stock_item_id INTEGER NOT NULL,
+    replacement_stock_item_id INTEGER,
+    original_serial_number TEXT NOT NULL DEFAULT '',
+    replacement_serial_number TEXT NOT NULL DEFAULT '',
+    customer_id INTEGER,
+    customer_return_id INTEGER,
+    warranty_reason TEXT NOT NULL DEFAULT '',
+    replaced_by TEXT NOT NULL DEFAULT '',
+    replaced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (original_stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (replacement_stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (customer_return_id) REFERENCES customer_returns(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -275,6 +315,13 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("stock_movements", "linked_sales_order_id INTEGER REFERENCES sales_orders(id)");
   await addColumnIfMissing("stock_movements", "customer_id INTEGER REFERENCES customers(id)");
   await addColumnIfMissing("stock_movements", "moved_by_user_id INTEGER REFERENCES users(id)");
+
+  await addColumnIfMissing("stock_items", "return_date TEXT");
+  await addColumnIfMissing("stock_items", "quarantine_reason TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "replaced_by_serial TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "replaces_serial TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "scrapped_date TEXT");
+  await addColumnIfMissing("stock_items", "scrapped_reason TEXT NOT NULL DEFAULT ''");
 }
 
 async function seedReferenceData() {
@@ -465,6 +512,22 @@ async function seedReferenceData() {
     'Rack A1',
     'rack'
   )`);
+
+  await run(`INSERT OR IGNORE INTO stock_locations (
+    code, name, location_type
+  ) VALUES (
+    'QUARANTINE',
+    'Quarantine',
+    'quarantine'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO stock_locations (
+    code, name, location_type
+  ) VALUES (
+    'RETURNS',
+    'Returns',
+    'returns'
+  )`);
 }
 
 async function createIndexes() {
@@ -485,6 +548,11 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_stock_item_id ON stock_movements(stock_item_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_purchase_order_id ON stock_movements(linked_purchase_order_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_sales_order_id ON stock_movements(linked_sales_order_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_stock_item_id ON customer_returns(stock_item_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_customer_id ON customer_returns(customer_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_return_reference ON customer_returns(return_reference)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_warranty_replacements_original_stock_item_id ON warranty_replacements(original_stock_item_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_warranty_replacements_customer_return_id ON warranty_replacements(customer_return_id)`);
 }
 
 async function initDatabase() {
