@@ -9,6 +9,7 @@ import LocationsPage from "./pages/LocationsPage";
 import SerialTrackerPage from "./pages/SerialTrackerPage";
 import SearchPage from "./pages/SearchPage";
 import ReturnsPage from "./pages/ReturnsPage";
+import ExceptionDashboardPage from "./pages/ExceptionDashboardPage";
 import { useApiResource } from "./hooks/useApiResource";
 
 const navigationItems = [
@@ -66,6 +67,12 @@ const navigationItems = [
     path: "/returns",
     description: "Log customer returns, quarantine goods, and raise warranty replacements.",
   },
+  {
+    key: "exceptions",
+    label: "Exceptions",
+    path: "/exceptions",
+    description: "Management view of overdue orders, stalled stock, and urgent customer deadlines.",
+  },
 ];
 
 const pageComponents = {
@@ -78,6 +85,7 @@ const pageComponents = {
   locations: LocationsPage,
   "serial-tracker": SerialTrackerPage,
   returns: ReturnsPage,
+  exceptions: ExceptionDashboardPage,
 };
 
 function getItemByPath(pathname) {
