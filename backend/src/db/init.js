@@ -244,6 +244,21 @@ async function createCoreTables() {
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
     FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_role TEXT DEFAULT 'system',
+    user_name TEXT DEFAULT 'System',
+    action_type TEXT,
+    entity_type TEXT,
+    entity_ref TEXT,
+    summary TEXT DEFAULT '',
+    details_json TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -275,9 +290,18 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("stock_movements", "linked_sales_order_id INTEGER REFERENCES sales_orders(id)");
   await addColumnIfMissing("stock_movements", "customer_id INTEGER REFERENCES customers(id)");
   await addColumnIfMissing("stock_movements", "moved_by_user_id INTEGER REFERENCES users(id)");
+
+  await addColumnIfMissing("goods_receipts", "delivery_number TEXT DEFAULT ''");
+  await addColumnIfMissing("goods_receipt_lines", "serial_numbers_json TEXT DEFAULT '[]'");
 }
 
 async function seedReferenceData() {
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (1, 'admin@ops.example', 'Alex Admin', 'admin', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (2, 'purchase@ops.example', 'Priya Purchasing', 'purchasing', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (3, 'warehouse@ops.example', 'Wayne Warehouse', 'warehouse', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (4, 'dispatch@ops.example', 'Diana Dispatch', 'dispatch', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (5, 'manager@ops.example', 'Marcus Management', 'management', 'active')`);
+
   await run(`INSERT OR IGNORE INTO customers (
     code, name, contact_name, email, phone, address_line1, city, postcode, country
   ) VALUES (
@@ -485,6 +509,8 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_stock_item_id ON stock_movements(stock_item_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_purchase_order_id ON stock_movements(linked_purchase_order_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_sales_order_id ON stock_movements(linked_sales_order_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id)`);
 }
 
 async function initDatabase() {

@@ -6,8 +6,13 @@ const { router: dispatchRouter } = require("./dispatch");
 const importsRouter = require("./imports");
 const serialsRouter = require("./serials");
 const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
+const { resolveUser, requireRole } = require("../middleware/auth");
+const auditRouter = require("./audit");
+const usersRouter = require("./users");
 
 const router = express.Router();
+
+router.use(resolveUser);
 
 const resourceQueries = {
   customers: "SELECT * FROM customers ORDER BY name ASC",
@@ -181,10 +186,10 @@ router.get("/dashboard/summary", async (_req, res, next) => {
 });
 
 router.use("/sales-orders", salesOrdersRouter);
-router.use("/dispatch", dispatchRouter);
+router.use("/dispatch", requireRole("admin", "dispatch"), dispatchRouter);
 router.use("/import", importsRouter);
 
-router.get("/allocation/available-stock/:productId", async (req, res, next) => {
+router.get("/allocation/available-stock/:productId", requireRole("admin", "warehouse", "dispatch", "purchasing"), async (req, res, next) => {
   try {
     const payload = await fetchAvailableStockByProduct(Number(req.params.productId));
     res.json(payload);
@@ -296,16 +301,27 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
   }
 });
 
-router.post("/purchase-orders/:poNumber/receive", async (req, res, next) => {
-  try {
-    const receipt = await receivePurchaseOrder(req.params.poNumber, req.body);
-    res.status(201).json(receipt);
-  } catch (error) {
-    next(error);
+router.post(
+  "/purchase-orders/:poNumber/receive",
+  requireRole("admin", "warehouse", "purchasing"),
+  async (req, res, next) => {
+    try {
+      const userContext = {
+        userId: req.user?.id,
+        userRole: req.user?.role,
+        userName: req.user?.full_name,
+      };
+      const receipt = await receivePurchaseOrder(req.params.poNumber, req.body, userContext);
+      res.status(201).json(receipt);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 router.use("/serials", serialsRouter);
+router.use("/audit-log", auditRouter);
+router.use("/users", usersRouter);
 
 Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
   router.get(`/${resourceKey}`, async (_req, res, next) => {

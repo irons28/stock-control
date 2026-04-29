@@ -7,7 +7,9 @@ import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
 import SerialTrackerPage from "./pages/SerialTrackerPage";
+import AuditLogPage from "./pages/AuditLogPage";
 import { useApiResource } from "./hooks/useApiResource";
+import { UserProvider } from "./context/UserContext";
 
 const navigationItems = [
   {
@@ -52,6 +54,12 @@ const navigationItems = [
     path: "/serial-tracker",
     description: "Look up any serial number to see its location and movement history.",
   },
+  {
+    key: "audit-log",
+    label: "Audit Log",
+    path: "/audit-log",
+    description: "User activity and action history for compliance and accountability.",
+  },
 ];
 
 const pageComponents = {
@@ -62,6 +70,7 @@ const pageComponents = {
   stock: StockPage,
   locations: LocationsPage,
   "serial-tracker": SerialTrackerPage,
+  "audit-log": AuditLogPage,
 };
 
 function getItemByPath(pathname) {
@@ -98,14 +107,16 @@ function App() {
   const pageProps = currentItem.key === "dashboard" ? { health } : {};
 
   return (
-    <Layout
-      navigationItems={navigationItems}
-      activePath={currentItem.path}
-      onNavigate={handleNavigate}
-      health={health}
-    >
-      <ActivePage {...pageProps} />
-    </Layout>
+    <UserProvider>
+      <Layout
+        navigationItems={navigationItems}
+        activePath={currentItem.path}
+        onNavigate={handleNavigate}
+        health={health}
+      >
+        <ActivePage {...pageProps} />
+      </Layout>
+    </UserProvider>
   );
 }
 

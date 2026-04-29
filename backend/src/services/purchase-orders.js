@@ -173,14 +173,27 @@ async function updatePurchaseOrderStatus(purchaseOrderId) {
   return status;
 }
 
-async function logActivity(entityType, entityId, action, details) {
+async function logActivity(entityType, entityRef, action, details, userContext = {}) {
+  const userId = userContext.userId || null;
+  const userRole = userContext.userRole || "system";
+  const userName = userContext.userName || "System";
+
   await run(
-    `INSERT INTO activity_log (entity_type, entity_id, action, details) VALUES (?, ?, ?, ?)`,
-    [entityType, String(entityId), action, details ? JSON.stringify(details) : ""]
+    `INSERT INTO activity_log (user_id, user_role, user_name, action_type, entity_type, entity_ref, summary, details_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId,
+      userRole,
+      userName,
+      action,
+      entityType,
+      String(entityRef),
+      details ? `${action} on ${entityType} ${entityRef}` : "",
+      details ? JSON.stringify(details) : "",
+    ]
   );
 }
 
-async function receivePurchaseOrder(poNumber, payload) {
+async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
   const deliveryNumber = String(payload?.deliveryNumber || "").trim();
   const receivedBy = String(payload?.receivedBy || "").trim();
   const lines = Array.isArray(payload?.lines) ? payload.lines : [];
@@ -452,7 +465,7 @@ async function receivePurchaseOrder(poNumber, payload) {
       purchaseOrder: orderDetails.order.order_number,
       receivedBy,
       lineCount: lineSummaries.length,
-    });
+    }, userContext);
 
     await logActivity("purchase_order", orderDetails.order.order_number, "received_goods", {
       receiptNumber,
@@ -460,7 +473,7 @@ async function receivePurchaseOrder(poNumber, payload) {
       receivedBy,
       status,
       lines: lineSummaries,
-    });
+    }, userContext);
 
     await exec("COMMIT");
 
