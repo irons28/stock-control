@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
+import { useUser } from "../context/UserContext";
 
 function Layout({ navigationItems, activePath, onNavigate, onSearch, health, children }) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
+  const { currentUser, users, switchUser } = useUser();
 
   const [quickQuery, setQuickQuery] = useState("");
   const quickRef = useRef(null);
@@ -70,6 +72,24 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
             </button>
           ))}
         </nav>
+
+        <div className="sidebar-user">
+          <div className="sidebar-user-info">
+            <span className="sidebar-user-name">{currentUser.full_name}</span>
+            <span className={`role-pill role-pill--${currentUser.role}`}>{currentUser.role}</span>
+          </div>
+          <select
+            className="role-switcher-select"
+            value={currentUser.id}
+            onChange={(e) => switchUser(e.target.value)}
+          >
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name} ({u.role})
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="sidebar-section sidebar-footer">
           <div className={backendOnline ? "system-status online" : "system-status"}>

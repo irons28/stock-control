@@ -10,7 +10,9 @@ import SerialTrackerPage from "./pages/SerialTrackerPage";
 import SearchPage from "./pages/SearchPage";
 import ReturnsPage from "./pages/ReturnsPage";
 import ExceptionDashboardPage from "./pages/ExceptionDashboardPage";
+import AuditLogPage from "./pages/AuditLogPage";
 import { useApiResource } from "./hooks/useApiResource";
+import { UserProvider } from "./context/UserContext";
 
 const navigationItems = [
   {
@@ -73,6 +75,12 @@ const navigationItems = [
     path: "/exceptions",
     description: "Management view of overdue orders, stalled stock, and urgent customer deadlines.",
   },
+  {
+    key: "audit-log",
+    label: "Audit Log",
+    path: "/audit-log",
+    description: "User activity and action history for compliance and accountability.",
+  },
 ];
 
 const pageComponents = {
@@ -86,6 +94,7 @@ const pageComponents = {
   "serial-tracker": SerialTrackerPage,
   returns: ReturnsPage,
   exceptions: ExceptionDashboardPage,
+  "audit-log": AuditLogPage,
 };
 
 function getItemByPath(pathname) {
@@ -136,15 +145,17 @@ function App() {
   }
 
   return (
-    <Layout
-      navigationItems={navigationItems}
-      activePath={currentItem.path}
-      onNavigate={handleNavigate}
-      onSearch={handleSearch}
-      health={health}
-    >
-      <ActivePage {...pageProps} />
-    </Layout>
+    <UserProvider>
+      <Layout
+        navigationItems={navigationItems}
+        activePath={currentItem.path}
+        onNavigate={handleNavigate}
+        onSearch={handleSearch}
+        health={health}
+      >
+        <ActivePage {...pageProps} />
+      </Layout>
+    </UserProvider>
   );
 }
 

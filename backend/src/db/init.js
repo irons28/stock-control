@@ -314,6 +314,21 @@ async function createCoreTables() {
     FOREIGN KEY (customer_id) REFERENCES customers(id),
     FOREIGN KEY (customer_return_id) REFERENCES customer_returns(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_role TEXT DEFAULT 'system',
+    user_name TEXT DEFAULT 'System',
+    action_type TEXT,
+    entity_type TEXT,
+    entity_ref TEXT,
+    summary TEXT DEFAULT '',
+    details_json TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -356,9 +371,17 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("stock_items", "replaces_serial TEXT NOT NULL DEFAULT ''");
   await addColumnIfMissing("stock_items", "scrapped_date TEXT");
   await addColumnIfMissing("stock_items", "scrapped_reason TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("goods_receipts", "delivery_number TEXT DEFAULT ''");
+  await addColumnIfMissing("goods_receipt_lines", "serial_numbers_json TEXT DEFAULT '[]'");
 }
 
 async function seedReferenceData() {
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (1, 'admin@ops.example', 'Alex Admin', 'admin', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (2, 'purchase@ops.example', 'Priya Purchasing', 'purchasing', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (3, 'warehouse@ops.example', 'Wayne Warehouse', 'warehouse', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (4, 'dispatch@ops.example', 'Diana Dispatch', 'dispatch', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (5, 'manager@ops.example', 'Marcus Management', 'management', 'active')`);
+
   await run(`INSERT OR IGNORE INTO customers (
     code, name, contact_name, email, phone, address_line1, city, postcode, country
   ) VALUES (
@@ -590,6 +613,8 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_customer_returns_return_reference ON customer_returns(return_reference)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_warranty_replacements_original_stock_item_id ON warranty_replacements(original_stock_item_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_warranty_replacements_customer_return_id ON warranty_replacements(customer_return_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id)`);
 }
 
 async function initDatabase() {
