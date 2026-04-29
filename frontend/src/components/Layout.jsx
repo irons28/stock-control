@@ -1,14 +1,6 @@
 import { useRef, useState } from "react";
 import { useUser } from "../context/UserContext";
 
-const DEMO_USERS = [
-  { id: "1", full_name: "Alex Admin",        role: "admin"      },
-  { id: "2", full_name: "Priya Purchasing",   role: "purchasing" },
-  { id: "3", full_name: "Wayne Warehouse",    role: "warehouse"  },
-  { id: "4", full_name: "Diana Dispatch",     role: "dispatch"   },
-  { id: "5", full_name: "Marcus Management",  role: "management" },
-];
-
 function getInitials(name) {
   return name
     .split(" ")
@@ -21,23 +13,12 @@ function getInitials(name) {
 function Layout({ navigationItems, activePath, onNavigate, onSearch, health, children }) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
+
   const { currentUser, users, switchUser } = useUser();
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const [quickQuery, setQuickQuery] = useState("");
   const quickRef = useRef(null);
-
-  const [userId, setUserId] = useState(
-    () => localStorage.getItem("sc_user_id") || "1"
-  );
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-
-  const currentUser = DEMO_USERS.find((u) => u.id === userId) || DEMO_USERS[0];
-
-  function handleUserSwitch(user) {
-    localStorage.setItem("sc_user_id", user.id);
-    setUserId(user.id);
-    setUserDropdownOpen(false);
-  }
 
   function handleQuickKeyDown(e) {
     if (e.key === "Enter" && quickQuery.trim()) {
@@ -103,24 +84,6 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
           ))}
         </nav>
 
-        <div className="sidebar-user">
-          <div className="sidebar-user-info">
-            <span className="sidebar-user-name">{currentUser.full_name}</span>
-            <span className={`role-pill role-pill--${currentUser.role}`}>{currentUser.role}</span>
-          </div>
-          <select
-            className="role-switcher-select"
-            value={currentUser.id}
-            onChange={(e) => switchUser(e.target.value)}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.full_name} ({u.role})
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="sidebar-section sidebar-footer">
           {/* User panel */}
           <div style={{ position: "relative" }}>
@@ -147,12 +110,12 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
 
             {userDropdownOpen && (
               <div className="sidebar-user-dropdown">
-                {DEMO_USERS.map((user) => (
+                {users.map((user) => (
                   <button
                     key={user.id}
                     type="button"
-                    className={`sidebar-user-option${user.id === userId ? " active" : ""}`}
-                    onClick={() => handleUserSwitch(user)}
+                    className={`sidebar-user-option${user.id === currentUser.id ? " active" : ""}`}
+                    onClick={() => { switchUser(user.id); setUserDropdownOpen(false); }}
                   >
                     <span className="sidebar-user-option-name">{user.full_name}</span>
                     <span className="sidebar-user-option-role">{user.role}</span>
