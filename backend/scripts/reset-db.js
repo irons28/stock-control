@@ -14,11 +14,16 @@ if (fs.existsSync(dbPath)) {
 }
 
 const { initializeDatabase: initDatabase } = require("../src/db/init");
+const { seedDemoData } = require("./seed-demo");
 const { closeDatabase } = require("../src/db/connection");
 
 initDatabase()
   .then(() => {
-    console.log("Database initialised and seeded.");
+    console.log("Schema initialised.");
+    return seedDemoData();
+  })
+  .then(() => {
+    console.log("Database initialised and seeded with demo data.");
     return closeDatabase();
   })
   .then(() => process.exit(0))
