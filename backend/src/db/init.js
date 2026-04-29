@@ -192,6 +192,16 @@ async function createCoreTables() {
     linked_sales_order_id INTEGER,
     linked_sales_order_line_id INTEGER,
     customer_id INTEGER,
+    -- lifecycle tracking columns
+    delivery_note_ref TEXT NOT NULL DEFAULT '',
+    dispatch_reference TEXT NOT NULL DEFAULT '',
+    dispatch_date TEXT,
+    return_date TEXT,
+    quarantine_reason TEXT NOT NULL DEFAULT '',
+    replaced_by_serial TEXT NOT NULL DEFAULT '',
+    replaces_serial TEXT NOT NULL DEFAULT '',
+    scrapped_date TEXT,
+    scrapped_reason TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -244,6 +254,26 @@ async function createCoreTables() {
     FOREIGN KEY (purchase_order_line_id) REFERENCES purchase_order_lines(id),
     FOREIGN KEY (sales_order_line_id) REFERENCES sales_order_lines(id)
   )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS serial_lifecycle_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stock_item_id INTEGER NOT NULL,
+    serial_number TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    reference_type TEXT NOT NULL DEFAULT '',
+    reference_number TEXT NOT NULL DEFAULT '',
+    customer_id INTEGER,
+    supplier_id INTEGER,
+    location_id INTEGER,
+    notes TEXT NOT NULL DEFAULT '',
+    event_by TEXT NOT NULL DEFAULT '',
+    event_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (stock_item_id) REFERENCES stock_items(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+    FOREIGN KEY (location_id) REFERENCES stock_locations(id)
+  )`);
 }
 
 async function applySchemaMigrations() {
@@ -275,6 +305,17 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("stock_movements", "linked_sales_order_id INTEGER REFERENCES sales_orders(id)");
   await addColumnIfMissing("stock_movements", "customer_id INTEGER REFERENCES customers(id)");
   await addColumnIfMissing("stock_movements", "moved_by_user_id INTEGER REFERENCES users(id)");
+
+  // serial lifecycle tracking columns on stock_items
+  await addColumnIfMissing("stock_items", "delivery_note_ref TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "dispatch_reference TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "dispatch_date TEXT");
+  await addColumnIfMissing("stock_items", "return_date TEXT");
+  await addColumnIfMissing("stock_items", "quarantine_reason TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "replaced_by_serial TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "replaces_serial TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing("stock_items", "scrapped_date TEXT");
+  await addColumnIfMissing("stock_items", "scrapped_reason TEXT NOT NULL DEFAULT ''");
 }
 
 async function seedReferenceData() {
@@ -465,6 +506,22 @@ async function seedReferenceData() {
     'Rack A1',
     'rack'
   )`);
+
+  await run(`INSERT OR IGNORE INTO stock_locations (
+    code, name, location_type
+  ) VALUES (
+    'QUARANTINE',
+    'Quarantine',
+    'quarantine'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO stock_locations (
+    code, name, location_type
+  ) VALUES (
+    'RETURNS',
+    'Returns',
+    'returns'
+  )`);
 }
 
 async function createIndexes() {
@@ -485,6 +542,9 @@ async function createIndexes() {
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_stock_item_id ON stock_movements(stock_item_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_purchase_order_id ON stock_movements(linked_purchase_order_id)`);
   await run(`CREATE INDEX IF NOT EXISTS idx_stock_movements_linked_sales_order_id ON stock_movements(linked_sales_order_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_serial_lifecycle_events_stock_item_id ON serial_lifecycle_events(stock_item_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_serial_lifecycle_events_serial_number ON serial_lifecycle_events(serial_number)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_serial_lifecycle_events_event_at ON serial_lifecycle_events(event_at)`);
 }
 
 async function initDatabase() {

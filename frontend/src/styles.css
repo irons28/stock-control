@@ -798,7 +798,7 @@ textarea {
   border-radius: var(--radius-sm);
 }
 
-/* ── Tracker page ──────────────────────────────────────────────────────────── */
+/* ── Tracker search ────────────────────────────────────────────────────────── */
 
 .tracker-search-area {
   display: flex;
@@ -815,6 +815,293 @@ textarea {
 
 .tracker-error {
   color: #8b2020;
+}
+
+/* ── Serial status hero card ───────────────────────────────────────────────── */
+
+.serial-status-card {
+  overflow: hidden;
+}
+
+/* Tone-coloured left accent mirrors the dashboard card approach */
+.serial-status--available    { border-left: 3px solid #27a570; }
+.serial-status--received     { border-left: 3px solid #3a82c4; }
+.serial-status--allocated    { border-left: 3px solid #325d88; }
+.serial-status--pending      { border-left: 3px solid #7a9ab5; }
+.serial-status--dispatched   { border-left: 3px solid #1a3f7a; }
+.serial-status--returned     { border-left: 3px solid #d4791a; }
+.serial-status--quarantined  { border-left: 3px solid #cc3333; }
+.serial-status--scrapped     { border-left: 3px solid #778899; }
+.serial-status--neutral      { border-left: 3px solid var(--border); }
+
+.serial-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.35rem 1.5rem 1rem;
+  border-bottom: 1px solid rgba(22, 50, 79, 0.07);
+}
+
+.serial-status-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.serial-status-number {
+  margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.7rem);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--navy-900);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status badge in hero */
+.serial-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge--available    { background: rgba(39, 165, 112, 0.1);  color: #1a6b3a; }
+.badge--received     { background: rgba(58, 130, 196, 0.1);  color: #1b5a96; }
+.badge--allocated    { background: rgba(50,  93, 136, 0.1);  color: #204870; }
+.badge--pending      { background: rgba(88, 112, 138, 0.1);  color: #4d6678; }
+.badge--dispatched   { background: rgba(26,  63, 122, 0.1);  color: #1a3f7a; }
+.badge--returned     { background: rgba(212,121,  26, 0.1);  color: #7a4500; }
+.badge--quarantined  { background: rgba(180,  50,  50, 0.1); color: #961c1c; }
+.badge--scrapped     { background: rgba(100,110,120, 0.1);   color: #4a5560; }
+.badge--neutral      { background: rgba(88, 112, 138, 0.1);  color: var(--text-muted); }
+
+/* Alert banners */
+.serial-alert {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.7rem 1.5rem;
+  font-size: 0.845rem;
+  line-height: 1.55;
+}
+
+.serial-alert strong {
+  white-space: nowrap;
+}
+
+.serial-alert--danger  { background: rgba(180, 50, 50, 0.07);   color: #7a1a1a; border-bottom: 1px solid rgba(180,50,50,0.12); }
+.serial-alert--warning { background: rgba(210,120, 20, 0.07);   color: #6b3a00; border-bottom: 1px solid rgba(210,120,20,0.12); }
+.serial-alert--neutral { background: rgba(88, 112,138, 0.07);   color: #3a4f60; border-bottom: 1px solid rgba(88,112,138,0.1); }
+
+/* Metrics row */
+.serial-status-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 0.75rem 1.5rem 1.1rem;
+}
+
+.serial-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 140px;
+  flex: 1;
+  padding: 0.55rem 1rem 0.55rem 0;
+}
+
+.serial-metric-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.serial-metric-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--navy-900);
+}
+
+/* ── Serial detail card ────────────────────────────────────────────────────── */
+
+.serial-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.serial-detail-section {
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(22, 50, 79, 0.07);
+}
+
+.serial-detail-section:last-child {
+  padding-bottom: 0.25rem;
+  border-bottom: none;
+}
+
+.serial-detail-section-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.serial-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+
+.serial-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.serial-detail-row dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.serial-detail-row dd {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--navy-900);
+  line-height: 1.4;
+}
+
+.mono {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 0.83rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Lifecycle timeline ────────────────────────────────────────────────────── */
+
+.serial-timeline {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-left: 2.25rem;
+}
+
+/* Vertical connecting line */
+.serial-timeline::before {
+  content: "";
+  position: absolute;
+  left: 0.6875rem;   /* centre of the 1.375rem dot */
+  top: 0.7rem;
+  bottom: 0.7rem;
+  width: 2px;
+  background: rgba(22, 50, 79, 0.1);
+  border-radius: 2px;
+}
+
+.timeline-event {
+  position: relative;
+  padding: 0 0 1.5rem;
+}
+
+.timeline-event--last {
+  padding-bottom: 0.25rem;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -2.25rem;
+  top: 0.15rem;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--panel-strong);
+  box-shadow: 0 0 0 3px var(--panel);
+}
+
+/* Timeline dot tone colours */
+.timeline-dot.tone-receipt     { border-color: #27a570; background: rgba(39,165,112,0.12); }
+.timeline-dot.tone-allocation  { border-color: #325d88; background: rgba(50,93,136,0.12); }
+.timeline-dot.tone-dispatch    { border-color: #1a3f7a; background: rgba(26,63,122,0.12); }
+.timeline-dot.tone-returned    { border-color: #d4791a; background: rgba(212,121,26,0.12); }
+.timeline-dot.tone-quarantined { border-color: #cc3333; background: rgba(180,50,50,0.12); }
+.timeline-dot.tone-warranty    { border-color: #7c3aed; background: rgba(124,58,237,0.12); }
+.timeline-dot.tone-scrapped    { border-color: #778899; background: rgba(119,136,153,0.12); }
+.timeline-dot.tone-neutral     { border-color: var(--border); }
+
+.timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.timeline-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Badge tones for timeline */
+.timeline-type-badge.tone-receipt     { background: rgba(39,165,112,0.1);  color: #1a6b3a; }
+.timeline-type-badge.tone-allocation  { background: rgba(50,93,136,0.1);   color: #204870; }
+.timeline-type-badge.tone-dispatch    { background: rgba(26,63,122,0.1);   color: #1a3f7a; }
+.timeline-type-badge.tone-returned    { background: rgba(212,121,26,0.1);  color: #7a4500; }
+.timeline-type-badge.tone-quarantined { background: rgba(180,50,50,0.1);   color: #961c1c; }
+.timeline-type-badge.tone-warranty    { background: rgba(124,58,237,0.1);  color: #5b21b6; }
+.timeline-type-badge.tone-scrapped    { background: rgba(119,136,153,0.1); color: #4a5560; }
+.timeline-type-badge.tone-neutral     { background: rgba(88,112,138,0.1);  color: var(--text-muted); }
+
+.timeline-date {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.timeline-ref {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--navy-800);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-notes {
+  margin: 0;
+  font-size: 0.835rem;
+  line-height: 1.55;
+  color: var(--text-muted);
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────────── */

@@ -24,10 +24,12 @@ async function seedDemoData() {
   const pScanner    = await get(`SELECT id FROM products        WHERE sku  = 'SCANNER-001'`);
   const pRoll       = await get(`SELECT id FROM products        WHERE sku  = 'ROLL-001'`);
   const pLabel      = await get(`SELECT id FROM products        WHERE sku  = 'LABEL-001'`);
-  const locHold     = await get(`SELECT id FROM stock_locations WHERE code = 'HOLD'`);
+  const locHold        = await get(`SELECT id FROM stock_locations WHERE code = 'HOLD'`);
   const locConsumables = await get(`SELECT id FROM stock_locations WHERE code = 'CONSUMABLES'`);
-  const locDispatch = await get(`SELECT id FROM stock_locations WHERE code = 'DISPATCH'`);
-  const locRackA1   = await get(`SELECT id FROM stock_locations WHERE code = 'RACK-A1'`);
+  const locDispatch    = await get(`SELECT id FROM stock_locations WHERE code = 'DISPATCH'`);
+  const locRackA1      = await get(`SELECT id FROM stock_locations WHERE code = 'RACK-A1'`);
+  const locQuarantine  = await get(`SELECT id FROM stock_locations WHERE code = 'QUARANTINE'`);
+  const locReturns     = await get(`SELECT id FROM stock_locations WHERE code = 'RETURNS'`);
 
   // ── Purchase Orders ────────────────────────────────────────────────────────
   //
@@ -415,9 +417,284 @@ async function seedDemoData() {
     [si1003.id, pTill.id, locDispatch.id, locRackA1.id, po1004.id, custHarbor.id],
   );
 
+  // ── Enrich existing serials with delivery_note_ref ────────────────────────
+  // TILL-SN-1001, 1002, 1003, 1004 were received on GR-1004A
+
+  for (const sn of ["TILL-SN-1001", "TILL-SN-1002", "TILL-SN-1003", "TILL-SN-1004"]) {
+    await run(
+      `UPDATE stock_items SET delivery_note_ref = 'GR-1004A' WHERE serial_number = ?`,
+      [sn],
+    );
+  }
+
+  // Enrich TILL-SN-1002 (allocated) and TILL-SN-1003 (dispatched) with refs
+  await run(
+    `UPDATE stock_items SET dispatch_reference = 'DISP-2002', dispatch_date = ?
+     WHERE serial_number = 'TILL-SN-1003'`,
+    [daysFromNow(-44)],
+  );
+
+  // ── Additional lifecycle scenario serials ──────────────────────────────────
+  //
+  //  TILL-SN-1005  quarantined  — passed QA then failed power-on test
+  //  TILL-SN-1006  returned     — dispatched to customer, customer returned it
+  //  TILL-SN-1007  dispatched   — sent as warranty replacement for TILL-SN-1006
+  //  TILL-SN-1008  scrapped     — full lifecycle then condemned
+
+  // ── TILL-SN-1005 — quarantined ────────────────────────────────────────────
+
+  await run(
+    `INSERT INTO stock_items
+       (product_id, stock_location_id, actual_location_id, serial_number,
+        quantity_on_hand, quantity_allocated, hold_status,
+        linked_purchase_order_id, linked_purchase_order_line_id,
+        delivery_note_ref, quarantine_reason, status)
+     VALUES (?, ?, ?, 'TILL-SN-1005', 1, 0, 'quarantined', ?, ?,
+             'GR-1004A', 'Power fault detected during QA power-on test — held for supplier return', 'active')`,
+    [pTill.id, locQuarantine.id, locQuarantine.id, po1004.id, pol1004Till.id],
+  );
+
+  const si1005 = await get(`SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1005'`);
+
+  // Use explicit created_at so the timeline sorts in correct historical order.
+  await run(
+    `INSERT INTO stock_movements
+       (movement_type, stock_item_id, product_id,
+        destination_location_id, actual_destination_location_id,
+        quantity, linked_purchase_order_id,
+        reference_type, reference_id, notes, created_at)
+     VALUES ('receipt', ?, ?, ?, ?, 1, ?, 'goods_receipt', ?,
+             'Received on PO-1004 / GR-1004A', ?)`,
+    [si1005.id, pTill.id, locRackA1.id, locRackA1.id, po1004.id, gr1004A.id, daysFromNow(-44)],
+  );
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, supplier_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1005', 'quarantined',
+             'inspection', 'QA-INSP-005', ?, ?,
+             'Failed power-on self-test — PSU output voltage out of spec. Quarantined pending supplier RMA.',
+             ?)`,
+    [si1005.id, supNexus.id, locQuarantine.id, daysFromNow(-43)],
+  );
+
+  // ── TILL-SN-1006 — returned ───────────────────────────────────────────────
+
+  await run(
+    `INSERT INTO stock_items
+       (product_id, stock_location_id, actual_location_id, serial_number,
+        quantity_on_hand, quantity_allocated, hold_status,
+        linked_purchase_order_id, linked_purchase_order_line_id,
+        customer_id,
+        delivery_note_ref, dispatch_reference, dispatch_date,
+        return_date, replaced_by_serial, status)
+     VALUES (?, ?, ?, 'TILL-SN-1006', 0, 0, 'returned', ?, ?,
+             ?,
+             'GR-1004A', 'DISP-2003', ?,
+             ?, 'TILL-SN-1007', 'active')`,
+    [
+      pTill.id, locReturns.id, locReturns.id, po1004.id, pol1004Till.id,
+      custAlpha.id,
+      daysFromNow(-35), daysFromNow(-3),
+    ],
+  );
+
+  const si1006 = await get(`SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1006'`);
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, supplier_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1006', 'receipt',
+             'goods_receipt', 'GR-1004A', ?, ?,
+             'Received into stock on PO-1004.', ?)`,
+    [si1006.id, supNexus.id, locRackA1.id, daysFromNow(-44)],
+  );
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, customer_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1006', 'dispatch',
+             'dispatch', 'DISP-2003', ?, ?,
+             'Dispatched to Alpha Veterinary Group on SO-HIST-001.', ?)`,
+    [si1006.id, custAlpha.id, locDispatch.id, daysFromNow(-35)],
+  );
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, customer_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1006', 'returned',
+             'returns', 'RET-2006', ?, ?,
+             'Customer reported intermittent screen blank. Unit returned by Alpha Vet for warranty assessment.', ?)`,
+    [si1006.id, custAlpha.id, locReturns.id, daysFromNow(-3)],
+  );
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, customer_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1006', 'warranty_replacement',
+             'warranty', 'WR-2007', ?, ?,
+             'Replacement unit TILL-SN-1007 dispatched to Alpha Vet. Original unit held for supplier credit.', ?)`,
+    [si1006.id, custAlpha.id, locReturns.id, daysFromNow(-2)],
+  );
+
+  // ── TILL-SN-1007 — warranty replacement ──────────────────────────────────
+
+  await run(
+    `INSERT INTO stock_items
+       (product_id, stock_location_id, actual_location_id, serial_number,
+        quantity_on_hand, quantity_allocated, hold_status,
+        linked_purchase_order_id, linked_purchase_order_line_id,
+        customer_id,
+        delivery_note_ref, dispatch_reference, dispatch_date,
+        replaces_serial, status)
+     VALUES (?, ?, NULL, 'TILL-SN-1007', 0, 0, 'dispatched', ?, ?,
+             ?,
+             'GR-1004A', 'DISP-W-2007', ?,
+             'TILL-SN-1006', 'active')`,
+    [
+      pTill.id, locDispatch.id, po1004.id, pol1004Till.id,
+      custAlpha.id,
+      daysFromNow(-2),
+    ],
+  );
+
+  const si1007 = await get(`SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1007'`);
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, supplier_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1007', 'receipt',
+             'goods_receipt', 'GR-1004A', ?, ?,
+             'Received into stock on PO-1004.', ?)`,
+    [si1007.id, supNexus.id, locRackA1.id, daysFromNow(-44)],
+  );
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, customer_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1007', 'warranty_replacement',
+             'warranty', 'WR-2007', ?, ?,
+             'Allocated as warranty replacement for TILL-SN-1006 returned by Alpha Vet.', ?)`,
+    [si1007.id, custAlpha.id, locRackA1.id, daysFromNow(-2)],
+  );
+
+  await run(
+    `INSERT INTO serial_lifecycle_events
+       (stock_item_id, serial_number, event_type,
+        reference_type, reference_number, customer_id, location_id, notes, event_at)
+     VALUES (?, 'TILL-SN-1007', 'dispatch',
+             'dispatch', 'DISP-W-2007', ?, ?,
+             'Dispatched to Alpha Vet as warranty replacement. Delivery confirmed.', ?)`,
+    [si1007.id, custAlpha.id, locDispatch.id, daysFromNow(-2)],
+  );
+
+  // ── TILL-SN-1008 — scrapped ───────────────────────────────────────────────
+  // Full lifecycle: received → dispatched → returned → quarantined → scrapped
+
+  await run(
+    `INSERT INTO stock_items
+       (product_id, stock_location_id, actual_location_id, serial_number,
+        quantity_on_hand, quantity_allocated, hold_status,
+        linked_purchase_order_id, linked_purchase_order_line_id,
+        customer_id,
+        delivery_note_ref, dispatch_reference, dispatch_date,
+        return_date, quarantine_reason,
+        scrapped_date, scrapped_reason, status)
+     VALUES (?, ?, NULL, 'TILL-SN-1008', 0, 0, 'scrapped', ?, ?,
+             ?,
+             'GR-1004A', 'DISP-1998', ?,
+             ?, 'Engineering hold — motherboard failure investigation',
+             ?, 'Motherboard failure: BIOS chip corroded, beyond economical repair. Supplier credit raised.', 'active')`,
+    [
+      pTill.id, locDispatch.id, po1004.id, pol1004Till.id,
+      custHarbor.id,
+      daysFromNow(-80),
+      daysFromNow(-25),
+      daysFromNow(-7),
+    ],
+  );
+
+  const si1008 = await get(`SELECT id FROM stock_items WHERE serial_number = 'TILL-SN-1008'`);
+
+  const lifecycleEvents1008 = [
+    {
+      event_type: "receipt",
+      reference_type: "goods_receipt",
+      reference_number: "GR-HIST-001",
+      customer_id: null,
+      supplier_id: supNexus.id,
+      location_id: locRackA1.id,
+      notes: "Received from Nexus Hardware Supply.",
+      event_at: daysFromNow(-90),
+    },
+    {
+      event_type: "dispatch",
+      reference_type: "dispatch",
+      reference_number: "DISP-1998",
+      customer_id: custHarbor.id,
+      supplier_id: null,
+      location_id: locDispatch.id,
+      notes: "Dispatched to Harbor Retail Ltd on sales order SO-HIST-998.",
+      event_at: daysFromNow(-80),
+    },
+    {
+      event_type: "returned",
+      reference_type: "returns",
+      reference_number: "RET-1998",
+      customer_id: custHarbor.id,
+      supplier_id: null,
+      location_id: locReturns.id,
+      notes: "Unit returned by Harbor Retail — completely unresponsive on boot.",
+      event_at: daysFromNow(-25),
+    },
+    {
+      event_type: "quarantined",
+      reference_type: "inspection",
+      reference_number: "QA-INSP-008",
+      customer_id: null,
+      supplier_id: null,
+      location_id: locQuarantine.id,
+      notes: "Engineering inspection: BIOS chip corrosion found. Held for further assessment.",
+      event_at: daysFromNow(-24),
+    },
+    {
+      event_type: "scrapped",
+      reference_type: "scrap",
+      reference_number: "SCRAP-008",
+      customer_id: null,
+      supplier_id: supNexus.id,
+      location_id: null,
+      notes: "Condemned — repair cost exceeds unit value. Supplier credit note requested. Unit disposed.",
+      event_at: daysFromNow(-7),
+    },
+  ];
+
+  for (const ev of lifecycleEvents1008) {
+    await run(
+      `INSERT INTO serial_lifecycle_events
+         (stock_item_id, serial_number, event_type,
+          reference_type, reference_number, customer_id, supplier_id, location_id, notes, event_at)
+       VALUES (?, 'TILL-SN-1008', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        si1008.id,
+        ev.event_type, ev.reference_type, ev.reference_number,
+        ev.customer_id, ev.supplier_id, ev.location_id,
+        ev.notes, ev.event_at,
+      ],
+    );
+  }
+
   console.log("  ✓ Purchase orders:  PO-1001 (Overdue), PO-1002 (Part Recv'd), PO-1003 (Open), PO-1004 (Fully Recv'd)");
   console.log("  ✓ Sales orders:     SO-2001 (Urgent), SO-2002 (Dispatch Ready), SO-2003 (Open)");
   console.log("  ✓ Serial numbers:   TILL-SN-1001 (available), TILL-SN-1002 (allocated), TILL-SN-1003 (dispatched), TILL-SN-1004 (received)");
+  console.log("  ✓ Lifecycle serials: TILL-SN-1005 (quarantined), TILL-SN-1006 (returned), TILL-SN-1007 (warranty replacement), TILL-SN-1008 (scrapped)");
   console.log("  ✓ Qty stock:        30× LABEL-001 awaiting allocation");
 }
 
