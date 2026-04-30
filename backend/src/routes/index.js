@@ -1,5 +1,5 @@
 const express = require("express");
-const { all, get } = require("../db/connection");
+const { all, get, run } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
 const { receivePurchaseOrder } = require("../services/purchase-orders");
 const { router: dispatchRouter } = require("./dispatch");
@@ -18,9 +18,7 @@ const router = express.Router();
 router.use(resolveUser);
 
 const resourceQueries = {
-  customers: "SELECT * FROM customers ORDER BY name ASC",
   suppliers: "SELECT * FROM suppliers ORDER BY name ASC",
-  products: "SELECT * FROM products ORDER BY name ASC",
   "stock-locations": "SELECT * FROM stock_locations ORDER BY code ASC",
   "sales-orders": `
     SELECT so.*, c.name AS customer_name
@@ -328,6 +326,76 @@ router.use("/returns", returnsRouter);
 router.use("/dashboard/exceptions", exceptionsRouter);
 router.use("/audit-log", auditRouter);
 router.use("/users", usersRouter);
+
+// Dedicated GET /products with optional ?active=true filter
+router.get("/products", async (req, res, next) => {
+  const activeOnly = req.query.active === "true";
+  try {
+    const items = await all(
+      activeOnly
+        ? "SELECT * FROM products WHERE status = 'active' ORDER BY name ASC"
+        : "SELECT * FROM products ORDER BY name ASC"
+    );
+    res.json({ resource: "products", items });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Dedicated GET /customers with optional ?search= filter (active only)
+router.get("/customers", async (req, res, next) => {
+  const search = String(req.query.search || "").trim().toLowerCase();
+  try {
+    const items = await all("SELECT * FROM customers WHERE status = 'active' ORDER BY name ASC");
+    const filtered = search
+      ? items.filter(
+          (c) =>
+            c.name.toLowerCase().includes(search) ||
+            c.code.toLowerCase().includes(search)
+        )
+      : items;
+    res.json({ resource: "customers", items: filtered });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /customers — quick create
+router.post(
+  "/customers",
+  requireRole("admin", "purchasing", "dispatch"),
+  async (req, res, next) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      const contactName = String(req.body?.contactName || "").trim();
+      const email = String(req.body?.email || "").trim();
+      const phone = String(req.body?.phone || "").trim();
+
+      if (!name) {
+        return res.status(400).json({ error: true, message: "Customer name is required." });
+      }
+
+      const code =
+        "CUST-" +
+        name
+          .toUpperCase()
+          .replace(/[^A-Z0-9]+/g, "-")
+          .slice(0, 20)
+          .replace(/-$/, "") +
+        "-" +
+        Date.now().toString().slice(-5);
+
+      const result = await run(
+        `INSERT INTO customers (code, name, contact_name, email, phone, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [code, name, contactName, email, phone]
+      );
+      const customer = await get("SELECT * FROM customers WHERE id = ?", [result.id]);
+      res.status(201).json(customer);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 Object.entries(resourceQueries).forEach(([resourceKey, sql]) => {
   router.get(`/${resourceKey}`, async (_req, res, next) => {

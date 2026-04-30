@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
+import NewSalesOrderPage from "./pages/NewSalesOrderPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
@@ -38,6 +39,12 @@ const navigationItems = [
     label: "Sales Orders",
     path: "/sales-orders",
     description: "Create customer orders, allocate stock, and dispatch goods.",
+  },
+  {
+    key: "new-sales-order",
+    label: "New Sales Order",
+    path: "/sales-orders/new",
+    description: "Create a customer order and allocate stock.",
   },
   {
     key: "products",
@@ -87,6 +94,7 @@ const pageComponents = {
   dashboard: DashboardPage,
   search: SearchPage,
   "purchase-orders": PurchaseOrdersPage,
+  "new-sales-order": NewSalesOrderPage,
   "sales-orders": SalesOrdersPage,
   products: ProductsPage,
   stock: StockPage,
@@ -97,15 +105,42 @@ const pageComponents = {
   "audit-log": AuditLogPage,
 };
 
+// navPath lets sub-routes highlight their parent nav item in the sidebar
+const routeNavPaths = {
+  "new-sales-order": "/sales-orders",
+};
+
 function getItemByPath(pathname) {
-  return navigationItems.find((item) => item.path === pathname) || navigationItems[0];
+  // Exact match first
+  const exact = navigationItems.find((item) => item.path === pathname);
+  if (exact) return exact;
+  // Prefix match for sub-routes (e.g. /sales-orders/new → sales-orders key)
+  const prefix = navigationItems.find(
+    (item) => item.path !== "/" && pathname.startsWith(item.path + "/")
+  );
+  if (prefix) {
+    // Return an item with the actual path so the correct page is resolved
+    const actual = navigationItems.find((item) => item.path === pathname);
+    return actual || prefix;
+  }
+  return navigationItems[0];
+}
+
+function resolveRouteKey(pathname) {
+  const exact = navigationItems.find((item) => item.path === pathname);
+  return exact ? exact.key : null;
 }
 
 function App() {
   const [pathname, setPathname] = useState(() => window.location.pathname || "/");
   const [searchQuery, setSearchQuery] = useState("");
+  const routeKey = resolveRouteKey(pathname);
   const currentItem = getItemByPath(pathname);
-  const ActivePage = pageComponents[currentItem.key] || DashboardPage;
+  // For sidebar highlighting: use navPath override if available
+  const activeNavPath = routeKey && routeNavPaths[routeKey]
+    ? routeNavPaths[routeKey]
+    : currentItem.path;
+  const ActivePage = (routeKey ? pageComponents[routeKey] : null) || pageComponents[currentItem.key] || DashboardPage;
   const health = useApiResource("/health");
 
   useEffect(() => {
@@ -137,18 +172,21 @@ function App() {
   }
 
   // Build page-specific props
+  const effectiveKey = routeKey || currentItem.key;
   let pageProps = {};
-  if (currentItem.key === "dashboard") {
+  if (effectiveKey === "dashboard") {
     pageProps = { health };
-  } else if (currentItem.key === "search") {
+  } else if (effectiveKey === "search") {
     pageProps = { initialQuery: searchQuery, onNavigate: handleNavigate };
+  } else if (effectiveKey === "new-sales-order") {
+    pageProps = { onNavigate: handleNavigate };
   }
 
   return (
     <UserProvider>
       <Layout
         navigationItems={navigationItems}
-        activePath={currentItem.path}
+        activePath={activeNavPath}
         onNavigate={handleNavigate}
         onSearch={handleSearch}
         health={health}

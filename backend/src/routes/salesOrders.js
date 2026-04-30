@@ -1,5 +1,6 @@
 const express = require("express");
 const { all, get, run } = require("../db/connection");
+const { requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -693,6 +694,144 @@ async function allocateSalesOrder(orderNumber, allocationsInput) {
     };
   });
 }
+
+router.post("/", requireRole("admin", "purchasing"), async (req, res, next) => {
+  try {
+    const customerId = Number(req.body?.customerId);
+    const orderDate = String(req.body?.orderDate || "").trim();
+    const requiredDate = String(req.body?.requiredDate || "").trim();
+    const priority = String(req.body?.priority || "normal").trim();
+    const customerReference = String(req.body?.customerReference || "").trim();
+    const notes = String(req.body?.notes || "").trim();
+    const rawLines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      return res.status(400).json({ error: true, message: "Customer is required." });
+    }
+    if (!orderDate || !/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
+      return res.status(400).json({ error: true, message: "Order date must be in YYYY-MM-DD format." });
+    }
+    if (rawLines.length === 0) {
+      return res.status(400).json({ error: true, message: "At least one line is required." });
+    }
+    if (!["normal", "urgent"].includes(priority)) {
+      return res.status(400).json({ error: true, message: "Priority must be normal or urgent." });
+    }
+
+    const customer = await get(
+      "SELECT id, name, code FROM customers WHERE id = ? AND status = 'active'",
+      [customerId]
+    );
+    if (!customer) {
+      return res.status(400).json({ error: true, message: "Customer not found or inactive." });
+    }
+
+    const normalizedLines = [];
+    for (let i = 0; i < rawLines.length; i++) {
+      const raw = rawLines[i];
+      const productId = Number(raw?.productId);
+      const quantityOrdered = Number(raw?.quantityOrdered);
+
+      if (!Number.isInteger(productId) || productId <= 0) {
+        return res.status(400).json({ error: true, message: `Line ${i + 1}: product is required.` });
+      }
+      if (!Number.isFinite(quantityOrdered) || quantityOrdered <= 0) {
+        return res.status(400).json({ error: true, message: `Line ${i + 1}: quantity must be greater than zero.` });
+      }
+
+      const product = await get(
+        "SELECT id, sku, name, is_serial_tracked, tracking_mode FROM products WHERE id = ? AND status = 'active'",
+        [productId]
+      );
+      if (!product) {
+        return res.status(400).json({ error: true, message: `Line ${i + 1}: product not found.` });
+      }
+      normalizedLines.push({
+        productId,
+        quantityOrdered: Math.round(quantityOrdered * 100) / 100,
+        product,
+      });
+    }
+
+    const maxRow = await get(
+      "SELECT MAX(CAST(SUBSTR(order_number, 4) AS INTEGER)) AS max_num FROM sales_orders WHERE order_number GLOB 'SO-[0-9]*'"
+    );
+    const nextNum = Math.max(2001, (Number(maxRow?.max_num) || 2000) + 1);
+    const orderNumber = `SO-${nextNum}`;
+
+    const initialStatus = "Awaiting Stock";
+
+    const result = await withTransaction(async () => {
+      const soResult = await run(
+        `INSERT INTO sales_orders (order_number, customer_id, status, requested_at, dispatch_due_at, priority, customer_reference, notes, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [orderNumber, customerId, initialStatus, orderDate, requiredDate || null, priority, customerReference, notes]
+      );
+
+      const soId = soResult.id;
+      const lineSummaries = [];
+
+      for (const line of normalizedLines) {
+        await run(
+          `INSERT INTO sales_order_lines (sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched, updated_at)
+           VALUES (?, ?, ?, 0, 0, CURRENT_TIMESTAMP)`,
+          [soId, line.productId, line.quantityOrdered]
+        );
+        lineSummaries.push({
+          productId: line.productId,
+          sku: line.product.sku,
+          productName: line.product.name,
+          isSerialTracked: Boolean(line.product.is_serial_tracked),
+          quantityOrdered: line.quantityOrdered,
+          quantityAllocated: 0,
+          quantityRemaining: line.quantityOrdered,
+        });
+      }
+
+      const userId = req.user?.id || null;
+      const userRole = req.user?.role || "system";
+      const userName = req.user?.full_name || "System";
+      await run(
+        `INSERT INTO activity_log (user_id, user_role, user_name, action_type, entity_type, entity_ref, summary, details_json)
+         VALUES (?, ?, ?, 'sales_order_created', 'sales_order', ?, ?, ?)`,
+        [
+          userId,
+          userRole,
+          userName,
+          orderNumber,
+          `Sales order ${orderNumber} created for ${customer.name}`,
+          JSON.stringify({
+            orderNumber,
+            customerId,
+            customerName: customer.name,
+            priority,
+            lineCount: normalizedLines.length,
+            lines: lineSummaries,
+          }),
+        ]
+      );
+
+      return {
+        id: soId,
+        orderNumber,
+        customerId,
+        customerName: customer.name,
+        customerCode: customer.code,
+        status: initialStatus,
+        priority,
+        orderDate,
+        requiredDate: requiredDate || null,
+        customerReference,
+        notes,
+        lines: lineSummaries,
+      };
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/", async (req, res, next) => {
   const search = String(req.query.search || "").trim().toLowerCase();
