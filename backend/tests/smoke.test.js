@@ -5,7 +5,7 @@ const { test, before, after, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const { initializeDatabase: initDatabase } = require("../src/db/init");
-const { closeDatabase, get } = require("../src/db/connection");
+const { closeDatabase, get, run } = require("../src/db/connection");
 const { createApp } = require("../src/app");
 
 let server;
@@ -278,5 +278,175 @@ describe("master data routes", () => {
     assert.equal(auditRow.action_type, "product_updated");
     assert.equal(auditRow.entity_type, "product");
     assert.equal(auditRow.entity_ref, sku);
+  });
+
+  test("GET /api/suppliers?active=true and /api/products?active=true return active records", async () => {
+    const suppliersResponse = await request("/api/suppliers?active=true");
+    assert.equal(suppliersResponse.status, 200);
+    assert.ok(suppliersResponse.body.items.length > 0);
+    assert.equal(suppliersResponse.body.items.every((item) => item.active === true), true);
+
+    const productsResponse = await request("/api/products?active=true");
+    assert.equal(productsResponse.status, 200);
+    assert.ok(productsResponse.body.items.length > 0);
+    assert.equal(productsResponse.body.items.every((item) => item.active === true), true);
+  });
+});
+
+describe("purchase order creation", () => {
+  test("POST /api/purchase-orders creates an open purchase order, links sales orders, and appears in list/detail", async () => {
+    const unique = Date.now();
+
+    const supplierResult = await run(
+      `
+        INSERT INTO suppliers (code, name, status)
+        VALUES (?, ?, 'active')
+      `,
+      [`SUP-PO-${unique}`, `PO Test Supplier ${unique}`]
+    );
+
+    const serialProductResult = await run(
+      `
+        INSERT INTO products (sku, name, is_serial_tracked, tracking_mode, cost_price, status)
+        VALUES (?, ?, 1, 'serial', 450, 'active')
+      `,
+      [`SKU-PO-S-${unique}`, `Serial Product ${unique}`]
+    );
+
+    const nonSerialProductResult = await run(
+      `
+        INSERT INTO products (sku, name, is_serial_tracked, tracking_mode, cost_price, status)
+        VALUES (?, ?, 0, 'quantity', 125, 'active')
+      `,
+      [`SKU-PO-N-${unique}`, `Quantity Product ${unique}`]
+    );
+
+    const customerResult = await run(
+      `
+        INSERT INTO customers (code, name, status)
+        VALUES (?, ?, 'active')
+      `,
+      [`CUS-PO-${unique}`, `PO Test Customer ${unique}`]
+    );
+
+    const salesOrderOneResult = await run(
+      `
+        INSERT INTO sales_orders (order_number, customer_id, status, requested_at, dispatch_due_at, notes)
+        VALUES (?, ?, 'open', '2026-04-30', '2026-05-02', 'First linked sales order')
+      `,
+      [`SO-PO-${unique}-1`, customerResult.id]
+    );
+
+    const salesOrderTwoResult = await run(
+      `
+        INSERT INTO sales_orders (order_number, customer_id, status, requested_at, dispatch_due_at, notes)
+        VALUES (?, ?, 'open', '2026-04-30', '2026-05-03', 'Second linked sales order')
+      `,
+      [`SO-PO-${unique}-2`, customerResult.id]
+    );
+
+    const createResponse = await request("/api/purchase-orders", {
+      method: "POST",
+      headers: { "X-User-Id": "1" },
+      body: {
+        supplierId: supplierResult.id,
+        orderDate: "2026-04-30",
+        expectedDeliveryDate: "2026-05-07",
+        supplierReference: "QUOTE-12345",
+        notes: "Urgent customer order",
+        linkedSalesOrders: [salesOrderOneResult.id, salesOrderTwoResult.id],
+        lines: [
+          {
+            productId: serialProductResult.id,
+            quantityOrdered: 1,
+            unitCost: 450,
+          },
+          {
+            productId: nonSerialProductResult.id,
+            quantityOrdered: 4,
+            unitCost: 125,
+          },
+        ],
+      },
+    });
+
+    assert.equal(createResponse.status, 201);
+    assert.match(createResponse.body.item.poNumber, /^PO-\d+$/);
+    assert.equal(createResponse.body.item.status, "Open");
+    assert.equal(createResponse.body.item.totals.lineCount, 2);
+    assert.equal(createResponse.body.item.totals.quantityReceived, 0);
+    assert.equal(createResponse.body.item.totals.quantityRemaining, 5);
+    assert.equal(createResponse.body.item.lines[0].serialRequired, true);
+    assert.equal(createResponse.body.item.lines[1].serialRequired, false);
+
+    const listResponse = await request("/api/purchase-orders");
+    assert.equal(listResponse.status, 200);
+    assert.equal(
+      listResponse.body.items.some((item) => item.poNumber === createResponse.body.item.poNumber),
+      true
+    );
+
+    const detailResponse = await request(
+      `/api/purchase-orders/${encodeURIComponent(createResponse.body.item.poNumber)}`
+    );
+    assert.equal(detailResponse.status, 200);
+    assert.equal(detailResponse.body.poNumber, createResponse.body.item.poNumber);
+    assert.equal(detailResponse.body.supplierReference, "QUOTE-12345");
+    assert.equal(detailResponse.body.notes, "Urgent customer order");
+    assert.equal(detailResponse.body.linkedSalesOrders.length, 2);
+    assert.equal(detailResponse.body.lines.length, 2);
+    assert.equal(detailResponse.body.lines.some((line) => line.serialTrackingRequired === true), true);
+    assert.equal(detailResponse.body.lines.some((line) => line.serialTrackingRequired === false), true);
+
+    const purchaseOrderRow = await get(
+      `
+        SELECT order_number, status, supplier_reference, linked_sales_order_id
+        FROM purchase_orders
+        WHERE id = ?
+      `,
+      [createResponse.body.item.id]
+    );
+
+    assert.equal(purchaseOrderRow.order_number, createResponse.body.item.poNumber);
+    assert.equal(purchaseOrderRow.status, "open");
+    assert.equal(purchaseOrderRow.supplier_reference, "QUOTE-12345");
+    assert.equal(purchaseOrderRow.linked_sales_order_id, salesOrderOneResult.id);
+
+    const linkedSalesOrderRows = await request("/api/sales-orders");
+    const matchingSalesOrders = linkedSalesOrderRows.body.items.filter((item) =>
+      [`SO-PO-${unique}-1`, `SO-PO-${unique}-2`].includes(item.orderNumber)
+    );
+    assert.equal(matchingSalesOrders.length, 2);
+
+    const auditRow = await get(
+      `
+        SELECT action_type, entity_type, entity_ref
+        FROM activity_log
+        WHERE entity_type = 'purchase_order' AND entity_ref = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [createResponse.body.item.poNumber]
+    );
+
+    assert.equal(auditRow.action_type, "purchase_order_created");
+    assert.equal(auditRow.entity_type, "purchase_order");
+    assert.equal(auditRow.entity_ref, createResponse.body.item.poNumber);
+  });
+
+  test("POST /api/purchase-orders rejects invalid payloads", async () => {
+    const invalidResponse = await request("/api/purchase-orders", {
+      method: "POST",
+      headers: { "X-User-Id": "1" },
+      body: {
+        supplierId: null,
+        orderDate: "2026-04-30",
+        lines: [],
+      },
+    });
+
+    assert.equal(invalidResponse.status, 400);
+    assert.equal(invalidResponse.body.error, true);
+    assert.match(invalidResponse.body.message, /Supplier is required|At least one purchase order line is required/);
   });
 });

@@ -1,7 +1,7 @@
 const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
-const { receivePurchaseOrder } = require("../services/purchase-orders");
+const { createPurchaseOrder, receivePurchaseOrder } = require("../services/purchase-orders");
 const {
   createProduct,
   createSupplier,
@@ -124,6 +124,10 @@ const purchaseOrderSummarySelect = `
     po.id,
     po.order_number AS poNumber,
     po.order_number,
+    po.supplier_id,
+    po.linked_sales_order_id,
+    po.supplier_reference,
+    po.notes,
     s.name AS supplier,
     s.name AS supplier_name,
     po.ordered_at AS orderDate,
@@ -159,6 +163,14 @@ function normalizePurchaseOrder(row) {
     totalOrderedQuantity: Number(row.totalOrderedQuantity) || 0,
     totalReceivedQuantity: Number(row.totalReceivedQuantity) || 0,
   };
+}
+
+function parseActiveOnly(value) {
+  if (value === undefined) {
+    return null;
+  }
+
+  return value === true || value === "true" || value === "1";
 }
 
 router.get("/health", async (_req, res, next) => {
@@ -201,9 +213,11 @@ router.use("/import", importsRouter);
 
 router.get("/suppliers", async (req, res, next) => {
   try {
+    const activeOnly = parseActiveOnly(req.query.active);
     const payload = await listSuppliers({
       query: req.query.q,
-      includeInactive: parseIncludeInactive(req.query.includeInactive),
+      includeInactive:
+        activeOnly === true ? false : parseIncludeInactive(req.query.includeInactive),
     });
     res.json(payload);
   } catch (error) {
@@ -245,9 +259,11 @@ router.put("/suppliers/:id", requireRole("admin", "purchasing"), async (req, res
 
 router.get("/products", async (req, res, next) => {
   try {
+    const activeOnly = parseActiveOnly(req.query.active);
     const payload = await listProducts({
       query: req.query.q,
-      includeInactive: parseIncludeInactive(req.query.includeInactive),
+      includeInactive:
+        activeOnly === true ? false : parseIncludeInactive(req.query.includeInactive),
     });
     res.json(payload);
   } catch (error) {
@@ -331,6 +347,23 @@ router.get("/purchase-orders", async (req, res, next) => {
   }
 });
 
+router.post("/purchase-orders", requireRole("admin", "purchasing"), async (req, res, next) => {
+  try {
+    const purchaseOrder = await createPurchaseOrder(req.body, {
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userName: req.user?.full_name,
+    });
+
+    res.status(201).json({
+      item: purchaseOrder,
+      message: `${purchaseOrder.poNumber} created successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/purchase-orders/:poNumber", async (req, res, next) => {
   try {
     const detail = await get(
@@ -353,13 +386,17 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
       `
         SELECT
           pol.id,
+          pol.product_id AS productId,
           p.sku AS productCode,
           p.name AS productName,
           pol.quantity_ordered AS orderedQuantity,
           pol.quantity_received AS receivedQuantity,
+          pol.unit_cost AS unitCost,
+          (pol.quantity_ordered - pol.quantity_received) * pol.unit_cost AS lineTotal,
           pol.quantity_ordered - pol.quantity_received AS remainingQuantity,
           p.is_serial_tracked AS serialTrackingRequired,
-          COALESCE(GROUP_CONCAT(DISTINCT so.order_number), '') AS linkedSalesOrderReferences
+          COALESCE(GROUP_CONCAT(DISTINCT so.order_number), '') AS linkedSalesOrderReferences,
+          COALESCE(GROUP_CONCAT(DISTINCT so.id), '') AS linkedSalesOrderIds
         FROM purchase_order_lines pol
         JOIN products p ON p.id = pol.product_id
         LEFT JOIN purchase_sales_links psl ON psl.purchase_order_line_id = pol.id
@@ -372,23 +409,48 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
       [detail.id],
     );
 
+    const linkedSalesOrders = await all(
+      `
+        SELECT id, order_number
+        FROM sales_orders
+        WHERE linked_purchase_order_id = ?
+        ORDER BY order_number ASC
+      `,
+      [detail.id]
+    );
+
     res.json({
+      id: detail.id,
       poNumber: detail.poNumber,
       supplier: detail.supplier,
+      supplierId: detail.supplier_id,
       status: detail.status,
       orderDate: detail.orderDate,
       expectedDeliveryDate: detail.expectedDeliveryDate,
+      supplierReference: detail.supplier_reference || "",
+      notes: detail.notes || "",
+      linkedSalesOrders: linkedSalesOrders.map((salesOrder) => ({
+        id: salesOrder.id,
+        orderNumber: salesOrder.order_number,
+      })),
       totalOrderedQuantity: Number(detail.totalOrderedQuantity) || 0,
       totalReceivedQuantity: Number(detail.totalReceivedQuantity) || 0,
       lineCount: Number(detail.lineCount) || 0,
       openLineCount: Number(detail.openLineCount) || 0,
       lines: lines.map((line) => ({
+        id: line.id,
+        productId: line.productId,
         productCode: line.productCode,
         productName: line.productName,
         orderedQuantity: Number(line.orderedQuantity) || 0,
         receivedQuantity: Number(line.receivedQuantity) || 0,
+        unitCost: Number(line.unitCost) || 0,
+        lineTotal: Number(line.lineTotal) || 0,
         remainingQuantity: Number(line.remainingQuantity) || 0,
         serialTrackingRequired: Boolean(line.serialTrackingRequired),
+        linkedSalesOrderIds: line.linkedSalesOrderIds
+          ? line.linkedSalesOrderIds.split(",").map((value) => Number(value)).filter(Number.isFinite)
+          : [],
         linkedSalesOrderReferences: line.linkedSalesOrderReferences
           ? line.linkedSalesOrderReferences.split(",")
           : [],

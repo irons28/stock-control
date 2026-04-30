@@ -99,6 +99,7 @@ async function createCoreTables() {
     status TEXT NOT NULL DEFAULT 'draft',
     ordered_at TEXT,
     expected_at TEXT,
+    supplier_reference TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -351,6 +352,7 @@ async function applySchemaMigrations() {
 
   await addColumnIfMissing("purchase_orders", "customer_id INTEGER REFERENCES customers(id)");
   await addColumnIfMissing("purchase_orders", "linked_sales_order_id INTEGER REFERENCES sales_orders(id)");
+  await addColumnIfMissing("purchase_orders", "supplier_reference TEXT DEFAULT ''");
 
   await addColumnIfMissing("sales_orders", "linked_purchase_order_id INTEGER REFERENCES purchase_orders(id)");
   await addColumnIfMissing("sales_order_lines", "linked_purchase_order_line_id INTEGER REFERENCES purchase_order_lines(id)");

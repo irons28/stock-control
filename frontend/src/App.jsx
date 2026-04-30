@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
+import NewPurchaseOrderPage from "./pages/NewPurchaseOrderPage";
+import ReceiveGoodsPage from "./pages/ReceiveGoodsPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import ProductsPage from "./pages/ProductsPage";
@@ -33,6 +35,12 @@ const navigationItems = [
     label: "Purchase Orders",
     path: "/purchase-orders",
     description: "Raise, receive, and reconcile purchase orders from suppliers.",
+  },
+  {
+    key: "receive-goods",
+    label: "Receive Goods",
+    path: "/receive-goods",
+    description: "Book supplier deliveries and update inbound stock in real time.",
   },
   {
     key: "sales-orders",
@@ -90,30 +98,108 @@ const navigationItems = [
   },
 ];
 
-const pageComponents = {
-  dashboard: DashboardPage,
-  search: SearchPage,
-  "purchase-orders": PurchaseOrdersPage,
-  "sales-orders": SalesOrdersPage,
-  suppliers: SuppliersPage,
-  products: ProductsPage,
-  stock: StockPage,
-  locations: LocationsPage,
-  "serial-tracker": SerialTrackerPage,
-  returns: ReturnsPage,
-  exceptions: ExceptionDashboardPage,
-  "audit-log": AuditLogPage,
-};
+const routes = [
+  {
+    key: "dashboard",
+    path: "/",
+    navPath: "/",
+    component: DashboardPage,
+  },
+  {
+    key: "search",
+    path: "/search",
+    navPath: "/search",
+    component: SearchPage,
+  },
+  {
+    key: "purchase-order-create",
+    path: "/purchase-orders/new",
+    navPath: "/purchase-orders",
+    component: NewPurchaseOrderPage,
+  },
+  {
+    key: "purchase-orders",
+    path: "/purchase-orders",
+    navPath: "/purchase-orders",
+    component: PurchaseOrdersPage,
+  },
+  {
+    key: "receive-goods",
+    path: "/receive-goods",
+    navPath: "/receive-goods",
+    component: ReceiveGoodsPage,
+  },
+  {
+    key: "sales-orders",
+    path: "/sales-orders",
+    navPath: "/sales-orders",
+    component: SalesOrdersPage,
+  },
+  {
+    key: "suppliers",
+    path: "/suppliers",
+    navPath: "/suppliers",
+    component: SuppliersPage,
+  },
+  {
+    key: "products",
+    path: "/products",
+    navPath: "/products",
+    component: ProductsPage,
+  },
+  {
+    key: "stock",
+    path: "/stock",
+    navPath: "/stock",
+    component: StockPage,
+  },
+  {
+    key: "locations",
+    path: "/locations",
+    navPath: "/locations",
+    component: LocationsPage,
+  },
+  {
+    key: "serial-tracker",
+    path: "/serial-tracker",
+    navPath: "/serial-tracker",
+    component: SerialTrackerPage,
+  },
+  {
+    key: "returns",
+    path: "/returns",
+    navPath: "/returns",
+    component: ReturnsPage,
+  },
+  {
+    key: "exceptions",
+    path: "/exceptions",
+    navPath: "/exceptions",
+    component: ExceptionDashboardPage,
+  },
+  {
+    key: "audit-log",
+    path: "/audit-log",
+    navPath: "/audit-log",
+    component: AuditLogPage,
+  },
+];
 
-function getItemByPath(pathname) {
-  return navigationItems.find((item) => item.path === pathname) || navigationItems[0];
+function getPathname(url) {
+  return String(url || "/").split("?")[0] || "/";
+}
+
+function resolveRoute(pathname) {
+  return routes.find((route) => route.path === pathname) || routes[0];
 }
 
 function App() {
   const [pathname, setPathname] = useState(() => window.location.pathname || "/");
   const [searchQuery, setSearchQuery] = useState("");
-  const currentItem = getItemByPath(pathname);
-  const ActivePage = pageComponents[currentItem.key] || DashboardPage;
+  const currentRoute = resolveRoute(pathname);
+  const currentItem =
+    navigationItems.find((item) => item.path === currentRoute.navPath) || navigationItems[0];
+  const ActivePage = currentRoute.component || DashboardPage;
   const health = useApiResource("/health");
 
   useEffect(() => {
@@ -128,11 +214,14 @@ function App() {
   }, []);
 
   function handleNavigate(nextPath) {
-    if (nextPath === pathname) {
+    const nextPathname = getPathname(nextPath);
+    const currentFullPath = `${window.location.pathname}${window.location.search}`;
+
+    if (nextPath === currentFullPath) {
       return;
     }
     window.history.pushState({}, "", nextPath);
-    setPathname(nextPath);
+    setPathname(nextPathname);
   }
 
   // Called by the sidebar quick-search: navigate to /search and carry the query
@@ -146,10 +235,16 @@ function App() {
 
   // Build page-specific props
   let pageProps = {};
-  if (currentItem.key === "dashboard") {
+  if (currentRoute.key === "dashboard") {
     pageProps = { health };
-  } else if (currentItem.key === "search") {
+  } else if (currentRoute.key === "search") {
     pageProps = { initialQuery: searchQuery, onNavigate: handleNavigate };
+  } else if (
+    currentRoute.key === "purchase-orders" ||
+    currentRoute.key === "purchase-order-create" ||
+    currentRoute.key === "receive-goods"
+  ) {
+    pageProps = { onNavigate: handleNavigate };
   }
 
   return (

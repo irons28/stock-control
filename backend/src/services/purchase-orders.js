@@ -1,4 +1,4 @@
-const { all, exec, get, run } = require("../db/connection");
+const { all, get, run } = require("../db/connection");
 
 function createRequestError(message, status = 400) {
   const error = new Error(message);
@@ -8,6 +8,46 @@ function createRequestError(message, status = 400) {
 
 function roundQuantity(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function normalizeString(value) {
+  return String(value || "").trim();
+}
+
+function normalizeDateValue(value, fieldName) {
+  const normalized = normalizeString(value);
+
+  if (!normalized) {
+    return "";
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw createRequestError(`${fieldName} must be in YYYY-MM-DD format.`);
+  }
+
+  return normalized;
+}
+
+async function withTransaction(work) {
+  await run("BEGIN TRANSACTION");
+
+  try {
+    const result = await work();
+    await run("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await run("ROLLBACK");
+    } catch (_rollbackError) {
+      // Surface the original error instead of a rollback failure.
+    }
+
+    throw error;
+  }
 }
 
 function normaliseStatus({ totalOrdered, totalReceived, expectedAt }) {
@@ -77,6 +117,270 @@ async function getPurchaseOrders() {
   return orders.map(buildPurchaseOrderSummary);
 }
 
+async function getNextPurchaseOrderNumber() {
+  const row = await get(
+    `
+      SELECT MAX(CAST(SUBSTR(order_number, 4) AS INTEGER)) AS max_number
+      FROM purchase_orders
+      WHERE order_number GLOB 'PO-[0-9]*'
+    `
+  );
+
+  const nextNumber = Math.max(1001, Number(row?.max_number || 1000) + 1);
+  return `PO-${nextNumber}`;
+}
+
+async function validateLinkedSalesOrders(linkedSalesOrders) {
+  if (!linkedSalesOrders.length) {
+    return [];
+  }
+
+  const rows = await all(
+    `
+      SELECT id, order_number, linked_purchase_order_id
+      FROM sales_orders
+      WHERE id IN (${linkedSalesOrders.map(() => "?").join(", ")})
+      ORDER BY order_number ASC
+    `,
+    linkedSalesOrders
+  );
+
+  if (rows.length !== linkedSalesOrders.length) {
+    const foundIds = new Set(rows.map((row) => Number(row.id)));
+    const missingIds = linkedSalesOrders.filter((id) => !foundIds.has(id));
+    throw createRequestError(`Linked sales order ${missingIds[0]} is invalid.`);
+  }
+
+  const existingLink = rows.find(
+    (row) => row.linked_purchase_order_id !== null && row.linked_purchase_order_id !== undefined
+  );
+
+  if (existingLink) {
+    throw createRequestError(
+      `Sales order ${existingLink.order_number} is already linked to purchase order ${existingLink.linked_purchase_order_id}.`
+    );
+  }
+
+  return rows;
+}
+
+async function createPurchaseOrder(payload, userContext = {}) {
+  const supplierId = Number(payload?.supplierId);
+  const orderDate = normalizeDateValue(payload?.orderDate, "orderDate");
+  const expectedDeliveryDate = normalizeDateValue(
+    payload?.expectedDeliveryDate,
+    "expectedDeliveryDate"
+  );
+  const supplierReference = normalizeString(payload?.supplierReference);
+  const notes = normalizeString(payload?.notes);
+  const linkedSalesOrders = Array.isArray(payload?.linkedSalesOrders)
+    ? [...new Set(payload.linkedSalesOrders.map((value) => Number(value)).filter(Number.isInteger))]
+    : [];
+  const rawLines = Array.isArray(payload?.lines) ? payload.lines : [];
+
+  if (!Number.isInteger(supplierId) || supplierId <= 0) {
+    throw createRequestError("Supplier is required.");
+  }
+
+  if (!orderDate) {
+    throw createRequestError("Order date is required.");
+  }
+
+  if (!rawLines.length) {
+    throw createRequestError("At least one purchase order line is required.");
+  }
+
+  const supplier = await get(
+    `
+      SELECT id, code, name
+      FROM suppliers
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [supplierId]
+  );
+
+  if (!supplier) {
+    throw createRequestError("Supplier is invalid.");
+  }
+
+  const normalizedLines = rawLines.map((rawLine, index) => {
+    const lineNumber = index + 1;
+    const productId = Number(rawLine?.productId);
+    const quantityOrdered = Number(rawLine?.quantityOrdered);
+    const unitCost = Number(rawLine?.unitCost);
+
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw createRequestError(`Line ${lineNumber}: product is required.`);
+    }
+
+    if (!Number.isFinite(quantityOrdered) || quantityOrdered <= 0) {
+      throw createRequestError(`Line ${lineNumber}: quantityOrdered must be greater than 0.`);
+    }
+
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      throw createRequestError(`Line ${lineNumber}: unitCost cannot be negative.`);
+    }
+
+    return {
+      productId,
+      quantityOrdered: roundQuantity(quantityOrdered),
+      unitCost: roundMoney(unitCost),
+    };
+  });
+
+  const uniqueProductIds = [...new Set(normalizedLines.map((line) => line.productId))];
+  const productRows = await all(
+    `
+      SELECT id, sku, name, is_serial_tracked
+      FROM products
+      WHERE id IN (${uniqueProductIds.map(() => "?").join(", ")})
+    `,
+    uniqueProductIds
+  );
+  const productMap = new Map(productRows.map((row) => [Number(row.id), row]));
+
+  normalizedLines.forEach((line, index) => {
+    const product = productMap.get(line.productId);
+    if (!product) {
+      throw createRequestError(`Line ${index + 1}: product is invalid.`);
+    }
+
+    line.product = product;
+  });
+
+  const linkedSalesOrderRows = await validateLinkedSalesOrders(linkedSalesOrders);
+
+  return withTransaction(async () => {
+    const orderNumber = await getNextPurchaseOrderNumber();
+    const headerResult = await run(
+      `
+        INSERT INTO purchase_orders (
+          order_number,
+          supplier_id,
+          linked_sales_order_id,
+          status,
+          ordered_at,
+          expected_at,
+          supplier_reference,
+          notes,
+          updated_at
+        ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `,
+      [
+        orderNumber,
+        supplier.id,
+        linkedSalesOrderRows[0]?.id || null,
+        orderDate,
+        expectedDeliveryDate || null,
+        supplierReference,
+        notes,
+      ]
+    );
+
+    const lineSummaries = [];
+
+    for (const line of normalizedLines) {
+      const lineResult = await run(
+        `
+          INSERT INTO purchase_order_lines (
+            purchase_order_id,
+            product_id,
+            quantity_ordered,
+            quantity_received,
+            unit_cost,
+            updated_at
+          ) VALUES (?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
+        `,
+        [headerResult.id, line.productId, line.quantityOrdered, line.unitCost]
+      );
+
+      lineSummaries.push({
+        id: lineResult.id,
+        productId: line.productId,
+        sku: line.product.sku,
+        productName: line.product.name,
+        quantityOrdered: line.quantityOrdered,
+        quantityReceived: 0,
+        quantityRemaining: line.quantityOrdered,
+        unitCost: line.unitCost,
+        serialRequired: Boolean(line.product.is_serial_tracked),
+        lineTotal: roundMoney(line.quantityOrdered * line.unitCost),
+      });
+    }
+
+    for (const salesOrder of linkedSalesOrderRows) {
+      await run(
+        `
+          UPDATE sales_orders
+          SET linked_purchase_order_id = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [headerResult.id, salesOrder.id]
+      );
+    }
+
+    const totalValue = roundMoney(
+      lineSummaries.reduce((sum, line) => sum + Number(line.lineTotal || 0), 0)
+    );
+
+    await logActivity(
+      "purchase_order",
+      orderNumber,
+      "purchase_order_created",
+      {
+        supplierId: supplier.id,
+        supplierCode: supplier.code,
+        supplierName: supplier.name,
+        orderDate,
+        expectedDeliveryDate,
+        supplierReference,
+        notes,
+        linkedSalesOrders: linkedSalesOrderRows.map((row) => ({
+          id: row.id,
+          orderNumber: row.order_number,
+        })),
+        totalValue,
+        lineCount: lineSummaries.length,
+        lines: lineSummaries,
+      },
+      userContext
+    );
+
+    return {
+      id: headerResult.id,
+      poNumber: orderNumber,
+      orderNumber,
+      supplier: {
+        id: supplier.id,
+        supplierCode: supplier.code,
+        name: supplier.name,
+      },
+      status: "Open",
+      orderDate,
+      expectedDeliveryDate,
+      supplierReference,
+      notes,
+      linkedSalesOrders: linkedSalesOrderRows.map((row) => ({
+        id: row.id,
+        orderNumber: row.order_number,
+      })),
+      lines: lineSummaries,
+      totals: {
+        lineCount: lineSummaries.length,
+        quantityOrdered: roundQuantity(
+          lineSummaries.reduce((sum, line) => sum + Number(line.quantityOrdered || 0), 0)
+        ),
+        quantityReceived: 0,
+        quantityRemaining: roundQuantity(
+          lineSummaries.reduce((sum, line) => sum + Number(line.quantityRemaining || 0), 0)
+        ),
+        totalValue,
+      },
+    };
+  });
+}
+
 async function getPurchaseOrderByNumber(poNumber) {
   const order = await get(
     `SELECT
@@ -138,6 +442,8 @@ async function getPurchaseOrderByNumber(poNumber) {
         quantity_ordered: ordered,
         quantity_received: received,
         quantity_remaining: roundQuantity(Math.max(0, ordered - received)),
+        unit_cost: roundMoney(line.unit_cost),
+        line_total: roundMoney(ordered * Number(line.unit_cost || 0)),
         is_serial_tracked: Boolean(line.is_serial_tracked),
       };
     }),
@@ -302,9 +608,7 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
     orderDetails.lines.map((line) => [Number(line.id), Number(line.quantity_received)])
   );
 
-  await exec("BEGIN");
-
-  try {
+  return withTransaction(async () => {
     const receiptResult = await run(
       `INSERT INTO goods_receipts (
         purchase_order_id,
@@ -475,8 +779,6 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
       lines: lineSummaries,
     }, userContext);
 
-    await exec("COMMIT");
-
     return {
       receiptNumber,
       deliveryNumber,
@@ -486,13 +788,11 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
       holdingLocation: holdLocation.code,
       lines: lineSummaries,
     };
-  } catch (error) {
-    await exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 module.exports = {
+  createPurchaseOrder,
   getPurchaseOrderByNumber,
   getPurchaseOrders,
   receivePurchaseOrder,

@@ -86,14 +86,15 @@ const lineColumns = [
   },
 ];
 
-function PurchaseOrdersPage() {
-  const [inputValue, setInputValue] = useState("");
-  const [searchValue, setSearchValue] = useState("");
+function PurchaseOrdersPage({ onNavigate }) {
+  const initialPoNumber = new URLSearchParams(window.location.search).get("po") || "";
+  const [inputValue, setInputValue] = useState(initialPoNumber);
+  const [searchValue, setSearchValue] = useState(initialPoNumber);
   const purchaseOrders = useApiResource(
     `/purchase-orders${searchValue ? `?poNumber=${encodeURIComponent(searchValue)}` : ""}`,
   );
   const rows = purchaseOrders.data?.items || [];
-  const [selectedPoNumber, setSelectedPoNumber] = useState("");
+  const [selectedPoNumber, setSelectedPoNumber] = useState(initialPoNumber);
   const detail = useApiResource(
     selectedPoNumber ? `/purchase-orders/${encodeURIComponent(selectedPoNumber)}` : "",
   );
@@ -133,15 +134,18 @@ function PurchaseOrdersPage() {
         title="Purchase Orders"
         description="Search by PO number, review supplier receipt progress, and spot the lines that still need to be booked in."
         actions={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              purchaseOrders.reload();
-              detail.reload();
-            }}
-          >
-            Refresh Results
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                purchaseOrders.reload();
+                detail.reload();
+              }}
+            >
+              Refresh Results
+            </Button>
+            <Button onClick={() => onNavigate?.("/purchase-orders/new")}>New Purchase Order</Button>
+          </>
         }
       />
 
@@ -217,7 +221,15 @@ function PurchaseOrdersPage() {
                   <h3>{detailData.poNumber}</h3>
                   <p>{detailData.supplier}</p>
                 </div>
-                <span className={getStatusBadgeClass(detailData.status)}>{detailData.status}</span>
+                <div className="purchase-orders-detail-actions">
+                  <span className={getStatusBadgeClass(detailData.status)}>{detailData.status}</span>
+                  <Button
+                    variant="secondary"
+                    onClick={() => onNavigate?.(`/receive-goods?po=${encodeURIComponent(detailData.poNumber)}`)}
+                  >
+                    Receive Goods
+                  </Button>
+                </div>
               </div>
 
               <dl className="po-meta-grid">
