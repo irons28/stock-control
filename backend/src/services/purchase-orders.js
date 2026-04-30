@@ -504,6 +504,19 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
   const receivedBy = String(payload?.receivedBy || "").trim();
   const lines = Array.isArray(payload?.lines) ? payload.lines : [];
 
+  // receivedDate defaults to today if not supplied; validates YYYY-MM-DD format.
+  const today = new Date().toISOString().slice(0, 10);
+  const rawReceivedDate = String(payload?.receivedDate || "").trim();
+  let receivedDate;
+  if (!rawReceivedDate) {
+    receivedDate = today;
+  } else {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rawReceivedDate)) {
+      throw createRequestError("receivedDate must be in YYYY-MM-DD format.");
+    }
+    receivedDate = rawReceivedDate;
+  }
+
   if (!deliveryNumber) {
     throw createRequestError("Delivery number is required.");
   }
@@ -541,8 +554,9 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
       throw createRequestError(`Purchase order line ${rawLine?.purchaseOrderLineId} is invalid.`);
     }
 
+    // Zero-quantity lines are silently ignored (not rejected).
     if (!Number.isFinite(quantityReceived) || quantityReceived <= 0) {
-      throw createRequestError(`Line ${orderLine.sku} must have a quantity received greater than zero.`);
+      continue;
     }
 
     if (quantityReceived > Number(orderLine.quantity_remaining)) {
@@ -586,6 +600,10 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
     });
   }
 
+  if (!normalisedLines.length) {
+    throw createRequestError("At least one line with a quantity greater than zero is required.");
+  }
+
   if (payloadSerials.size) {
     const existingSerialRows = await all(
       `SELECT serial_number
@@ -614,9 +632,10 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
         purchase_order_id,
         receipt_number,
         delivery_number,
-        received_by
-      ) VALUES (?, ?, ?, ?)`,
-      [orderDetails.order.id, receiptNumber, deliveryNumber, receivedBy]
+        received_by,
+        received_at
+      ) VALUES (?, ?, ?, ?, ?)`,
+      [orderDetails.order.id, receiptNumber, deliveryNumber, receivedBy, receivedDate]
     );
 
     const lineSummaries = [];
@@ -693,6 +712,32 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
               orderDetails.order.id,
               receiptResult.id,
               `Delivery ${deliveryNumber}`,
+            ]
+          );
+
+          // Record serial lifecycle event for traceability.
+          await run(
+            `INSERT INTO serial_lifecycle_events (
+              stock_item_id,
+              serial_number,
+              event_type,
+              reference_type,
+              reference_number,
+              supplier_id,
+              location_id,
+              notes,
+              event_by,
+              event_at
+            ) VALUES (?, ?, 'received', 'goods_receipt', ?, ?, ?, ?, ?, ?)`,
+            [
+              stockItemResult.id,
+              serialNumber,
+              receiptNumber,
+              orderDetails.order.supplier_id,
+              holdLocation.id,
+              `Received against ${orderDetails.order.order_number} delivery ${deliveryNumber}`,
+              receivedBy,
+              receivedDate,
             ]
           );
         }
@@ -783,6 +828,7 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
       receiptNumber,
       deliveryNumber,
       receivedBy,
+      receivedDate,
       purchaseOrderNumber: orderDetails.order.order_number,
       status,
       holdingLocation: holdLocation.code,
