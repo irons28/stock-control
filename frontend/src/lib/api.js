@@ -15,7 +15,7 @@ export async function apiFetch(endpoint, options = {}) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || `Request failed with status ${response.status}`);
+    throw new Error(payload?.message || payload?.error || `Request failed with status ${response.status}`);
   }
 
   return payload;
@@ -30,7 +30,7 @@ export async function apiPost(endpoint, body) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `Request failed with status ${response.status}`);
+    throw new Error(data.message || data.error || `Request failed with status ${response.status}`);
   }
 
   return response.json();

@@ -6,6 +6,7 @@ const PERMISSIONS = {
   "so:dispatch": ["admin", "dispatch"],
   "so:allocate": ["admin", "warehouse", "dispatch"],
   "so:view": ["admin", "warehouse", "purchasing", "dispatch", "management"],
+  "master-data:manage": ["admin", "purchasing"],
   "stock:view": ["admin", "warehouse", "dispatch", "management"],
   "serial:view": ["admin", "warehouse", "dispatch", "management"],
   "audit:view": ["admin", "management"],

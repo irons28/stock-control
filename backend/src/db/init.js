@@ -341,6 +341,8 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("suppliers", "city TEXT DEFAULT ''");
   await addColumnIfMissing("suppliers", "postcode TEXT DEFAULT ''");
   await addColumnIfMissing("suppliers", "country TEXT DEFAULT ''");
+  await addColumnIfMissing("suppliers", "address TEXT DEFAULT ''");
+  await addColumnIfMissing("suppliers", "notes TEXT DEFAULT ''");
 
   await addColumnIfMissing("products", "category TEXT DEFAULT ''");
   await addColumnIfMissing("products", "barcode TEXT DEFAULT ''");

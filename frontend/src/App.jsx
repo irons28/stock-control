@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
+import SuppliersPage from "./pages/SuppliersPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
 import LocationsPage from "./pages/LocationsPage";
@@ -40,10 +41,16 @@ const navigationItems = [
     description: "Create customer orders, allocate stock, and dispatch goods.",
   },
   {
+    key: "suppliers",
+    label: "Suppliers",
+    path: "/suppliers",
+    description: "Maintain supplier records, contacts, and purchasing availability.",
+  },
+  {
     key: "products",
     label: "Products",
     path: "/products",
-    description: "Maintain SKUs, pricing, tracking mode, and supplier defaults.",
+    description: "Maintain SKUs, tracking rules, and unit-cost master data.",
   },
   {
     key: "stock",
@@ -88,6 +95,7 @@ const pageComponents = {
   search: SearchPage,
   "purchase-orders": PurchaseOrdersPage,
   "sales-orders": SalesOrdersPage,
+  suppliers: SuppliersPage,
   products: ProductsPage,
   stock: StockPage,
   locations: LocationsPage,

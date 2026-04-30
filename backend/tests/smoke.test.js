@@ -5,15 +5,25 @@ const { test, before, after, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const { initializeDatabase: initDatabase } = require("../src/db/init");
-const { closeDatabase } = require("../src/db/connection");
+const { closeDatabase, get } = require("../src/db/connection");
 const { createApp } = require("../src/app");
 
 let server;
 let baseUrl;
 
-function request(path) {
+function request(path, options = {}) {
   return new Promise((resolve, reject) => {
-    http.get(`${baseUrl}${path}`, (res) => {
+    const requestOptions = {
+      method: options.method || "GET",
+      headers: options.body
+        ? {
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+          }
+        : options.headers || {},
+    };
+
+    const req = http.request(`${baseUrl}${path}`, requestOptions, (res) => {
       let body = "";
       res.on("data", (chunk) => {
         body += chunk;
@@ -25,7 +35,15 @@ function request(path) {
           resolve({ status: res.statusCode, body });
         }
       });
-    }).on("error", reject);
+    });
+
+    req.on("error", reject);
+
+    if (options.body) {
+      req.write(JSON.stringify(options.body));
+    }
+
+    req.end();
   });
 }
 
@@ -130,5 +148,135 @@ describe("error response shape", () => {
     const { body } = await request("/api/no-such-route");
     assert.equal(body.error, true);
     assert.equal(typeof body.message, "string");
+  });
+});
+
+describe("master data routes", () => {
+  test("POST and PUT /api/suppliers create, update, and audit supplier changes", async () => {
+    const supplierCode = `SUP-T-${Date.now()}`;
+    const createResponse = await request("/api/suppliers", {
+      method: "POST",
+      headers: { "X-User-Id": "1" },
+      body: {
+        supplierCode,
+        name: "Test Supplier",
+        contactName: "Tina Tester",
+        email: "tina@test.example",
+        phone: "01234 567890",
+        address: "1 Test Way",
+        notes: "Created from smoke test",
+        active: true,
+      },
+    });
+
+    assert.equal(createResponse.status, 201);
+    assert.equal(createResponse.body.item.supplierCode, supplierCode);
+    assert.equal(createResponse.body.item.active, true);
+
+    const updateResponse = await request(`/api/suppliers/${createResponse.body.item.id}`, {
+      method: "PUT",
+      headers: { "X-User-Id": "1" },
+      body: {
+        ...createResponse.body.item,
+        name: "Test Supplier Updated",
+        active: false,
+      },
+    });
+
+    assert.equal(updateResponse.status, 200);
+    assert.equal(updateResponse.body.item.name, "Test Supplier Updated");
+    assert.equal(updateResponse.body.item.active, false);
+
+    const visibleSuppliers = await request("/api/suppliers");
+    assert.equal(
+      visibleSuppliers.body.items.some((item) => item.supplierCode === supplierCode),
+      false,
+    );
+
+    const allSuppliers = await request("/api/suppliers?includeInactive=true");
+    assert.equal(
+      allSuppliers.body.items.some((item) => item.supplierCode === supplierCode && item.active === false),
+      true,
+    );
+
+    const auditRow = await get(
+      `
+        SELECT action_type, entity_type, entity_ref
+        FROM activity_log
+        WHERE entity_type = 'supplier' AND entity_ref = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [supplierCode],
+    );
+
+    assert.equal(auditRow.action_type, "supplier_updated");
+    assert.equal(auditRow.entity_type, "supplier");
+    assert.equal(auditRow.entity_ref, supplierCode);
+  });
+
+  test("POST and PUT /api/products create, update, filter inactive, and audit changes", async () => {
+    const sku = `SKU-T-${Date.now()}`;
+    const createResponse = await request("/api/products", {
+      method: "POST",
+      headers: { "X-User-Id": "1" },
+      body: {
+        sku,
+        name: "Test Product",
+        category: "Sensors",
+        description: "Created from smoke test",
+        serialRequired: true,
+        defaultUnitCost: 12.5,
+        active: true,
+      },
+    });
+
+    assert.equal(createResponse.status, 201);
+    assert.equal(createResponse.body.item.sku, sku);
+    assert.equal(createResponse.body.item.serialRequired, true);
+
+    const updateResponse = await request(`/api/products/${createResponse.body.item.id}`, {
+      method: "PUT",
+      headers: { "X-User-Id": "1" },
+      body: {
+        ...createResponse.body.item,
+        name: "Test Product Updated",
+        serialRequired: false,
+        defaultUnitCost: 19.99,
+        active: false,
+      },
+    });
+
+    assert.equal(updateResponse.status, 200);
+    assert.equal(updateResponse.body.item.name, "Test Product Updated");
+    assert.equal(updateResponse.body.item.serialRequired, false);
+    assert.equal(updateResponse.body.item.active, false);
+
+    const visibleProducts = await request("/api/products");
+    assert.equal(
+      visibleProducts.body.items.some((item) => item.sku === sku),
+      false,
+    );
+
+    const allProducts = await request("/api/products?includeInactive=true");
+    assert.equal(
+      allProducts.body.items.some((item) => item.sku === sku && item.active === false),
+      true,
+    );
+
+    const auditRow = await get(
+      `
+        SELECT action_type, entity_type, entity_ref
+        FROM activity_log
+        WHERE entity_type = 'product' AND entity_ref = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [sku],
+    );
+
+    assert.equal(auditRow.action_type, "product_updated");
+    assert.equal(auditRow.entity_type, "product");
+    assert.equal(auditRow.entity_ref, sku);
   });
 });

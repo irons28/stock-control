@@ -2,6 +2,15 @@ const express = require("express");
 const { all, get } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
 const { receivePurchaseOrder } = require("../services/purchase-orders");
+const {
+  createProduct,
+  createSupplier,
+  listProducts,
+  listSuppliers,
+  parseIncludeInactive,
+  updateProduct,
+  updateSupplier,
+} = require("../services/master-data");
 const { router: dispatchRouter } = require("./dispatch");
 const importsRouter = require("./imports");
 const serialsRouter = require("./serials");
@@ -19,8 +28,6 @@ router.use(resolveUser);
 
 const resourceQueries = {
   customers: "SELECT * FROM customers ORDER BY name ASC",
-  suppliers: "SELECT * FROM suppliers ORDER BY name ASC",
-  products: "SELECT * FROM products ORDER BY name ASC",
   "stock-locations": "SELECT * FROM stock_locations ORDER BY code ASC",
   "sales-orders": `
     SELECT so.*, c.name AS customer_name
@@ -191,6 +198,94 @@ router.get("/dashboard/summary", async (_req, res, next) => {
 router.use("/sales-orders", salesOrdersRouter);
 router.use("/dispatch", requireRole("admin", "dispatch"), dispatchRouter);
 router.use("/import", importsRouter);
+
+router.get("/suppliers", async (req, res, next) => {
+  try {
+    const payload = await listSuppliers({
+      query: req.query.q,
+      includeInactive: parseIncludeInactive(req.query.includeInactive),
+    });
+    res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/suppliers", requireRole("admin", "purchasing"), async (req, res, next) => {
+  try {
+    const supplier = await createSupplier(req.body, {
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userName: req.user?.full_name,
+    });
+    res.status(201).json({
+      item: supplier,
+      message: `Supplier ${supplier.supplierCode} created successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/suppliers/:id", requireRole("admin", "purchasing"), async (req, res, next) => {
+  try {
+    const supplier = await updateSupplier(req.params.id, req.body, {
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userName: req.user?.full_name,
+    });
+    res.json({
+      item: supplier,
+      message: `Supplier ${supplier.supplierCode} updated successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/products", async (req, res, next) => {
+  try {
+    const payload = await listProducts({
+      query: req.query.q,
+      includeInactive: parseIncludeInactive(req.query.includeInactive),
+    });
+    res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/products", requireRole("admin", "purchasing"), async (req, res, next) => {
+  try {
+    const product = await createProduct(req.body, {
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userName: req.user?.full_name,
+    });
+    res.status(201).json({
+      item: product,
+      message: `Product ${product.sku} created successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/products/:id", requireRole("admin", "purchasing"), async (req, res, next) => {
+  try {
+    const product = await updateProduct(req.params.id, req.body, {
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userName: req.user?.full_name,
+    });
+    res.json({
+      item: product,
+      message: `Product ${product.sku} updated successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/allocation/available-stock/:productId", requireRole("admin", "warehouse", "dispatch", "purchasing"), async (req, res, next) => {
   try {
