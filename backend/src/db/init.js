@@ -589,6 +589,91 @@ async function seedReferenceData() {
     'Returns',
     'returns'
   )`);
+
+  // ── Demo scenario reference data (office booking flow) ─────────────────────
+
+  await run(`INSERT OR IGNORE INTO suppliers (
+    code, name, contact_name, email, phone, address_line1, city, postcode, country, account_reference
+  ) VALUES (
+    'SUP-EPOS',
+    'EPOS Hardware Supplies Ltd',
+    'Carla Meadows',
+    'orders@eposhardware.example',
+    '0117 800 9010',
+    '3 Commerce Park',
+    'Bristol',
+    'BS1 5RQ',
+    'UK',
+    'EHS-3301'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO customers (
+    code, name, contact_name, email, phone, address_line1, city, postcode, country
+  ) VALUES (
+    'CUST-EXAMPLE',
+    'Example Retail Ltd',
+    'Tom Weston',
+    'it@exampleretail.example',
+    '020 7000 1234',
+    '99 High Street',
+    'London',
+    'EC1A 1BB',
+    'UK'
+  )`);
+
+  await run(`INSERT OR IGNORE INTO products (
+    sku, name, description, category, barcode, default_supplier_id, tracking_mode,
+    is_serial_tracked, is_consumable, unit_of_measure, cost_price, sell_price
+  ) VALUES (
+    'EPOS-TILL-001',
+    'EPOS Till Terminal',
+    'Countertop EPOS till terminal with touchscreen',
+    'EPOS Hardware',
+    '5010000000101',
+    (SELECT id FROM suppliers WHERE code = 'SUP-EPOS'),
+    'serial',
+    1,
+    0,
+    'each',
+    280.00,
+    449.00
+  )`);
+
+  await run(`INSERT OR IGNORE INTO products (
+    sku, name, description, category, barcode, default_supplier_id, tracking_mode,
+    is_serial_tracked, is_consumable, unit_of_measure, cost_price, sell_price
+  ) VALUES (
+    'EPOS-PRINT-001',
+    'Receipt Printer (EPOS)',
+    'Thermal receipt printer for EPOS systems',
+    'EPOS Hardware',
+    '5010000000118',
+    (SELECT id FROM suppliers WHERE code = 'SUP-EPOS'),
+    'serial',
+    1,
+    0,
+    'each',
+    95.00,
+    159.00
+  )`);
+
+  await run(`INSERT OR IGNORE INTO products (
+    sku, name, description, category, barcode, default_supplier_id, tracking_mode,
+    is_serial_tracked, is_consumable, unit_of_measure, cost_price, sell_price
+  ) VALUES (
+    'EPOS-ROLL-001',
+    'Label Rolls (EPOS)',
+    'Thermal label rolls compatible with EPOS printers',
+    'Consumables',
+    '5010000000125',
+    (SELECT id FROM suppliers WHERE code = 'SUP-EPOS'),
+    'quantity',
+    0,
+    1,
+    'roll',
+    1.80,
+    3.50
+  )`);
 }
 
 async function createIndexes() {

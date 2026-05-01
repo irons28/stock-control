@@ -691,11 +691,114 @@ async function seedDemoData() {
     );
   }
 
+  // ── Demo Scenario: Office Booking Flow ────────────────────────────────────
+  // PO-DEMO-001  EPOS Hardware Supplies Ltd — 3 tills, 2 printers, 20 label rolls (NOT received)
+  // SO-DEMO-001  Example Retail Ltd — 2 tills, 1 printer, 10 label rolls (NOT allocated)
+  // User demonstrates the full receive → put-away → allocate → dispatch flow during the demo.
+
+  const supEpos     = await get(`SELECT id FROM suppliers WHERE code = 'SUP-EPOS'`);
+  const custExample = await get(`SELECT id FROM customers WHERE code = 'CUST-EXAMPLE'`);
+  const pEposTill   = await get(`SELECT id FROM products  WHERE sku = 'EPOS-TILL-001'`);
+  const pEposPrint  = await get(`SELECT id FROM products  WHERE sku = 'EPOS-PRINT-001'`);
+  const pEposRoll   = await get(`SELECT id FROM products  WHERE sku = 'EPOS-ROLL-001'`);
+
+  // Demo PO — ordered 3 days ago, delivery expected in 7 days, nothing received yet
+  await run(
+    `INSERT INTO purchase_orders
+       (order_number, supplier_id, status, ordered_at, expected_at, notes)
+     VALUES (?, ?, 'confirmed', ?, ?, ?)`,
+    [
+      "PO-DEMO-001", supEpos.id,
+      daysFromNow(-3), daysFromNow(7),
+      "Demo scenario: EPOS equipment order for Example Retail Ltd new store fit-out",
+    ],
+  );
+
+  const poDemo = await get(`SELECT id FROM purchase_orders WHERE order_number = 'PO-DEMO-001'`);
+
+  await run(
+    `INSERT INTO purchase_order_lines
+       (purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost)
+     VALUES (?, ?, 3, 0, 280.00)`,
+    [poDemo.id, pEposTill.id],
+  );
+  await run(
+    `INSERT INTO purchase_order_lines
+       (purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost)
+     VALUES (?, ?, 2, 0, 95.00)`,
+    [poDemo.id, pEposPrint.id],
+  );
+  await run(
+    `INSERT INTO purchase_order_lines
+       (purchase_order_id, product_id, quantity_ordered, quantity_received, unit_cost)
+     VALUES (?, ?, 20, 0, 1.80)`,
+    [poDemo.id, pEposRoll.id],
+  );
+
+  const polDemoTill  = await get(`SELECT id FROM purchase_order_lines WHERE purchase_order_id = ? AND product_id = ?`, [poDemo.id, pEposTill.id]);
+  const polDemoPrint = await get(`SELECT id FROM purchase_order_lines WHERE purchase_order_id = ? AND product_id = ?`, [poDemo.id, pEposPrint.id]);
+  const polDemoRoll  = await get(`SELECT id FROM purchase_order_lines WHERE purchase_order_id = ? AND product_id = ?`, [poDemo.id, pEposRoll.id]);
+
+  // Demo SO — raised 2 days ago, dispatch due in 5 days, nothing allocated yet
+  await run(
+    `INSERT INTO sales_orders
+       (order_number, customer_id, status, requested_at, dispatch_due_at, notes, priority)
+     VALUES (?, ?, 'confirmed', ?, ?, ?, 'normal')`,
+    [
+      "SO-DEMO-001", custExample.id,
+      daysFromNow(-2), daysFromNow(5),
+      "Demo scenario: EPOS kit for Example Retail Ltd new store — partial delivery from PO-DEMO-001",
+    ],
+  );
+
+  const soDemo = await get(`SELECT id FROM sales_orders WHERE order_number = 'SO-DEMO-001'`);
+
+  await run(
+    `INSERT INTO sales_order_lines
+       (sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched)
+     VALUES (?, ?, 2, 0, 0)`,
+    [soDemo.id, pEposTill.id],
+  );
+  await run(
+    `INSERT INTO sales_order_lines
+       (sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched)
+     VALUES (?, ?, 1, 0, 0)`,
+    [soDemo.id, pEposPrint.id],
+  );
+  await run(
+    `INSERT INTO sales_order_lines
+       (sales_order_id, product_id, quantity_ordered, quantity_allocated, quantity_dispatched)
+     VALUES (?, ?, 10, 0, 0)`,
+    [soDemo.id, pEposRoll.id],
+  );
+
+  const solDemoTill  = await get(`SELECT id FROM sales_order_lines WHERE sales_order_id = ? AND product_id = ?`, [soDemo.id, pEposTill.id]);
+  const solDemoPrint = await get(`SELECT id FROM sales_order_lines WHERE sales_order_id = ? AND product_id = ?`, [soDemo.id, pEposPrint.id]);
+  const solDemoRoll  = await get(`SELECT id FROM sales_order_lines WHERE sales_order_id = ? AND product_id = ?`, [soDemo.id, pEposRoll.id]);
+
+  // Link PO lines to SO lines so the suggestion engine highlights "Linked to this purchase order"
+  await run(
+    `INSERT INTO purchase_sales_links (purchase_order_line_id, sales_order_line_id, quantity_linked)
+     VALUES (?, ?, 2)`,
+    [polDemoTill.id, solDemoTill.id],
+  );
+  await run(
+    `INSERT INTO purchase_sales_links (purchase_order_line_id, sales_order_line_id, quantity_linked)
+     VALUES (?, ?, 1)`,
+    [polDemoPrint.id, solDemoPrint.id],
+  );
+  await run(
+    `INSERT INTO purchase_sales_links (purchase_order_line_id, sales_order_line_id, quantity_linked)
+     VALUES (?, ?, 10)`,
+    [polDemoRoll.id, solDemoRoll.id],
+  );
+
   console.log("  ✓ Purchase orders:  PO-1001 (Overdue), PO-1002 (Part Recv'd), PO-1003 (Open), PO-1004 (Fully Recv'd)");
   console.log("  ✓ Sales orders:     SO-2001 (Urgent), SO-2002 (Dispatch Ready), SO-2003 (Open)");
   console.log("  ✓ Serial numbers:   TILL-SN-1001 (available), TILL-SN-1002 (allocated), TILL-SN-1003 (dispatched), TILL-SN-1004 (received)");
   console.log("  ✓ Lifecycle serials: TILL-SN-1005 (quarantined), TILL-SN-1006 (returned), TILL-SN-1007 (warranty replacement), TILL-SN-1008 (scrapped)");
   console.log("  ✓ Qty stock:        30× LABEL-001 awaiting allocation");
+  console.log("  ✓ Demo scenario:    PO-DEMO-001 (open, not received) + SO-DEMO-001 (open, not allocated) — ready for office booking demo");
 }
 
 module.exports = { seedDemoData };
