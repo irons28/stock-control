@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
+import ReceiveGoodsPage from "./pages/ReceiveGoodsPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
@@ -32,6 +33,12 @@ const navigationItems = [
     label: "Purchase Orders",
     path: "/purchase-orders",
     description: "Raise, receive, and reconcile purchase orders from suppliers.",
+  },
+  {
+    key: "receive-goods",
+    label: "Receive Goods",
+    path: "/receive-goods",
+    description: "Book deliveries against open purchase orders and get suggested SO allocations.",
   },
   {
     key: "sales-orders",
@@ -87,6 +94,7 @@ const pageComponents = {
   dashboard: DashboardPage,
   search: SearchPage,
   "purchase-orders": PurchaseOrdersPage,
+  "receive-goods": ReceiveGoodsPage,
   "sales-orders": SalesOrdersPage,
   products: ProductsPage,
   stock: StockPage,
@@ -142,6 +150,8 @@ function App() {
     pageProps = { health };
   } else if (currentItem.key === "search") {
     pageProps = { initialQuery: searchQuery, onNavigate: handleNavigate };
+  } else if (currentItem.key === "receive-goods") {
+    pageProps = { onNavigate: handleNavigate };
   }
 
   return (

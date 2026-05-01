@@ -1,221 +1,410 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import PageHeader from "../components/PageHeader";
 import { useApiResource } from "../hooks/useApiResource";
 import { apiFetch } from "../lib/api";
-import { formatDate, formatDateTime, formatLabel, formatNumber } from "../lib/formatters";
+import { formatDate, formatNumber } from "../lib/formatters";
+import { useUser } from "../context/UserContext";
 
-function parseSerialText(value) {
-  return value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function classifyDispatchDate(dateStr) {
+  if (!dateStr) return "none";
+  const daysUntil = (new Date(dateStr) - Date.now()) / 86_400_000;
+  if (daysUntil < 0) return "overdue";
+  if (daysUntil <= 3) return "soon";
+  return "ok";
+}
+
+function parseSerials(text) {
+  return text
+    .split(/[\r\n,]+/)
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
-function buildInitialLineState(lines) {
-  return Object.fromEntries(
-    lines.map((line) => [
-      line.id,
-      {
-        quantityReceived: "",
-        serialText: "",
-      },
-    ])
+// ── Suggestion panel ──────────────────────────────────────────────────────────
+
+function ReasonTag({ text }) {
+  const cls = text.toLowerCase().includes("overdue")
+    ? "sug-reason-tag sug-reason-tag--overdue"
+    : text.toLowerCase().includes("urgent") || text.toLowerCase().includes("today")
+    ? "sug-reason-tag sug-reason-tag--urgent"
+    : text.toLowerCase().includes("linked")
+    ? "sug-reason-tag sug-reason-tag--linked"
+    : "sug-reason-tag sug-reason-tag--default";
+  return <span className={cls}>{text}</span>;
+}
+
+function SuggestionCard({ productName, productSku, isSerialTracked, availableQuantity, requiresPutaway, soMatch, onAllocate }) {
+  const dateCls = classifyDispatchDate(soMatch.dispatchDueAt);
+
+  return (
+    <article className="sug-card">
+      <div className="sug-card-header">
+        <div className="sug-card-product">
+          <span className="sug-product-name">{productName}</span>
+          <span className="sug-product-sku">{productSku}</span>
+        </div>
+        <div className="sug-card-meta">
+          {soMatch.isLinked && (
+            <span className="sug-linked-badge">🔗 Linked PO</span>
+          )}
+          {soMatch.priority === "urgent" && (
+            <span className="sug-urgent-badge">🔴 Urgent</span>
+          )}
+        </div>
+      </div>
+
+      <div className="sug-card-body">
+        <div className="sug-so-block">
+          <div className="sug-so-number">{soMatch.salesOrderNumber}</div>
+          <div className="sug-so-customer">{soMatch.customerName}</div>
+          {soMatch.dispatchDueAt && (
+            <div className={`sug-due-tag sug-due-tag--${dateCls}`}>
+              {dateCls === "overdue"
+                ? `Overdue · ${formatDate(soMatch.dispatchDueAt)}`
+                : `Due ${formatDate(soMatch.dispatchDueAt)}`}
+            </div>
+          )}
+        </div>
+
+        <div className="sug-stock-block">
+          <div className="sug-qty-row">
+            <div className="sug-qty-item">
+              <span className="sug-qty-label">Available</span>
+              <strong className="sug-qty-value">{formatNumber(availableQuantity)}</strong>
+            </div>
+            <div className="sug-qty-item">
+              <span className="sug-qty-label">Needed</span>
+              <strong className={`sug-qty-value ${soMatch.canFullyFulfill ? "sug-qty--ok" : "sug-qty--short"}`}>
+                {formatNumber(soMatch.remainingQuantity)}
+              </strong>
+            </div>
+          </div>
+          {!soMatch.canFullyFulfill && (
+            <p className="sug-short-warning">
+              Stock short by {formatNumber(soMatch.remainingQuantity - availableQuantity)}{" "}
+              {isSerialTracked ? "unit" : "pack"}
+              {soMatch.remainingQuantity - availableQuantity !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="sug-reasons">
+        {soMatch.reasons.map((r) => (
+          <ReasonTag key={r} text={r} />
+        ))}
+      </div>
+
+      {requiresPutaway && (
+        <p className="sug-putaway-notice">
+          ⚠ Stock is in hold — put away required before allocating
+        </p>
+      )}
+
+      <div className="sug-card-footer">
+        <button
+          type="button"
+          className="sug-allocate-btn"
+          onClick={() => onAllocate(soMatch.salesOrderNumber)}
+        >
+          Go to {soMatch.salesOrderNumber} to allocate →
+        </button>
+      </div>
+    </article>
   );
 }
 
-function ReceiveGoodsPage() {
+function SuggestionsPanel({ poNumber, onNavigateToSO }) {
+  const [status, setStatus] = useState("loading");
+  const [suggestions, setSuggestions] = useState([]);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+
+    async function load() {
+      try {
+        const data = await apiFetch(`/allocation/suggestions/${encodeURIComponent(poNumber)}`);
+        if (cancelledRef.current) return;
+        setSuggestions(data.suggestions || []);
+        setStatus("success");
+      } catch {
+        if (cancelledRef.current) return;
+        setStatus("error");
+      }
+    }
+
+    void load();
+    return () => { cancelledRef.current = true; };
+  }, [poNumber]);
+
+  if (status === "loading") {
+    return (
+      <div className="sug-panel">
+        <div className="sug-panel-header">
+          <h3 className="sug-panel-title">Checking for open demand…</h3>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return null; // silently skip
+  }
+
+  if (!suggestions.length) {
+    return (
+      <div className="sug-panel sug-panel--empty">
+        <div className="sug-panel-header">
+          <h3 className="sug-panel-title">No open demand found</h3>
+          <p className="sug-panel-sub">
+            No sales orders currently need the products received from this delivery.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Flatten to a list of (product, soMatch) cards, prioritised
+  const cards = [];
+  for (const group of suggestions) {
+    for (const soMatch of group.matchedSalesOrders) {
+      cards.push({ group, soMatch });
+    }
+  }
+
+  return (
+    <div className="sug-panel">
+      <div className="sug-panel-header">
+        <h3 className="sug-panel-title">Suggested Sales Order Allocations</h3>
+        <p className="sug-panel-sub">
+          The received stock matches open demand on the orders below. Review each suggestion and
+          confirm allocation — nothing is assigned automatically.
+        </p>
+      </div>
+      <div className="sug-cards-grid">
+        {cards.map(({ group, soMatch }) => (
+          <SuggestionCard
+            key={`${group.productId}-${soMatch.salesOrderNumber}`}
+            productName={group.productName}
+            productSku={group.productSku}
+            isSerialTracked={group.isSerialTracked}
+            availableQuantity={group.availableQuantity}
+            requiresPutaway={group.requiresPutaway}
+            soMatch={soMatch}
+            onAllocate={onNavigateToSO}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+function ReceiveGoodsPage({ onNavigate }) {
+  const { currentUser } = useUser();
   const purchaseOrders = useApiResource("/purchase-orders");
+
   const [selectedPoNumber, setSelectedPoNumber] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("po") || "";
   });
-  const [detailState, setDetailState] = useState({
-    status: "idle",
-    data: null,
-    error: "",
-  });
-  const [detailRequestKey, setDetailRequestKey] = useState(0);
-  const [formState, setFormState] = useState({
-    deliveryNumber: "",
-    receivedBy: "",
-    lines: {},
-  });
-  const [validationMessage, setValidationMessage] = useState("");
+
+  const [detailStatus, setDetailStatus] = useState("idle");
+  const [detailData, setDetailData] = useState(null);
+  const [detailError, setDetailError] = useState("");
+
+  // Form state — keyed by line id
+  const [lineInputs, setLineInputs] = useState({});
+  const [deliveryNumber, setDeliveryNumber] = useState("");
+  const [receivedBy, setReceivedBy] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
-  const [successSummary, setSuccessSummary] = useState(null);
+  const [validationMsg, setValidationMsg] = useState("");
+  const [successSummary, setSuccessSummary] = useState(null); // receipt result from API
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const purchaseOrderOptions = purchaseOrders.data?.items || [];
+  const poOptions = purchaseOrders.data?.items || [];
 
+  // Auto-select first PO on load
   useEffect(() => {
-    if (!purchaseOrderOptions.length || selectedPoNumber) {
-      return;
+    if (!poOptions.length || selectedPoNumber) return;
+    setSelectedPoNumber(poOptions[0].poNumber || poOptions[0].order_number || "");
+  }, [poOptions, selectedPoNumber]);
+
+  // Pre-fill receivedBy from current user
+  useEffect(() => {
+    if (currentUser?.full_name && !receivedBy) {
+      setReceivedBy(currentUser.full_name);
     }
+  }, [currentUser]);
 
-    setSelectedPoNumber(purchaseOrderOptions[0].order_number);
-  }, [purchaseOrderOptions, selectedPoNumber]);
-
+  // Load PO detail when selection changes
   useEffect(() => {
     let cancelled = false;
 
-    async function loadDetail() {
+    async function load() {
       if (!selectedPoNumber) {
-        setDetailState({
-          status: "idle",
-          data: null,
-          error: "",
-        });
+        setDetailStatus("idle");
+        setDetailData(null);
         return;
       }
 
-      setDetailState({
-        status: "loading",
-        data: null,
-        error: "",
-      });
+      setDetailStatus("loading");
+      setDetailData(null);
+      setDetailError("");
+      setSuccessSummary(null);
+      setShowSuggestions(false);
 
       try {
-        const payload = await apiFetch(`/purchase-orders/${encodeURIComponent(selectedPoNumber)}`);
-        if (cancelled) {
-          return;
-        }
+        const payload = await apiFetch(
+          `/purchase-orders/${encodeURIComponent(selectedPoNumber)}`,
+        );
+        if (cancelled) return;
 
-        setDetailState({
-          status: "success",
-          data: payload,
-          error: "",
-        });
-        setFormState((current) => ({
-          deliveryNumber:
-            current.deliveryNumber && payload.order.order_number === selectedPoNumber
-              ? current.deliveryNumber
-              : "",
-          receivedBy:
-            current.receivedBy && payload.order.order_number === selectedPoNumber
-              ? current.receivedBy
-              : "",
-          lines: buildInitialLineState(payload.lines),
-        }));
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
+        setDetailData(payload);
+        setDetailStatus("success");
 
-        setDetailState({
-          status: "error",
-          data: null,
-          error: error.message || "Unable to load purchase order detail.",
-        });
+        // Initialise per-line inputs
+        const initial = {};
+        for (const line of payload.lines || []) {
+          initial[line.id] = { qty: "", serials: "" };
+        }
+        setLineInputs(initial);
+      } catch (err) {
+        if (cancelled) return;
+        setDetailStatus("error");
+        setDetailError(err.message || "Unable to load purchase order.");
       }
     }
 
-    void loadDetail();
+    void load();
+    return () => { cancelled = true; };
+  }, [selectedPoNumber]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedPoNumber, detailRequestKey]);
-
-  const liveLineSummary = useMemo(() => {
-    const lines = detailState.data?.lines || [];
-    return lines.map((line) => {
-      const draftValue = formState.lines[line.id]?.quantityReceived;
-      const quantityNow = draftValue === "" ? 0 : Number(draftValue);
+  // Live summary of what will be received
+  const liveSummary = useMemo(() => {
+    if (!detailData?.lines) return [];
+    return detailData.lines.map((line) => {
+      const rawQty = lineInputs[line.id]?.qty || "";
+      const qty = parseFloat(rawQty);
+      const qtyNow = Number.isFinite(qty) && qty > 0 ? qty : 0;
+      const serials = parseSerials(lineInputs[line.id]?.serials || "");
       return {
         ...line,
-        quantity_now: Number.isFinite(quantityNow) && quantityNow > 0 ? quantityNow : 0,
-        quantity_after: Math.max(0, Number(line.quantity_remaining) - (Number.isFinite(quantityNow) ? quantityNow : 0)),
-        serial_count: parseSerialText(formState.lines[line.id]?.serialText || "").length,
+        qtyNow,
+        qtyAfter: Math.max(0, line.remainingQuantity - qtyNow),
+        serialCount: serials.length,
       };
     });
-  }, [detailState.data, formState.lines]);
+  }, [detailData, lineInputs]);
 
-  function updateLine(lineId, field, value) {
-    setValidationMessage("");
-    setSuccessSummary(null);
-    setFormState((current) => ({
-      ...current,
-      lines: {
-        ...current.lines,
-        [lineId]: {
-          ...(current.lines[lineId] || { quantityReceived: "", serialText: "" }),
-          [field]: value,
-        },
-      },
+  function updateLineField(lineId, field, value) {
+    setValidationMsg("");
+    setLineInputs((prev) => ({
+      ...prev,
+      [lineId]: { ...(prev[lineId] || { qty: "", serials: "" }), [field]: value },
     }));
   }
 
-  function handleHeaderField(field, value) {
-    setValidationMessage("");
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setValidationMsg("");
     setSuccessSummary(null);
-    setFormState((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setValidationMessage("");
-    setSuccessSummary(null);
+    setShowSuggestions(false);
 
     if (!selectedPoNumber) {
-      setValidationMessage("Select a purchase order before receiving goods.");
+      setValidationMsg("Select a purchase order first.");
+      return;
+    }
+    if (!deliveryNumber.trim()) {
+      setValidationMsg("Enter the supplier delivery note number.");
+      return;
+    }
+    if (!receivedBy.trim()) {
+      setValidationMsg("Enter who received the delivery.");
       return;
     }
 
-    if (!formState.deliveryNumber.trim()) {
-      setValidationMessage("Enter the supplier delivery number.");
-      return;
-    }
-
-    if (!formState.receivedBy.trim()) {
-      setValidationMessage("Enter who received the delivery.");
-      return;
-    }
-
-    const submissionLines = liveLineSummary
-      .filter((line) => line.quantity_now > 0)
+    const submissionLines = liveSummary
+      .filter((line) => line.qtyNow > 0)
       .map((line) => ({
         purchaseOrderLineId: line.id,
-        quantityReceived: line.quantity_now,
-        serialNumbers: parseSerialText(formState.lines[line.id]?.serialText || ""),
+        quantityReceived: line.qtyNow,
+        serialNumbers: parseSerials(lineInputs[line.id]?.serials || ""),
       }));
 
     if (!submissionLines.length) {
-      setValidationMessage("Enter at least one quantity to receive.");
+      setValidationMsg("Enter at least one quantity to receive.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const payload = await apiFetch(`/purchase-orders/${encodeURIComponent(selectedPoNumber)}/receive`, {
-        method: "POST",
-        body: JSON.stringify({
-          deliveryNumber: formState.deliveryNumber.trim(),
-          receivedBy: formState.receivedBy.trim(),
-          lines: submissionLines,
-        }),
-      });
+      const result = await apiFetch(
+        `/purchase-orders/${encodeURIComponent(selectedPoNumber)}/receive`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            deliveryNumber: deliveryNumber.trim(),
+            receivedBy: receivedBy.trim(),
+            lines: submissionLines,
+          }),
+        },
+      );
 
-      setSuccessSummary(payload);
+      setSuccessSummary(result);
+      setShowSuggestions(true);
       purchaseOrders.reload();
-      setDetailRequestKey((current) => current + 1);
-    } catch (error) {
-      setValidationMessage(error.message || "Unable to receive goods.");
+
+      // Re-fetch PO detail to update quantities
+      const refreshed = await apiFetch(
+        `/purchase-orders/${encodeURIComponent(selectedPoNumber)}`,
+      );
+      setDetailData(refreshed);
+      const reset = {};
+      for (const line of refreshed.lines || []) {
+        reset[line.id] = { qty: "", serials: "" };
+      }
+      setLineInputs(reset);
+    } catch (err) {
+      setValidationMsg(err.message || "Unable to save receipt.");
     } finally {
       setSubmitting(false);
     }
   }
+
+  function handleNavigateToSO(soNumber) {
+    if (typeof onNavigate === "function") {
+      onNavigate("/sales-orders");
+    } else {
+      window.history.pushState({}, "", "/sales-orders");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }
+
+  function handleReceiveAnother() {
+    setSuccessSummary(null);
+    setShowSuggestions(false);
+    setSelectedPoNumber("");
+    setDeliveryNumber("");
+    setLineInputs({});
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="page-stack">
       <PageHeader
         eyebrow="Goods In"
         title="Receive Goods"
-        description="Book partial or full deliveries against open purchase orders, capture serial numbers, and make stock immediately available."
+        description="Book deliveries against open purchase orders, capture serials, and see which sales orders can be fulfilled immediately."
         actions={
           <Button variant="secondary" onClick={purchaseOrders.reload}>
             Refresh Orders
@@ -223,239 +412,246 @@ function ReceiveGoodsPage() {
         }
       />
 
+      {/* PO selector */}
       <Card title="Select Purchase Order" subtitle="Inbound Queue">
-        <div className="form-grid">
-          <label className="field">
-            <span>Purchase order</span>
+        {purchaseOrders.status === "loading" && (
+          <p className="rg-loading">Loading open purchase orders…</p>
+        )}
+        {purchaseOrders.status === "error" && (
+          <p className="rg-error">{purchaseOrders.error || "Unable to load orders."}</p>
+        )}
+        {purchaseOrders.status === "success" && (
+          <div className="rg-po-selector">
+            <label className="field-label" htmlFor="po-select">
+              Purchase order
+            </label>
             <select
+              id="po-select"
+              className="text-input"
               value={selectedPoNumber}
-              onChange={(event) => {
-                setSelectedPoNumber(event.target.value);
+              onChange={(e) => {
+                setSelectedPoNumber(e.target.value);
                 setSuccessSummary(null);
-                setValidationMessage("");
+                setShowSuggestions(false);
+                setValidationMsg("");
               }}
             >
-              <option value="">Select a purchase order</option>
-              {purchaseOrderOptions.map((item) => (
-                <option key={item.order_number} value={item.order_number}>
-                  {item.order_number} · {item.supplier_name} · {formatLabel(item.status)}
-                </option>
-              ))}
+              <option value="">— Select a purchase order —</option>
+              {poOptions.map((po) => {
+                const num = po.poNumber || po.order_number;
+                const sup = po.supplier || po.supplier_name;
+                return (
+                  <option key={num} value={num}>
+                    {num} · {sup} · {po.status}
+                  </option>
+                );
+              })}
             </select>
-          </label>
-        </div>
+          </div>
+        )}
       </Card>
 
-      <Card title="Receive Delivery" subtitle="Receipt Entry">
-        {detailState.status === "loading" ? (
+      {/* Receipt form */}
+      {detailStatus === "loading" && (
+        <Card title="Loading…" subtitle="Fetching PO detail">
           <div className="table-state">
             <strong>Loading purchase order</strong>
             <p>Preparing lines for receipt entry.</p>
           </div>
-        ) : null}
+        </Card>
+      )}
 
-        {detailState.status === "error" ? (
+      {detailStatus === "error" && (
+        <Card title="Error" subtitle="Unable to load">
           <div className="table-state error">
             <strong>Unable to load purchase order</strong>
-            <p>{detailState.error}</p>
-            <div className="table-state-actions">
-              <Button variant="secondary" onClick={() => setDetailRequestKey((current) => current + 1)}>
-                Try Again
-              </Button>
-            </div>
+            <p>{detailError}</p>
           </div>
-        ) : null}
+        </Card>
+      )}
 
-        {detailState.status === "success" ? (
-          <form className="receive-form" onSubmit={handleSubmit}>
-            <section className="po-detail-grid">
-              <div className="po-summary">
-                <p className="eyebrow">Receiving Against</p>
-                <h3>{detailState.data.order.order_number}</h3>
-                <p className="po-summary-copy">
-                  {detailState.data.order.supplier_name} · Ordered {formatDate(detailState.data.order.ordered_at)} ·
-                  Expected {formatDate(detailState.data.order.expected_at)}
-                </p>
-                <dl className="po-line-metrics">
-                  <div>
-                    <dt>Status</dt>
-                    <dd>{formatLabel(detailState.data.order.status)}</dd>
-                  </div>
-                  <div>
-                    <dt>Total ordered</dt>
-                    <dd>{formatNumber(detailState.data.order.total_ordered)}</dd>
-                  </div>
-                  <div>
-                    <dt>Previously received</dt>
-                    <dd>{formatNumber(detailState.data.order.total_received)}</dd>
-                  </div>
-                  <div>
-                    <dt>Remaining</dt>
-                    <dd>{formatNumber(detailState.data.order.total_remaining)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div className="form-grid tight">
-                <label className="field">
-                  <span>Delivery number</span>
-                  <input
-                    value={formState.deliveryNumber}
-                    onChange={(event) => handleHeaderField("deliveryNumber", event.target.value)}
-                    placeholder="DN-001"
-                  />
-                </label>
-                <label className="field">
-                  <span>Received by</span>
-                  <input
-                    value={formState.receivedBy}
-                    onChange={(event) => handleHeaderField("receivedBy", event.target.value)}
-                    placeholder="Warehouse Team"
-                  />
-                </label>
-              </div>
-            </section>
-
-            {validationMessage ? (
-              <div className="notice error">
-                <strong>Validation error</strong>
-                <p>{validationMessage}</p>
-              </div>
-            ) : null}
-
-            {successSummary ? (
-              <div className="notice success">
-                <strong>Receipt saved</strong>
-                <p>
-                  {successSummary.deliveryNumber} booked as {successSummary.receiptNumber}. Purchase
-                  order is now {formatLabel(successSummary.status)} and stock is available in{" "}
-                  {successSummary.holdingLocation}.
-                </p>
-              </div>
-            ) : null}
-
-            <div className="receive-line-list">
-              {liveLineSummary.map((line) => (
-                <article key={line.id} className="receive-line-card">
-                  <div className="po-line-card-header">
-                    <div>
-                      <strong>
-                        {line.sku} · {line.product_name}
-                      </strong>
-                      <p>{line.is_serial_tracked ? "Serial tracked" : "Quantity tracked"}</p>
-                    </div>
-                    <span className="pill subtle">{formatLabel(line.quantity_remaining > 0 ? "pending" : "complete")}</span>
-                  </div>
-
-                  <dl className="po-line-metrics">
-                    <div>
-                      <dt>Ordered</dt>
-                      <dd>{formatNumber(line.quantity_ordered)}</dd>
-                    </div>
-                    <div>
-                      <dt>Previously received</dt>
-                      <dd>{formatNumber(line.quantity_received)}</dd>
-                    </div>
-                    <div>
-                      <dt>Receiving now</dt>
-                      <dd>{formatNumber(line.quantity_now)}</dd>
-                    </div>
-                    <div>
-                      <dt>Remaining after receipt</dt>
-                      <dd>{formatNumber(line.quantity_after)}</dd>
-                    </div>
-                  </dl>
-
-                  <div className="form-grid tight">
-                    <label className="field">
-                      <span>Quantity received</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step={line.is_serial_tracked ? "1" : "0.01"}
-                        value={formState.lines[line.id]?.quantityReceived || ""}
-                        onChange={(event) => updateLine(line.id, "quantityReceived", event.target.value)}
-                        placeholder="0"
-                      />
-                    </label>
-
-                    {line.is_serial_tracked ? (
-                      <label className="field field-span-2">
-                        <span>Serial numbers</span>
-                        <textarea
-                          rows="4"
-                          value={formState.lines[line.id]?.serialText || ""}
-                          onChange={(event) => updateLine(line.id, "serialText", event.target.value)}
-                          placeholder="One serial per line or comma-separated"
-                        />
-                        <small>{line.serial_count} captured</small>
-                      </label>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="form-actions">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Saving Receipt..." : "Submit Receipt"}
-              </Button>
-            </div>
-
-            {successSummary ? (
-              <section>
-                <h4 className="section-title">Success Summary</h4>
-                <div className="receipt-history-list">
-                  {successSummary.lines.map((line) => (
-                    <article key={line.purchase_order_line_id} className="receipt-history-card">
-                      <strong>
-                        {line.sku} · {line.product_name}
-                      </strong>
-                      <p>
-                        Ordered {formatNumber(line.quantity_ordered)} · Previously received{" "}
-                        {formatNumber(line.previously_received)}
-                      </p>
-                      <small>
-                        Receiving now {formatNumber(line.quantity_received_now)} · Remaining{" "}
-                        {formatNumber(line.quantity_remaining_after_receipt)}
-                      </small>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            <section>
-              <h4 className="section-title">Recent Receipts</h4>
-              {detailState.data.receipts.length ? (
-                <div className="receipt-history-list">
-                  {detailState.data.receipts.map((receipt) => (
-                    <article key={receipt.id} className="receipt-history-card">
-                      <strong>{receipt.delivery_number || receipt.receipt_number}</strong>
-                      <p>
-                        {formatDateTime(receipt.received_at)} · {receipt.received_by}
-                      </p>
-                      <small>{formatNumber(receipt.total_received)} units received</small>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="table-state">
-                  <strong>No receipts yet</strong>
-                  <p>This purchase order has not been received before.</p>
-                </div>
-              )}
-            </section>
-          </form>
-        ) : null}
-
-        {detailState.status === "idle" ? (
+      {detailStatus === "idle" && (
+        <Card title="Receive Delivery" subtitle="Select a PO above">
           <div className="table-state">
             <strong>No purchase order selected</strong>
-            <p>Choose an order from the inbound queue to start receiving goods.</p>
+            <p>Choose an order from the queue to start booking a receipt.</p>
           </div>
-        ) : null}
-      </Card>
+        </Card>
+      )}
+
+      {detailStatus === "success" && detailData && (
+        <Card title="Receive Delivery" subtitle={detailData.poNumber}>
+          {/* PO summary */}
+          <div className="rg-po-summary">
+            <div className="rg-po-summary-left">
+              <p className="rg-eyebrow">Receiving against</p>
+              <h3 className="rg-po-number">{detailData.poNumber}</h3>
+              <p className="rg-po-meta">
+                {detailData.supplier} · Ordered {formatDate(detailData.orderDate)} ·
+                Expected {formatDate(detailData.expectedDeliveryDate)}
+              </p>
+            </div>
+            <div className="rg-po-summary-right">
+              <dl className="rg-po-metrics">
+                <div>
+                  <dt>Status</dt>
+                  <dd>{detailData.status}</dd>
+                </div>
+                <div>
+                  <dt>Ordered</dt>
+                  <dd>{formatNumber(detailData.totalOrderedQuantity)}</dd>
+                </div>
+                <div>
+                  <dt>Received</dt>
+                  <dd>{formatNumber(detailData.totalReceivedQuantity)}</dd>
+                </div>
+                <div>
+                  <dt>Remaining</dt>
+                  <dd>{formatNumber(detailData.totalOrderedQuantity - detailData.totalReceivedQuantity)}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+
+          {/* Success notice */}
+          {successSummary && (
+            <div className="rg-success-notice">
+              <div className="rg-success-icon">✓</div>
+              <div className="rg-success-body">
+                <strong>Receipt saved — {successSummary.receiptNumber}</strong>
+                <p>
+                  Delivery {successSummary.deliveryNumber} booked against {successSummary.purchaseOrderNumber}.
+                  Stock is now in <strong>{successSummary.holdingLocation}</strong>.
+                </p>
+                <div className="rg-success-actions">
+                  <button type="button" className="btn-sm btn-secondary" onClick={handleReceiveAnother}>
+                    Receive Another PO
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Validation error */}
+          {validationMsg && (
+            <div className="rg-validation-error">{validationMsg}</div>
+          )}
+
+          {/* Entry form */}
+          {!successSummary && (
+            <form className="rg-form" onSubmit={handleSubmit}>
+              <div className="rg-form-header">
+                <div className="rg-form-field">
+                  <label className="field-label" htmlFor="delivery-number">
+                    Delivery note number
+                  </label>
+                  <input
+                    id="delivery-number"
+                    className="text-input"
+                    value={deliveryNumber}
+                    onChange={(e) => setDeliveryNumber(e.target.value)}
+                    placeholder="DN-00123"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="rg-form-field">
+                  <label className="field-label" htmlFor="received-by">
+                    Received by
+                  </label>
+                  <input
+                    id="received-by"
+                    className="text-input"
+                    value={receivedBy}
+                    onChange={(e) => setReceivedBy(e.target.value)}
+                    placeholder="Warehouse team"
+                  />
+                </div>
+              </div>
+
+              <div className="rg-lines">
+                {liveSummary.map((line) => (
+                  <article key={line.id} className="rg-line-card">
+                    <div className="rg-line-header">
+                      <div>
+                        <strong className="rg-line-name">{line.productName}</strong>
+                        <span className="rg-line-sku">{line.productCode}</span>
+                      </div>
+                      <span className={`rg-line-badge ${line.remainingQuantity <= 0 ? "rg-line-badge--done" : ""}`}>
+                        {line.remainingQuantity <= 0 ? "Complete" : "Pending"}
+                      </span>
+                    </div>
+
+                    <dl className="rg-line-metrics">
+                      <div><dt>Ordered</dt><dd>{formatNumber(line.orderedQuantity)}</dd></div>
+                      <div><dt>Prev. received</dt><dd>{formatNumber(line.receivedQuantity)}</dd></div>
+                      <div><dt>Receiving now</dt><dd>{formatNumber(line.qtyNow)}</dd></div>
+                      <div><dt>Remaining after</dt><dd>{formatNumber(line.qtyAfter)}</dd></div>
+                    </dl>
+
+                    {line.remainingQuantity > 0 && (
+                      <div className="rg-line-inputs">
+                        <div className="rg-input-group">
+                          <label className="field-label" htmlFor={`qty-${line.id}`}>
+                            Quantity received
+                          </label>
+                          <input
+                            id={`qty-${line.id}`}
+                            className="text-input rg-qty-input"
+                            type="number"
+                            min="0"
+                            step={line.serialTrackingRequired ? "1" : "0.01"}
+                            max={line.remainingQuantity}
+                            value={lineInputs[line.id]?.qty || ""}
+                            onChange={(e) => updateLineField(line.id, "qty", e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+
+                        {line.serialTrackingRequired && (
+                          <div className="rg-input-group rg-input-group--serials">
+                            <label className="field-label" htmlFor={`serials-${line.id}`}>
+                              Serial numbers{" "}
+                              <span className="rg-serial-count">
+                                ({line.serialCount} captured)
+                              </span>
+                            </label>
+                            <textarea
+                              id={`serials-${line.id}`}
+                              className="text-input rg-serial-textarea"
+                              rows={4}
+                              value={lineInputs[line.id]?.serials || ""}
+                              onChange={(e) => updateLineField(line.id, "serials", e.target.value)}
+                              placeholder="One serial per line or comma-separated"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {line.remainingQuantity <= 0 && (
+                      <p className="rg-line-complete">All {formatNumber(line.orderedQuantity)} units received.</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+
+              <div className="rg-form-actions">
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Saving…" : "Submit Receipt"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
+
+      {/* Suggestions panel — shown after a successful receipt */}
+      {showSuggestions && successSummary && (
+        <SuggestionsPanel
+          poNumber={selectedPoNumber}
+          onNavigateToSO={handleNavigateToSO}
+        />
+      )}
     </div>
   );
 }

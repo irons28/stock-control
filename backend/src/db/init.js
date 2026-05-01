@@ -373,6 +373,10 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("stock_items", "scrapped_reason TEXT NOT NULL DEFAULT ''");
   await addColumnIfMissing("goods_receipts", "delivery_number TEXT DEFAULT ''");
   await addColumnIfMissing("goods_receipt_lines", "serial_numbers_json TEXT DEFAULT '[]'");
+
+  // Priority and customer reference on sales orders
+  await addColumnIfMissing("sales_orders", "priority TEXT NOT NULL DEFAULT 'normal'");
+  await addColumnIfMissing("sales_orders", "customer_reference TEXT DEFAULT ''");
 }
 
 async function seedReferenceData() {

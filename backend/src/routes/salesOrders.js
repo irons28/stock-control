@@ -83,6 +83,7 @@ async function fetchSalesOrderRow(orderNumber) {
         so.notes,
         so.created_at,
         so.updated_at,
+        COALESCE(so.priority, 'normal') AS priority,
         c.code AS customer_code,
         c.name AS customer_name
       FROM sales_orders so
@@ -327,6 +328,7 @@ async function getSalesOrderPayload(orderNumber) {
       notes: order.notes,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
+      priority: order.priority || "normal",
       allocationStatus: summary.allocationStatus,
       status: order.status,
       summary,
@@ -756,10 +758,14 @@ router.get("/", async (req, res, next) => {
           so.dispatch_due_at,
           so.created_at,
           so.updated_at,
+          COALESCE(so.priority, 'normal') AS priority,
           c.name AS customer_name
         FROM sales_orders so
         JOIN customers c ON c.id = so.customer_id
-        ORDER BY datetime(so.dispatch_due_at) ASC, so.order_number ASC
+        ORDER BY
+          CASE COALESCE(so.priority, 'normal') WHEN 'urgent' THEN 0 ELSE 1 END ASC,
+          datetime(so.dispatch_due_at) ASC,
+          so.order_number ASC
       `,
     );
 
@@ -782,6 +788,7 @@ router.get("/", async (req, res, next) => {
         orderNumber: order.order_number,
         customerName: order.customer_name,
         status: order.status,
+        priority: order.priority || "normal",
         requestedAt: order.requested_at,
         dispatchDueAt: order.dispatch_due_at,
         createdAt: order.created_at,
