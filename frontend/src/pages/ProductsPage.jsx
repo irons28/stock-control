@@ -11,6 +11,16 @@ const columns = [
   { key: "name", header: "Product" },
   { key: "category", header: "Category" },
   {
+    key: "supplier_name",
+    header: "Supplier",
+    render: (row) =>
+      row.supplier_name ? (
+        <span>{row.supplier_name}</span>
+      ) : (
+        <span className="text-muted">—</span>
+      ),
+  },
+  {
     key: "tracking_mode",
     header: "Tracking",
     render: (row) => <span className="pill neutral">{formatLabel(row.tracking_mode)}</span>,

@@ -381,12 +381,10 @@ function ReceiveGoodsPage({ onNavigate }) {
   }
 
   function handleNavigateToSO(soNumber) {
-    if (typeof onNavigate === "function") {
-      onNavigate("/sales-orders");
-    } else {
-      window.history.pushState({}, "", "/sales-orders");
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    }
+    // Use direct pushState so we can include ?so= without App.jsx stripping it
+    const path = `/sales-orders${soNumber ? `?so=${encodeURIComponent(soNumber)}` : ""}`;
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
   function handleReceiveAnother() {
@@ -537,13 +535,27 @@ function ReceiveGoodsPage({ onNavigate }) {
             <div className="rg-validation-error">{validationMsg}</div>
           )}
 
+          {/* Fully-received banner — replaces the form */}
+          {!successSummary && liveSummary.length > 0 && liveSummary.every((l) => l.remainingQuantity <= 0) && (
+            <div className="rg-fully-received">
+              <div className="rg-fully-received-icon">✓</div>
+              <div className="rg-fully-received-body">
+                <strong>Purchase order fully received</strong>
+                <p>
+                  All {formatNumber(detailData.totalOrderedQuantity)} units ordered on{" "}
+                  {detailData.poNumber} have been received. No further receipt is needed.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Entry form */}
-          {!successSummary && (
+          {!successSummary && liveSummary.some((l) => l.remainingQuantity > 0) && (
             <form className="rg-form" onSubmit={handleSubmit}>
               <div className="rg-form-header">
                 <div className="rg-form-field">
                   <label className="field-label" htmlFor="delivery-number">
-                    Delivery note number
+                    Delivery note number <span className="field-required">*</span>
                   </label>
                   <input
                     id="delivery-number"
@@ -556,7 +568,7 @@ function ReceiveGoodsPage({ onNavigate }) {
                 </div>
                 <div className="rg-form-field">
                   <label className="field-label" htmlFor="received-by">
-                    Received by
+                    Received by <span className="field-required">*</span>
                   </label>
                   <input
                     id="received-by"
@@ -577,14 +589,14 @@ function ReceiveGoodsPage({ onNavigate }) {
                         <span className="rg-line-sku">{line.productCode}</span>
                       </div>
                       <span className={`rg-line-badge ${line.remainingQuantity <= 0 ? "rg-line-badge--done" : ""}`}>
-                        {line.remainingQuantity <= 0 ? "Complete" : "Pending"}
+                        {line.remainingQuantity <= 0 ? "Complete" : `${formatNumber(line.remainingQuantity)} to receive`}
                       </span>
                     </div>
 
                     <dl className="rg-line-metrics">
                       <div><dt>Ordered</dt><dd>{formatNumber(line.orderedQuantity)}</dd></div>
-                      <div><dt>Prev. received</dt><dd>{formatNumber(line.receivedQuantity)}</dd></div>
-                      <div><dt>Receiving now</dt><dd>{formatNumber(line.qtyNow)}</dd></div>
+                      <div><dt>Previously received</dt><dd>{formatNumber(line.receivedQuantity)}</dd></div>
+                      <div><dt>Receiving now</dt><dd className={line.qtyNow > 0 ? "rg-metric-active" : ""}>{formatNumber(line.qtyNow)}</dd></div>
                       <div><dt>Remaining after</dt><dd>{formatNumber(line.qtyAfter)}</dd></div>
                     </dl>
 
@@ -610,26 +622,37 @@ function ReceiveGoodsPage({ onNavigate }) {
                         {line.serialTrackingRequired && (
                           <div className="rg-input-group rg-input-group--serials">
                             <label className="field-label" htmlFor={`serials-${line.id}`}>
-                              Serial numbers{" "}
-                              <span className="rg-serial-count">
-                                ({line.serialCount} captured)
-                              </span>
+                              Serial numbers
+                              {line.qtyNow > 0 && (
+                                <span className={`rg-serial-count ${line.serialCount === line.qtyNow ? "rg-serial-count--ok" : line.serialCount > 0 ? "rg-serial-count--warn" : ""}`}>
+                                  {" "}({line.serialCount} of {line.qtyNow} entered)
+                                </span>
+                              )}
                             </label>
                             <textarea
                               id={`serials-${line.id}`}
                               className="text-input rg-serial-textarea"
-                              rows={4}
+                              rows={Math.max(3, Math.min(8, line.qtyNow || 3))}
                               value={lineInputs[line.id]?.serials || ""}
                               onChange={(e) => updateLineField(line.id, "serials", e.target.value)}
-                              placeholder="One serial per line or comma-separated"
+                              placeholder={`Scan or type ${line.qtyNow > 0 ? line.qtyNow : "each"} serial number — one per line or comma-separated`}
                             />
+                            {line.qtyNow > 0 && line.serialCount !== line.qtyNow && line.serialCount > 0 && (
+                              <p className="rg-serial-mismatch">
+                                {line.serialCount > line.qtyNow
+                                  ? `${line.serialCount} serials entered but only ${line.qtyNow} needed — remove ${line.serialCount - line.qtyNow}`
+                                  : `${line.qtyNow - line.serialCount} more serial${line.qtyNow - line.serialCount !== 1 ? "s" : ""} needed`}
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
                     )}
 
                     {line.remainingQuantity <= 0 && (
-                      <p className="rg-line-complete">All {formatNumber(line.orderedQuantity)} units received.</p>
+                      <p className="rg-line-complete">
+                        ✓ All {formatNumber(line.orderedQuantity)} units received.
+                      </p>
                     )}
                   </article>
                 ))}
@@ -637,8 +660,11 @@ function ReceiveGoodsPage({ onNavigate }) {
 
               <div className="rg-form-actions">
                 <Button type="submit" disabled={submitting}>
-                  {submitting ? "Saving…" : "Submit Receipt"}
+                  {submitting ? "Saving receipt…" : "Book Receipt"}
                 </Button>
+                <p className="rg-form-hint">
+                  Only lines with a quantity entered will be booked.
+                </p>
               </div>
             </form>
           )}

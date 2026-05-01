@@ -817,11 +817,17 @@ router.get("/:soNumber", async (req, res, next) => {
 
 router.post("/:soNumber/allocate", async (req, res, next) => {
   try {
-    const allocatedBy = String(req.body?.allocatedBy || "").trim() || "System";
+    const allocatedBy =
+      String(req.body?.allocatedBy || req.user?.full_name || "").trim() || "System";
     const payload = await allocateSalesOrder(
       req.params.soNumber,
       Array.isArray(req.body?.allocations) ? req.body.allocations : [],
-      { allocatedBy },
+      {
+        allocatedBy,
+        userId: req.user?.id ?? null,
+        userRole: req.user?.role ?? "system",
+        userName: req.user?.full_name ?? allocatedBy,
+      },
     );
 
     res.json(payload);
