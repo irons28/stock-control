@@ -387,7 +387,7 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
       `
         SELECT
           pol.id,
-          pol.product_id AS productId,
+          p.id AS productId,
           p.sku AS productCode,
           p.name AS productName,
           pol.quantity_ordered AS orderedQuantity,
@@ -478,6 +478,195 @@ router.post(
       next(error);
     }
   }
+);
+
+// ── Allocation suggestions ─────────────────────────────────────────────────────
+// Returns open SO demand that best matches stock received from a specific PO.
+// Suggestions are sorted by: linked PO first → urgent priority → oldest due date.
+// Nothing is allocated automatically — the user must confirm via the normal
+// allocate endpoint.
+
+function buildSuggestionReasons(row) {
+  const reasons = [];
+
+  if (Boolean(row.is_linked)) {
+    reasons.push("Linked to this purchase order");
+  }
+
+  if (row.priority === "urgent") {
+    reasons.push("Marked urgent");
+  }
+
+  if (row.dispatch_due_at) {
+    const daysUntil = (new Date(row.dispatch_due_at) - Date.now()) / 86_400_000;
+    if (daysUntil < 0) {
+      const overdueDays = Math.abs(Math.round(daysUntil));
+      reasons.push(`Dispatch overdue by ${overdueDays} day${overdueDays !== 1 ? "s" : ""}`);
+    } else if (daysUntil < 1) {
+      reasons.push("Dispatch due today");
+    } else if (daysUntil <= 3) {
+      const days = Math.ceil(daysUntil);
+      reasons.push(`Dispatch due in ${days} day${days !== 1 ? "s" : ""}`);
+    }
+  }
+
+  if (!reasons.length) {
+    reasons.push("Matching product");
+  }
+
+  return reasons;
+}
+
+router.get(
+  "/allocation/suggestions/:purchaseOrderNumber",
+  requireRole("admin", "warehouse", "dispatch", "purchasing"),
+  async (req, res, next) => {
+    try {
+      const { purchaseOrderNumber } = req.params;
+
+      // Find the PO
+      const po = await get(
+        `SELECT id, order_number FROM purchase_orders WHERE order_number = ? LIMIT 1`,
+        [purchaseOrderNumber],
+      );
+
+      if (!po) {
+        res.status(404).json({ error: `Purchase order ${purchaseOrderNumber} not found.` });
+        return;
+      }
+
+      // Find all stock from this PO that is available or recently received into hold.
+      // We include 'received' status so suggestions appear immediately after booking a receipt —
+      // the warehouse team can see open demand before putting stock away.
+      const stockRows = await all(
+        `
+          SELECT
+            si.id            AS stock_item_id,
+            si.product_id,
+            si.serial_number,
+            (si.quantity_on_hand - si.quantity_allocated) AS available_qty,
+            si.hold_status,
+            COALESCE(la.code, ls.code) AS location_code,
+            p.sku            AS product_sku,
+            p.name           AS product_name,
+            p.is_serial_tracked
+          FROM stock_items si
+          JOIN products p ON p.id = si.product_id
+          LEFT JOIN stock_locations la ON la.id = si.actual_location_id
+          LEFT JOIN stock_locations ls ON ls.id = si.stock_location_id
+          WHERE si.linked_purchase_order_id = ?
+            AND si.hold_status IN ('available', 'received')
+            AND (si.quantity_on_hand - si.quantity_allocated) > 0
+          ORDER BY p.name ASC, si.serial_number ASC
+        `,
+        [po.id],
+      );
+
+      if (!stockRows.length) {
+        res.json({ purchaseOrderNumber, suggestions: [] });
+        return;
+      }
+
+      // Group stock by product
+      const byProduct = new Map();
+      for (const row of stockRows) {
+        if (!byProduct.has(row.product_id)) {
+          byProduct.set(row.product_id, {
+            productId: row.product_id,
+            productSku: row.product_sku,
+            productName: row.product_name,
+            isSerialTracked: Boolean(row.is_serial_tracked),
+            availableStockItems: [],
+          });
+        }
+        byProduct.get(row.product_id).availableStockItems.push({
+          stockItemId: row.stock_item_id,
+          serialNumber: row.serial_number || null,
+          availableQty: Number(row.available_qty),
+          locationCode: row.location_code || null,
+          holdStatus: row.hold_status,
+          requiresPutaway: row.hold_status === "received",
+        });
+      }
+
+      const suggestions = [];
+
+      for (const [productId, productGroup] of byProduct) {
+        const totalAvailableQty = productGroup.availableStockItems.reduce(
+          (sum, item) => sum + item.availableQty,
+          0,
+        );
+
+        // Find open SO lines for this product, sorted by priority
+        const soRows = await all(
+          `
+            SELECT
+              sol.id            AS line_id,
+              sol.product_id,
+              (sol.quantity_ordered - sol.quantity_allocated) AS remaining_qty,
+              so.id             AS so_id,
+              so.order_number,
+              so.dispatch_due_at,
+              so.status,
+              COALESCE(so.priority, 'normal') AS priority,
+              c.name            AS customer_name,
+              c.id              AS customer_id,
+              CASE WHEN psl.id IS NOT NULL THEN 1 ELSE 0 END AS is_linked
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON so.id = sol.sales_order_id
+            JOIN customers c ON c.id = so.customer_id
+            LEFT JOIN purchase_sales_links psl
+              ON psl.sales_order_line_id = sol.id
+              AND psl.purchase_order_line_id IN (
+                SELECT id FROM purchase_order_lines WHERE purchase_order_id = ?
+              )
+            WHERE sol.product_id = ?
+              AND sol.quantity_ordered > sol.quantity_allocated
+              AND so.status NOT IN ('dispatched', 'cancelled')
+            GROUP BY sol.id, so.id
+            ORDER BY
+              is_linked DESC,
+              CASE COALESCE(so.priority, 'normal') WHEN 'urgent' THEN 0 ELSE 1 END ASC,
+              COALESCE(so.dispatch_due_at, '9999-12-31') ASC
+            LIMIT 10
+          `,
+          [po.id, productId],
+        );
+
+        if (!soRows.length) continue;
+
+        const matchedSalesOrders = soRows.map((row) => {
+          const remaining = Number(row.remaining_qty);
+          const isLinked = Boolean(row.is_linked);
+          return {
+            salesOrderNumber: row.order_number,
+            salesOrderLineId: row.line_id,
+            customerId: row.customer_id,
+            customerName: row.customer_name,
+            priority: row.priority || "normal",
+            dispatchDueAt: row.dispatch_due_at || null,
+            isLinked,
+            remainingQuantity: remaining,
+            canFullyFulfill: totalAvailableQty >= remaining,
+            reasons: buildSuggestionReasons(row),
+          };
+        });
+
+        const requiresPutaway = productGroup.availableStockItems.some((item) => item.requiresPutaway);
+
+        suggestions.push({
+          ...productGroup,
+          availableQuantity: totalAvailableQty,
+          requiresPutaway,
+          matchedSalesOrders,
+        });
+      }
+
+      res.json({ purchaseOrderNumber, suggestions });
+    } catch (error) {
+      next(error);
+    }
+  },
 );
 
 router.use("/serials", serialsRouter);

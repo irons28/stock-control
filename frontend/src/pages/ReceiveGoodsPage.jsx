@@ -7,7 +7,15 @@ import { useApiResource } from "../hooks/useApiResource";
 import { apiFetch } from "../lib/api";
 import { formatDate, formatLabel, formatNumber } from "../lib/formatters";
 
-// ── Serial chip input ────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function classifyDispatchDate(dateStr) {
+  if (!dateStr) return "none";
+  const daysUntil = (new Date(dateStr) - Date.now()) / 86_400_000;
+  if (daysUntil < 0) return "overdue";
+  if (daysUntil <= 3) return "soon";
+  return "ok";
+}
 
 function parseRawSerials(value) {
   return value
@@ -15,6 +23,8 @@ function parseRawSerials(value) {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+// ── Serial chip input ────────────────────────────────────────────────────────
 
 function SerialChipInput({ lineId, scanned, onAdd, onRemove }) {
   const [inputValue, setInputValue] = useState("");
@@ -181,6 +191,186 @@ function POSearchInput({ options, selectedPoNumber, onSelect }) {
   );
 }
 
+// ── Suggestion panel ──────────────────────────────────────────────────────────
+
+function ReasonTag({ text }) {
+  const cls = text.toLowerCase().includes("overdue")
+    ? "sug-reason-tag sug-reason-tag--overdue"
+    : text.toLowerCase().includes("urgent") || text.toLowerCase().includes("today")
+    ? "sug-reason-tag sug-reason-tag--urgent"
+    : text.toLowerCase().includes("linked")
+    ? "sug-reason-tag sug-reason-tag--linked"
+    : "sug-reason-tag sug-reason-tag--default";
+  return <span className={cls}>{text}</span>;
+}
+
+function SuggestionCard({ productName, productSku, isSerialTracked, availableQuantity, requiresPutaway, soMatch, onAllocate }) {
+  const dateCls = classifyDispatchDate(soMatch.dispatchDueAt);
+
+  return (
+    <article className="sug-card">
+      <div className="sug-card-header">
+        <div className="sug-card-product">
+          <span className="sug-product-name">{productName}</span>
+          <span className="sug-product-sku">{productSku}</span>
+        </div>
+        <div className="sug-card-meta">
+          {soMatch.isLinked && (
+            <span className="sug-linked-badge">🔗 Linked PO</span>
+          )}
+          {soMatch.priority === "urgent" && (
+            <span className="sug-urgent-badge">🔴 Urgent</span>
+          )}
+        </div>
+      </div>
+
+      <div className="sug-card-body">
+        <div className="sug-so-block">
+          <div className="sug-so-number">{soMatch.salesOrderNumber}</div>
+          <div className="sug-so-customer">{soMatch.customerName}</div>
+          {soMatch.dispatchDueAt && (
+            <div className={`sug-due-tag sug-due-tag--${dateCls}`}>
+              {dateCls === "overdue"
+                ? `Overdue · ${formatDate(soMatch.dispatchDueAt)}`
+                : `Due ${formatDate(soMatch.dispatchDueAt)}`}
+            </div>
+          )}
+        </div>
+
+        <div className="sug-stock-block">
+          <div className="sug-qty-row">
+            <div className="sug-qty-item">
+              <span className="sug-qty-label">Available</span>
+              <strong className="sug-qty-value">{formatNumber(availableQuantity)}</strong>
+            </div>
+            <div className="sug-qty-item">
+              <span className="sug-qty-label">Needed</span>
+              <strong className={`sug-qty-value ${soMatch.canFullyFulfill ? "sug-qty--ok" : "sug-qty--short"}`}>
+                {formatNumber(soMatch.remainingQuantity)}
+              </strong>
+            </div>
+          </div>
+          {!soMatch.canFullyFulfill && (
+            <p className="sug-short-warning">
+              Stock short by {formatNumber(soMatch.remainingQuantity - availableQuantity)}{" "}
+              {isSerialTracked ? "unit" : "pack"}
+              {soMatch.remainingQuantity - availableQuantity !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="sug-reasons">
+        {soMatch.reasons.map((r) => (
+          <ReasonTag key={r} text={r} />
+        ))}
+      </div>
+
+      {requiresPutaway && (
+        <p className="sug-putaway-notice">
+          ⚠ Stock is in hold — put away required before allocating
+        </p>
+      )}
+
+      <div className="sug-card-footer">
+        <button
+          type="button"
+          className="sug-allocate-btn"
+          onClick={() => onAllocate(soMatch.salesOrderNumber)}
+        >
+          Go to {soMatch.salesOrderNumber} to allocate →
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function SuggestionsPanel({ poNumber, onNavigateToSO }) {
+  const [status, setStatus] = useState("loading");
+  const [suggestions, setSuggestions] = useState([]);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+
+    async function load() {
+      try {
+        const data = await apiFetch(`/allocation/suggestions/${encodeURIComponent(poNumber)}`);
+        if (cancelledRef.current) return;
+        setSuggestions(data.suggestions || []);
+        setStatus("success");
+      } catch {
+        if (cancelledRef.current) return;
+        setStatus("error");
+      }
+    }
+
+    void load();
+    return () => { cancelledRef.current = true; };
+  }, [poNumber]);
+
+  if (status === "loading") {
+    return (
+      <div className="sug-panel">
+        <div className="sug-panel-header">
+          <h3 className="sug-panel-title">Checking for open demand…</h3>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return null; // silently skip
+  }
+
+  if (!suggestions.length) {
+    return (
+      <div className="sug-panel sug-panel--empty">
+        <div className="sug-panel-header">
+          <h3 className="sug-panel-title">No open demand found</h3>
+          <p className="sug-panel-sub">
+            No sales orders currently need the products received from this delivery.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Flatten to a list of (product, soMatch) cards, prioritised
+  const cards = [];
+  for (const group of suggestions) {
+    for (const soMatch of group.matchedSalesOrders) {
+      cards.push({ group, soMatch });
+    }
+  }
+
+  return (
+    <div className="sug-panel">
+      <div className="sug-panel-header">
+        <h3 className="sug-panel-title">Suggested Sales Order Allocations</h3>
+        <p className="sug-panel-sub">
+          The received stock matches open demand on the orders below. Review each suggestion and
+          confirm allocation — nothing is assigned automatically.
+        </p>
+      </div>
+      <div className="sug-cards-grid">
+        {cards.map(({ group, soMatch }) => (
+          <SuggestionCard
+            key={`${group.productId}-${soMatch.salesOrderNumber}`}
+            productName={group.productName}
+            productSku={group.productSku}
+            isSerialTracked={group.isSerialTracked}
+            availableQuantity={group.availableQuantity}
+            requiresPutaway={group.requiresPutaway}
+            soMatch={soMatch}
+            onAllocate={onNavigateToSO}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildInitialLineState(lines) {
@@ -221,16 +411,31 @@ function ReceiveGoodsPage({ onNavigate }) {
     lines: {},
   });
   const [validationMessage, setValidationMessage] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [successSummary, setSuccessSummary] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const purchaseOrderOptions = purchaseOrders.data?.items || [];
+  const poOptions = purchaseOrders.data?.items || [];
+
+  // Auto-select first PO on load
+  useEffect(() => {
+    if (!poOptions.length || selectedPoNumber) return;
+    setSelectedPoNumber(poOptions[0].poNumber || poOptions[0].order_number || "");
+  }, [poOptions, selectedPoNumber]);
+
+  // Pre-fill receivedBy from current user
+  useEffect(() => {
+    if (currentUser?.full_name && !formState.receivedBy) {
+      setFormState((prev) => ({ ...prev, receivedBy: currentUser.full_name }));
+    }
+  }, [currentUser]);
 
   // Load PO detail when selection changes
   useEffect(() => {
     let cancelled = false;
 
-    async function loadDetail() {
+    async function load() {
       if (!selectedPoNumber) {
         setDetailState({ status: "idle", data: null, error: "" });
         return;
@@ -261,7 +466,7 @@ function ReceiveGoodsPage({ onNavigate }) {
       }
     }
 
-    void loadDetail();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -348,13 +553,23 @@ function ReceiveGoodsPage({ onNavigate }) {
     setFormState((prev) => ({ ...prev, [field]: value }));
   }
 
+  function handleNavigateToSO(soNumber) {
+    if (typeof onNavigate === "function") {
+      onNavigate(`/sales-orders?so=${encodeURIComponent(soNumber)}`);
+    } else {
+      window.history.pushState({}, "", `/sales-orders?so=${encodeURIComponent(soNumber)}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setValidationMessage("");
     setSuccessSummary(null);
+    setShowSuggestions(false);
 
     if (!selectedPoNumber) {
-      setValidationMessage("Select a purchase order before receiving goods.");
+      setValidationMessage("Select a purchase order first.");
       return;
     }
     if (!formState.deliveryNumber.trim()) {
@@ -396,6 +611,7 @@ function ReceiveGoodsPage({ onNavigate }) {
       );
 
       setSuccessSummary(payload);
+      setShowSuggestions(true);
       purchaseOrders.reload();
     } catch (error) {
       setValidationMessage(error.message || "Unable to receive goods.");
@@ -406,6 +622,7 @@ function ReceiveGoodsPage({ onNavigate }) {
 
   function handleReceiveAnother() {
     setSuccessSummary(null);
+    setShowSuggestions(false);
     setSelectedPoNumber("");
     setFormState({
       deliveryNumber: "",
@@ -472,6 +689,13 @@ function ReceiveGoodsPage({ onNavigate }) {
           ))}
         </div>
 
+        {showSuggestions && (
+          <SuggestionsPanel
+            poNumber={selectedPoNumber}
+            onNavigateToSO={handleNavigateToSO}
+          />
+        )}
+
         <div className="receive-success-actions">
           {onNavigate && (
             <Button onClick={() => onNavigate("/stock")}>View Stock</Button>
@@ -493,7 +717,7 @@ function ReceiveGoodsPage({ onNavigate }) {
       <PageHeader
         eyebrow="Goods In"
         title="Receive Goods"
-        description="Book partial or full deliveries against open purchase orders, capture serial numbers, and make stock immediately available."
+        description="Book deliveries against open purchase orders, capture serials, and see which sales orders can be fulfilled immediately."
         actions={
           <Button variant="secondary" onClick={purchaseOrders.reload}>
             Refresh Orders
@@ -510,14 +734,14 @@ function ReceiveGoodsPage({ onNavigate }) {
         ) : (
           <div className="receive-po-search-block">
             <POSearchInput
-              options={purchaseOrderOptions}
+              options={poOptions}
               selectedPoNumber={selectedPoNumber}
               onSelect={handlePoSelect}
             />
-            {purchaseOrderOptions.length > 0 && (
+            {poOptions.length > 0 && (
               <small className="receive-po-count">
                 {
-                  purchaseOrderOptions.filter(
+                  poOptions.filter(
                     (po) =>
                       !String(po.status || "").toLowerCase().includes("fully")
                   ).length

@@ -54,6 +54,11 @@ function AllocationStatusPill({ allocationStatus }) {
   return <span className={cls}>{allocationStatus}</span>;
 }
 
+function PriorityBadge({ priority }) {
+  if (!priority || priority === "normal") return null;
+  return <span className="so-priority-badge so-priority-badge--urgent">🔴 Urgent</span>;
+}
+
 function DispatchTag({ dateStr }) {
   const cls = classifyDispatchDate(dateStr);
   if (!dateStr) return <span className="so-dispatch-tag so-dispatch-tag--none">No due date</span>;
@@ -297,6 +302,71 @@ function QuantityAllocator({ lineId, line, availableItems, quantityValue, onQuan
   );
 }
 
+// ── Quick-apply suggestion banner ─────────────────────────────────────────────
+
+function QuickApplyBanner({ line, availableItems, selectedSerialIds, onQuickApplySerials, onQuickApplyQty, quantityValue }) {
+  if (!availableItems.length || line.remainingQuantity <= 0) return null;
+
+  if (line.product.isSerialTracked) {
+    const unselected = availableItems.filter((item) => !selectedSerialIds.includes(item.stockItemId));
+    const needed = line.remainingQuantity - selectedSerialIds.length;
+    if (needed <= 0 || !unselected.length) return null;
+
+    // Group by PO for context
+    const poCounts = new Map();
+    for (const item of availableItems) {
+      const po = item.purchaseOrderNumber || "Unknown PO";
+      poCounts.set(po, (poCounts.get(po) || 0) + 1);
+    }
+    const poSummary = [...poCounts.entries()]
+      .map(([po, count]) => `${count} from ${po}`)
+      .join(", ");
+
+    return (
+      <div className="alloc-quick-apply-banner">
+        <div className="alloc-quick-apply-info">
+          <span className="alloc-quick-apply-label">Quick apply</span>
+          <span className="alloc-quick-apply-detail">{poSummary} — select all up to needed</span>
+        </div>
+        <button
+          type="button"
+          className="btn-xs btn-secondary"
+          onClick={() => onQuickApplySerials(line.id, unselected, needed)}
+        >
+          Select {Math.min(needed, unselected.length)} serial{Math.min(needed, unselected.length) !== 1 ? "s" : ""}
+        </button>
+      </div>
+    );
+  }
+
+  // Qty line
+  const totalAvail = availableItems.reduce((s, i) => s + i.availableQuantity, 0);
+  const suggestQty = Math.min(totalAvail, line.remainingQuantity);
+  const currentQty = parseFloat(quantityValue) || 0;
+  if (suggestQty <= 0 || currentQty >= suggestQty) return null;
+
+  const poNums = [...new Set(availableItems.map((i) => i.purchaseOrderNumber).filter(Boolean))];
+  const poHint = poNums.length ? `from ${poNums.slice(0, 2).join(", ")}` : "";
+
+  return (
+    <div className="alloc-quick-apply-banner">
+      <div className="alloc-quick-apply-info">
+        <span className="alloc-quick-apply-label">Quick apply</span>
+        <span className="alloc-quick-apply-detail">
+          {formatNumber(totalAvail)} available {poHint} — fill to needed
+        </span>
+      </div>
+      <button
+        type="button"
+        className="btn-xs btn-secondary"
+        onClick={() => onQuickApplyQty(line.id, String(suggestQty))}
+      >
+        Fill {fmtQty(suggestQty, line.product.unitOfMeasure)}
+      </button>
+    </div>
+  );
+}
+
 // ── Allocation line card ──────────────────────────────────────────────────────
 
 function AllocationLineCard({
@@ -308,6 +378,8 @@ function AllocationLineCard({
   onSerialAdd,
   onSerialRemove,
   onQuantityChange,
+  onQuickApplySerials,
+  onQuickApplyQty,
 }) {
   const availableItems = stock?.items || [];
   const selectedSerialIds = serialSelections[line.id] || [];
@@ -343,6 +415,17 @@ function AllocationLineCard({
           <LineProgressBar ordered={line.quantityOrdered} allocated={line.quantityAllocated} />
         </div>
       </div>
+
+      {!isFullyAllocated && stockStatus === "success" && availableItems.length > 0 && (
+        <QuickApplyBanner
+          line={line}
+          availableItems={availableItems}
+          selectedSerialIds={selectedSerialIds}
+          quantityValue={qtyValue}
+          onQuickApplySerials={onQuickApplySerials}
+          onQuickApplyQty={onQuickApplyQty}
+        />
+      )}
 
       {isFullyAllocated ? (
         <div className="alloc-line-done">
@@ -610,6 +693,20 @@ function SalesOrdersPage() {
     setQuantitySelections((prev) => ({ ...prev, [lineId]: value }));
   }
 
+  // Quick-apply: pre-select serials (up to `count` unselected items)
+  function handleQuickApplySerials(lineId, unselectedItems, count) {
+    const toAdd = unselectedItems.slice(0, count).map((item) => item.stockItemId);
+    setSerialSelections((prev) => ({
+      ...prev,
+      [lineId]: [...new Set([...(prev[lineId] || []), ...toAdd])],
+    }));
+  }
+
+  // Quick-apply: fill quantity
+  function handleQuickApplyQty(lineId, value) {
+    setQuantitySelections((prev) => ({ ...prev, [lineId]: value }));
+  }
+
   async function handleConfirm() {
     if (!orderDetail || submitStatus === "submitting") return;
 
@@ -726,7 +823,7 @@ function SalesOrdersPage() {
                     <button
                       key={order.orderNumber}
                       type="button"
-                      className={`so-queue-item ${isActive ? "so-queue-item--active" : ""}`}
+                      className={`so-queue-item ${isActive ? "so-queue-item--active" : ""} ${order.priority === "urgent" ? "so-queue-item--urgent" : ""}`}
                       onClick={() => handleSelectOrder(order.orderNumber)}
                     >
                       <div className="so-queue-item-top">
@@ -736,6 +833,7 @@ function SalesOrdersPage() {
                       <p className="so-queue-customer">{order.customerName}</p>
                       <div className="so-queue-item-bottom">
                         <DispatchTag dateStr={order.dispatchDueAt} />
+                        {order.priority === "urgent" && <PriorityBadge priority={order.priority} />}
                         {order.summary.quantityRemaining > 0 && (
                           <span className="so-remaining-badge">
                             {formatNumber(order.summary.quantityRemaining)} remaining
@@ -787,6 +885,7 @@ function SalesOrdersPage() {
                 </div>
                 <div className="alloc-order-header-right">
                   <AllocationStatusPill allocationStatus={orderDetail.order.summary.allocationStatus} />
+                  {orderDetail.order.priority === "urgent" && <PriorityBadge priority="urgent" />}
                   <DispatchTag dateStr={orderDetail.order.dispatchDueAt} />
                 </div>
               </div>
@@ -832,6 +931,8 @@ function SalesOrdersPage() {
                     onSerialAdd={handleSerialAdd}
                     onSerialRemove={handleSerialRemove}
                     onQuantityChange={handleQuantityChange}
+                    onQuickApplySerials={handleQuickApplySerials}
+                    onQuickApplyQty={handleQuickApplyQty}
                   />
                 ))}
               </div>

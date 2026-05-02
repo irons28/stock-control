@@ -41,7 +41,7 @@ const navigationItems = [
     key: "receive-goods",
     label: "Receive Goods",
     path: "/receive-goods",
-    description: "Book supplier deliveries and update inbound stock in real time.",
+    description: "Book deliveries against open purchase orders and get suggested SO allocations.",
   },
   {
     key: "sales-orders",
