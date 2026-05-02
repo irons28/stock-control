@@ -5,6 +5,7 @@ import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import NewPurchaseOrderPage from "./pages/NewPurchaseOrderPage";
 import ReceiveGoodsPage from "./pages/ReceiveGoodsPage";
 import SalesOrdersPage from "./pages/SalesOrdersPage";
+import NewSalesOrderPage from "./pages/NewSalesOrderPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import ProductsPage from "./pages/ProductsPage";
 import StockPage from "./pages/StockPage";
@@ -47,6 +48,12 @@ const navigationItems = [
     label: "Sales Orders",
     path: "/sales-orders",
     description: "Create customer orders, allocate stock, and dispatch goods.",
+  },
+  {
+    key: "new-sales-order",
+    label: "New Sales Order",
+    path: "/sales-orders/new",
+    description: "Create a customer order and allocate stock.",
   },
   {
     key: "suppliers",
@@ -98,108 +105,72 @@ const navigationItems = [
   },
 ];
 
-const routes = [
-  {
-    key: "dashboard",
-    path: "/",
-    navPath: "/",
-    component: DashboardPage,
-  },
-  {
-    key: "search",
-    path: "/search",
-    navPath: "/search",
-    component: SearchPage,
-  },
-  {
-    key: "purchase-order-create",
-    path: "/purchase-orders/new",
-    navPath: "/purchase-orders",
-    component: NewPurchaseOrderPage,
-  },
-  {
-    key: "purchase-orders",
-    path: "/purchase-orders",
-    navPath: "/purchase-orders",
-    component: PurchaseOrdersPage,
-  },
-  {
-    key: "receive-goods",
-    path: "/receive-goods",
-    navPath: "/receive-goods",
-    component: ReceiveGoodsPage,
-  },
-  {
-    key: "sales-orders",
-    path: "/sales-orders",
-    navPath: "/sales-orders",
-    component: SalesOrdersPage,
-  },
-  {
-    key: "suppliers",
-    path: "/suppliers",
-    navPath: "/suppliers",
-    component: SuppliersPage,
-  },
-  {
-    key: "products",
-    path: "/products",
-    navPath: "/products",
-    component: ProductsPage,
-  },
-  {
-    key: "stock",
-    path: "/stock",
-    navPath: "/stock",
-    component: StockPage,
-  },
-  {
-    key: "locations",
-    path: "/locations",
-    navPath: "/locations",
-    component: LocationsPage,
-  },
-  {
-    key: "serial-tracker",
-    path: "/serial-tracker",
-    navPath: "/serial-tracker",
-    component: SerialTrackerPage,
-  },
-  {
-    key: "returns",
-    path: "/returns",
-    navPath: "/returns",
-    component: ReturnsPage,
-  },
-  {
-    key: "exceptions",
-    path: "/exceptions",
-    navPath: "/exceptions",
-    component: ExceptionDashboardPage,
-  },
-  {
-    key: "audit-log",
-    path: "/audit-log",
-    navPath: "/audit-log",
-    component: AuditLogPage,
-  },
-];
+const pageComponents = {
+  dashboard: DashboardPage,
+  search: SearchPage,
+  "purchase-orders": PurchaseOrdersPage,
+  "purchase-order-create": NewPurchaseOrderPage,
+  "receive-goods": ReceiveGoodsPage,
+  "new-sales-order": NewSalesOrderPage,
+  "sales-orders": SalesOrdersPage,
+  suppliers: SuppliersPage,
+  products: ProductsPage,
+  stock: StockPage,
+  locations: LocationsPage,
+  "serial-tracker": SerialTrackerPage,
+  returns: ReturnsPage,
+  exceptions: ExceptionDashboardPage,
+  "audit-log": AuditLogPage,
+};
+
+// navPath lets sub-routes highlight their parent nav item in the sidebar
+const routeNavPaths = {
+  "new-sales-order": "/sales-orders",
+  "purchase-order-create": "/purchase-orders",
+};
+
+// Direct path-to-key for routes not in navigationItems
+const pathToKeyMap = {
+  "/purchase-orders/new": "purchase-order-create",
+};
 
 function getPathname(url) {
   return String(url || "/").split("?")[0] || "/";
 }
 
-function resolveRoute(pathname) {
-  return routes.find((route) => route.path === pathname) || routes[0];
+// navPath lets sub-routes highlight their parent nav item in the sidebar
+function getItemByPath(pathname) {
+  // Exact match first
+  const exact = navigationItems.find((item) => item.path === pathname);
+  if (exact) return exact;
+  // Prefix match for sub-routes (e.g. /sales-orders/new → sales-orders key)
+  const prefix = navigationItems.find(
+    (item) => item.path !== "/" && pathname.startsWith(item.path + "/")
+  );
+  if (prefix) {
+    // Return an item with the actual path so the correct page is resolved
+    const actual = navigationItems.find((item) => item.path === pathname);
+    return actual || prefix;
+  }
+  return navigationItems[0];
+}
+
+function resolveRouteKey(pathname) {
+  const exact = navigationItems.find((item) => item.path === pathname);
+  if (exact) return exact.key;
+  return pathToKeyMap[pathname] || null;
 }
 
 function App() {
   const [pathname, setPathname] = useState(() => window.location.pathname || "/");
   const [searchQuery, setSearchQuery] = useState("");
-  const currentRoute = resolveRoute(pathname);
-  const currentItem =
-    navigationItems.find((item) => item.path === currentRoute.navPath) || navigationItems[0];
-  const ActivePage = currentRoute.component || DashboardPage;
+  const routeKey = resolveRouteKey(pathname);
+  const currentItem = getItemByPath(pathname);
+  // For sidebar highlighting: use navPath override if available
+  const activeNavPath = routeKey && routeNavPaths[routeKey]
+    ? routeNavPaths[routeKey]
+    : currentItem.path;
+  const ActivePage = (routeKey ? pageComponents[routeKey] : null) || pageComponents[currentItem.key] || DashboardPage;
   const health = useApiResource("/health");
 
   useEffect(() => {
@@ -234,15 +205,17 @@ function App() {
   }
 
   // Build page-specific props
+  const effectiveKey = routeKey || currentItem.key;
   let pageProps = {};
-  if (currentRoute.key === "dashboard") {
+  if (effectiveKey === "dashboard") {
     pageProps = { health };
-  } else if (currentRoute.key === "search") {
+  } else if (effectiveKey === "search") {
     pageProps = { initialQuery: searchQuery, onNavigate: handleNavigate };
   } else if (
-    currentRoute.key === "purchase-orders" ||
-    currentRoute.key === "purchase-order-create" ||
-    currentRoute.key === "receive-goods"
+    effectiveKey === "new-sales-order" ||
+    effectiveKey === "purchase-orders" ||
+    effectiveKey === "purchase-order-create" ||
+    effectiveKey === "receive-goods"
   ) {
     pageProps = { onNavigate: handleNavigate };
   }
@@ -251,7 +224,7 @@ function App() {
     <UserProvider>
       <Layout
         navigationItems={navigationItems}
-        activePath={currentItem.path}
+        activePath={activeNavPath}
         onNavigate={handleNavigate}
         onSearch={handleSearch}
         health={health}
