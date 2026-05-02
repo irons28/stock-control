@@ -993,9 +993,22 @@ function ReceiveGoodsPage({ onNavigate }) {
                               onAdd={addSerials}
                               onRemove={removeSerial}
                             />
+                            {line.qtyNow > 0 && line.serialCount !== line.qtyNow && line.serialCount > 0 && (
+                              <p className="rg-serial-mismatch">
+                                {line.serialCount > line.qtyNow
+                                  ? `${line.serialCount} serials entered but only ${line.qtyNow} needed — remove ${line.serialCount - line.qtyNow}`
+                                  : `${line.qtyNow - line.serialCount} more serial${line.qtyNow - line.serialCount !== 1 ? "s" : ""} needed`}
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {line.remainingQuantity <= 0 && (
+                      <p className="rg-line-complete">
+                        ✓ All {formatNumber(line.orderedQuantity)} units received.
+                      </p>
                     )}
                   </article>
                 );

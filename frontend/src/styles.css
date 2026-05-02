@@ -5855,7 +5855,11 @@ textarea.form-control {
 
 .rg-form-actions {
   display: flex;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.5rem;
 }
 
 /* ── Suggestions panel ────────────────────────────────────────────────────────── */
@@ -6107,4 +6111,135 @@ textarea.form-control {
   border-radius: var(--radius-sm);
   padding: 0.35em 0.65em;
 }
+
+/* ── Phase 3 review & polish additions ─────────────────────────────────────── */
+
+/* Utility */
+.text-muted { color: var(--text-muted); }
+
+/* Required field asterisk */
+.field-required {
+  color: #c0392b;
+  font-weight: 700;
+  margin-left: 0.15em;
+}
+
+/* ── Receive Goods: fully-received banner ────────────────────────────────── */
+.rg-fully-received {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: rgba(45, 159, 107, 0.07);
+  border: 1.5px solid rgba(45, 159, 107, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.rg-fully-received-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: #2d9f6b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.rg-fully-received-body strong {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--navy-900);
+  margin-bottom: 0.25rem;
+}
+
+.rg-fully-received-body p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* ── Receive Goods: serial count feedback ────────────────────────────────── */
+.rg-serial-count {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.rg-serial-count--ok {
+  color: #1a6b3a;
+  font-weight: 700;
+}
+
+.rg-serial-count--warn {
+  color: #7a4a00;
+  font-weight: 700;
+}
+
+.rg-serial-mismatch {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #7a4a00;
+  background: rgba(212, 121, 26, 0.07);
+  border-radius: 6px;
+  padding: 0.3em 0.6em;
+}
+
+/* Active metric highlight */
+.rg-metric-active {
+  color: var(--navy-800);
+  font-weight: 700;
+}
+
+/* Form submit hint */
+.rg-form-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex: 1;
+  text-align: right;
+}
+
+/* ── Sales Orders: queue filter row ─────────────────────────────────────── */
+.so-queue-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+
+.so-queue-filter-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.so-filter-toggle {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--navy-700);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 0.2em 0.65em;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.so-filter-toggle:hover {
+  background: var(--sky-100);
+}
+
+.so-filter-toggle--active {
+  background: var(--sky-200);
+  border-color: var(--navy-700);
+}
+
 

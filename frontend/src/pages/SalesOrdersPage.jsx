@@ -547,7 +547,27 @@ function SalesOrdersPage() {
   const salesOrders = useApiResource("/sales-orders");
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  // Allow deep-linking from ReceiveGoodsPage suggestions via ?so= query param
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("so") || null;
+  });
+
+  // Clean ?so= from URL after we've captured it, so the back button works cleanly
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("so")) {
+      params.delete("so");
+      const qs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+      );
+    }
+  }, []);
   const [orderDetail, setOrderDetail] = useState(null);
   const [detailStatus, setDetailStatus] = useState("idle"); // idle | loading | success | error
   const [detailError, setDetailError] = useState("");
@@ -563,13 +583,20 @@ function SalesOrdersPage() {
 
   const filteredOrders = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return allOrders;
-    return allOrders.filter(
+    let orders = allOrders;
+
+    // By default hide dispatched and cancelled orders; toggle reveals them
+    if (!showCompleted) {
+      orders = orders.filter((o) => !["dispatched", "cancelled"].includes(o.status));
+    }
+
+    if (!q) return orders;
+    return orders.filter(
       (o) =>
         o.orderNumber.toLowerCase().includes(q) ||
         o.customerName.toLowerCase().includes(q),
     );
-  }, [allOrders, searchTerm]);
+  }, [allOrders, searchTerm, showCompleted]);
 
   // Auto-select first order when list loads
   useEffect(() => {
@@ -813,11 +840,30 @@ function SalesOrdersPage() {
           )}
           {salesOrders.status === "success" && (
             <div className="so-queue-list">
+              {/* Filter toggle */}
+              <div className="so-queue-filter-row">
+                <span className="so-queue-filter-count">
+                  {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+                </span>
+                <button
+                  type="button"
+                  className={`so-filter-toggle ${showCompleted ? "so-filter-toggle--active" : ""}`}
+                  onClick={() => setShowCompleted((v) => !v)}
+                >
+                  {showCompleted ? "Active only" : "Show completed"}
+                </button>
+              </div>
+
               {filteredOrders.length === 0 ? (
-                <div className="so-queue-state">No orders match your search.</div>
+                <div className="so-queue-state">
+                  {searchTerm
+                    ? `No orders match "${searchTerm}".`
+                    : showCompleted
+                    ? "No orders in the system."
+                    : "No active orders. Toggle to show completed orders."}
+                </div>
               ) : (
                 filteredOrders.map((order) => {
-                  const dateCls = classifyDispatchDate(order.dispatchDueAt);
                   const isActive = order.orderNumber === selectedOrderNumber;
                   return (
                     <button
@@ -828,7 +874,7 @@ function SalesOrdersPage() {
                     >
                       <div className="so-queue-item-top">
                         <span className="so-queue-number">{order.orderNumber}</span>
-                        <StatusPill status={order.status} />
+                        <AllocationStatusPill allocationStatus={order.summary.allocationStatus} />
                       </div>
                       <p className="so-queue-customer">{order.customerName}</p>
                       <div className="so-queue-item-bottom">

@@ -29,6 +29,12 @@ router.use(resolveUser);
 const resourceQueries = {
   customers: "SELECT * FROM customers ORDER BY name ASC",
   suppliers: "SELECT * FROM suppliers ORDER BY name ASC",
+  products: `
+    SELECT p.*, s.name AS supplier_name
+    FROM products p
+    LEFT JOIN suppliers s ON s.id = p.default_supplier_id
+    ORDER BY p.name ASC
+  `,
   "stock-locations": "SELECT * FROM stock_locations ORDER BY code ASC",
   "sales-orders": `
     SELECT so.*, c.name AS customer_name
