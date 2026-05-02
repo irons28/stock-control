@@ -206,7 +206,23 @@ async function fetchAvailableStockByProduct(productId) {
         stock_location.code AS stock_location_code,
         stock_location.name AS stock_location_name,
         actual_location.code AS actual_location_code,
-        actual_location.name AS actual_location_name
+        actual_location.name AS actual_location_name,
+        COALESCE(
+          (
+            SELECT sle.event_at
+            FROM serial_lifecycle_events sle
+            WHERE sle.stock_item_id = si.id AND sle.event_type = 'received'
+            LIMIT 1
+          ),
+          (
+            SELECT gr.received_at
+            FROM goods_receipt_lines grl
+            JOIN goods_receipts gr ON gr.id = grl.goods_receipt_id
+            WHERE grl.purchase_order_line_id = si.linked_purchase_order_line_id
+            ORDER BY gr.received_at ASC
+            LIMIT 1
+          )
+        ) AS received_at
       FROM stock_items si
       LEFT JOIN purchase_orders po ON po.id = si.linked_purchase_order_id
       LEFT JOIN stock_locations stock_location ON stock_location.id = si.stock_location_id
@@ -229,6 +245,7 @@ async function fetchAvailableStockByProduct(productId) {
     stockLocationName: item.stock_location_name,
     actualLocationCode: item.actual_location_code,
     actualLocationName: item.actual_location_name,
+    receivedAt: item.received_at || null,
   }));
 
   return {
@@ -247,29 +264,28 @@ async function fetchAvailableStockByProduct(productId) {
   };
 }
 
-async function writeActivityLog({
-  stockItemId,
-  serialNumber = "",
-  activityType,
-  summary,
-  referenceId,
-  payload,
-}) {
-  await run(
-    `
-      INSERT INTO activity_log (
-        stock_item_id, serial_number, activity_type, summary, reference_type, reference_id, payload_json
-      ) VALUES (?, ?, ?, ?, 'sales_order_allocation', ?, ?)
-    `,
-    [
-      stockItemId || null,
-      serialNumber || "",
-      activityType,
-      summary,
-      referenceId,
-      JSON.stringify(payload),
-    ],
-  );
+async function writeActivityLog({ userId, userRole, userName, actionType, entityType, entityRef, summary, details }) {
+  try {
+    await run(
+      `
+        INSERT INTO activity_log (
+          user_id, user_role, user_name, action_type, entity_type, entity_ref, summary, details_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        userId || null,
+        userRole || "system",
+        userName || "System",
+        actionType || "unknown",
+        entityType || "stock",
+        entityRef || "",
+        summary || "",
+        JSON.stringify(details || {}),
+      ],
+    );
+  } catch (_logError) {
+    // Activity log failures must not block the primary operation.
+  }
 }
 
 async function refreshSalesOrderStatus(salesOrderId) {
@@ -320,7 +336,14 @@ async function getSalesOrderPayload(orderNumber) {
   };
 }
 
-async function allocateSalesOrder(orderNumber, allocationsInput) {
+async function allocateSalesOrder(orderNumber, allocationsInput, context = {}) {
+  const {
+    allocatedBy = "System",
+    userId = null,
+    userRole = "system",
+    userName = "System",
+  } = context;
+
   return withTransaction(async () => {
     const order = await fetchSalesOrderRow(orderNumber);
 
@@ -459,16 +482,38 @@ async function allocateSalesOrder(orderNumber, allocationsInput) {
             ],
           );
 
+          // Record serial lifecycle event for the allocation.
+          await run(
+            `
+              INSERT INTO serial_lifecycle_events (
+                stock_item_id, serial_number, event_type, reference_type, reference_number,
+                customer_id, location_id, notes, event_by, event_at
+              ) VALUES (?, ?, 'allocated', 'sales_order', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `,
+            [
+              stockItemId,
+              stockItem.serial_number,
+              order.order_number,
+              order.customer_id,
+              stockItem.actual_location_id || stockItem.stock_location_id,
+              `Allocated to ${order.order_number} for ${order.customer_name}`,
+              allocatedBy,
+            ],
+          );
+
           await writeActivityLog({
-            stockItemId,
-            serialNumber: stockItem.serial_number,
-            activityType: "serial_allocated",
+            userId,
+            userRole,
+            userName,
+            actionType: "serial_allocated",
+            entityType: "stock_item",
+            entityRef: String(stockItemId),
             summary: `Allocated serial ${stockItem.serial_number} to ${order.order_number}`,
-            referenceId: line.id,
-            payload: {
+            details: {
               salesOrderNumber: order.order_number,
               salesOrderLineId: line.id,
               customerName: order.customer_name,
+              serialNumber: stockItem.serial_number,
             },
           });
 
@@ -650,11 +695,14 @@ async function allocateSalesOrder(orderNumber, allocationsInput) {
         );
 
         await writeActivityLog({
-          stockItemId: allocationRecord.id,
-          activityType: "quantity_allocated",
-          summary: `Allocated ${entry.quantity} ${line.unit_of_measure} of ${line.product_name} to ${order.order_number}`,
-          referenceId: line.id,
-          payload: {
+          userId,
+          userRole,
+          userName,
+          actionType: "quantity_allocated",
+          entityType: "stock_item",
+          entityRef: String(allocationRecord.id),
+          summary: `Allocated ${entry.quantity} ${line.unit_of_measure || "units"} of ${line.product_name} to ${order.order_number}`,
+          details: {
             salesOrderNumber: order.order_number,
             salesOrderLineId: line.id,
             sourceStockItemId: entry.stockItemId,
@@ -901,9 +949,11 @@ router.get("/:soNumber", async (req, res, next) => {
 
 router.post("/:soNumber/allocate", async (req, res, next) => {
   try {
+    const allocatedBy = String(req.body?.allocatedBy || "").trim() || "System";
     const payload = await allocateSalesOrder(
       req.params.soNumber,
       Array.isArray(req.body?.allocations) ? req.body.allocations : [],
+      { allocatedBy },
     );
 
     res.json(payload);

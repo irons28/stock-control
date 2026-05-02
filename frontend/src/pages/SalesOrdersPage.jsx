@@ -1,322 +1,586 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
-import Card from "../components/Card";
 import PageHeader from "../components/PageHeader";
 import { useApiResource } from "../hooks/useApiResource";
 import { apiFetch } from "../lib/api";
-import { formatDate, formatLabel, formatNumber } from "../lib/formatters";
+import { formatDate, formatNumber } from "../lib/formatters";
+import { useUser } from "../context/UserContext";
 
-const BADGE_CLASS_BY_STATUS = {
-  "Awaiting Stock": "badge-awaiting",
-  "Part Allocated": "badge-partial",
-  "Fully Allocated": "badge-full",
-  "Ready to Dispatch": "badge-ready",
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function classifyDispatchDate(dateStr) {
+  if (!dateStr) return "none";
+  const daysUntil = (new Date(dateStr) - Date.now()) / 86_400_000;
+  if (daysUntil < 0) return "overdue";
+  if (daysUntil <= 3) return "soon";
+  return "ok";
+}
+
+function fmtQty(value, uom = "") {
+  const n = formatNumber(value);
+  return uom ? `${n} ${uom}` : n;
+}
+
+const STATUS_LABELS = {
+  awaiting_stock: "Awaiting Stock",
+  part_allocated: "Part Allocated",
+  fully_allocated: "Fully Allocated",
+  ready_to_dispatch: "Ready to Dispatch",
 };
 
-function StatusBadge({ value }) {
-  const className = BADGE_CLASS_BY_STATUS[value] || "";
-  return <span className={`pill status-pill ${className}`}>{value}</span>;
+function allocationLabel(status) {
+  return STATUS_LABELS[status] || status || "—";
 }
 
-function formatQuantity(value, unitOfMeasure = "") {
-  const formatted = formatNumber(value);
-  return unitOfMeasure ? `${formatted} ${unitOfMeasure}` : formatted;
+// ── Small presentational components ──────────────────────────────────────────
+
+function StatusPill({ status }) {
+  const cls = {
+    awaiting_stock: "so-pill so-pill--awaiting",
+    part_allocated: "so-pill so-pill--partial",
+    fully_allocated: "so-pill so-pill--full",
+    ready_to_dispatch: "so-pill so-pill--ready",
+  }[status] || "so-pill so-pill--awaiting";
+  return <span className={cls}>{allocationLabel(status)}</span>;
 }
 
-function toNumericMap(values = {}) {
-  return Object.entries(values).reduce((accumulator, [key, rawValue]) => {
-    const parsed = Number(rawValue);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      accumulator[key] = parsed;
+function AllocationStatusPill({ allocationStatus }) {
+  const cls = {
+    "Awaiting Stock": "so-pill so-pill--awaiting",
+    "Part Allocated": "so-pill so-pill--partial",
+    "Fully Allocated": "so-pill so-pill--full",
+    "Ready to Dispatch": "so-pill so-pill--ready",
+  }[allocationStatus] || "so-pill so-pill--awaiting";
+  return <span className={cls}>{allocationStatus}</span>;
+}
+
+function DispatchTag({ dateStr }) {
+  const cls = classifyDispatchDate(dateStr);
+  if (!dateStr) return <span className="so-dispatch-tag so-dispatch-tag--none">No due date</span>;
+  const label = cls === "overdue" ? `Overdue · ${formatDate(dateStr)}` : `Due ${formatDate(dateStr)}`;
+  return <span className={`so-dispatch-tag so-dispatch-tag--${cls}`}>{label}</span>;
+}
+
+function LineProgressBar({ ordered, allocated }) {
+  const pct = ordered > 0 ? Math.min(100, Math.round((allocated / ordered) * 100)) : 0;
+  const cls = pct >= 100 ? "full" : pct > 0 ? "partial" : "empty";
+  return (
+    <div className="alloc-progress-track" title={`${pct}% allocated`}>
+      <div className={`alloc-progress-fill alloc-progress-fill--${cls}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+// ── Serial chip input ─────────────────────────────────────────────────────────
+
+function SerialChipInput({ lineId, needed, availableItems, selectedIds, onAdd, onRemove }) {
+  const [inputValue, setInputValue] = useState("");
+  const [flashError, setFlashError] = useState("");
+  const inputRef = useRef(null);
+
+  // Build a lookup map from serial number (lowercased) → stock item
+  const serialMap = useMemo(() => {
+    const m = new Map();
+    for (const item of availableItems) {
+      if (item.serialNumber) {
+        m.set(item.serialNumber.toLowerCase(), item);
+      }
     }
-    return accumulator;
-  }, {});
+    return m;
+  }, [availableItems]);
+
+  // Items that are currently selected
+  const selectedItems = useMemo(
+    () => availableItems.filter((item) => selectedIds.includes(item.stockItemId)),
+    [availableItems, selectedIds],
+  );
+
+  function tryAdd(raw) {
+    const val = raw.trim();
+    if (!val) return;
+
+    const item = serialMap.get(val.toLowerCase());
+    if (!item) {
+      setFlashError(`Serial "${val}" not found in available stock`);
+      setTimeout(() => setFlashError(""), 3000);
+      return;
+    }
+
+    if (selectedIds.includes(item.stockItemId)) {
+      setFlashError(`Serial "${val}" already selected`);
+      setTimeout(() => setFlashError(""), 2000);
+      setInputValue("");
+      return;
+    }
+
+    onAdd(lineId, item.stockItemId);
+    setInputValue("");
+    setFlashError("");
+    inputRef.current?.focus();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      tryAdd(inputValue);
+    } else if (e.key === "Backspace" && !inputValue && selectedIds.length) {
+      onRemove(lineId, selectedIds[selectedIds.length - 1]);
+    }
+  }
+
+  const remaining = needed - selectedIds.length;
+
+  return (
+    <div className="alloc-serial-picker">
+      <div className="alloc-picker-header">
+        <span className="alloc-picker-label">Serial numbers</span>
+        <span className={`alloc-need-badge ${remaining > 0 ? "alloc-need-badge--open" : "alloc-need-badge--done"}`}>
+          {remaining > 0 ? `${selectedIds.length} of ${needed} selected` : `${needed} of ${needed} — complete`}
+        </span>
+      </div>
+
+      <div className="alloc-scanner-row">
+        <input
+          ref={inputRef}
+          className="text-input alloc-scanner-input"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Scan or type serial, then press Enter"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          className="btn-sm btn-secondary"
+          onClick={() => tryAdd(inputValue)}
+        >
+          Add
+        </button>
+      </div>
+
+      {flashError ? <p className="alloc-flash-error">{flashError}</p> : null}
+
+      {selectedItems.length > 0 && (
+        <div className="alloc-chip-row">
+          {selectedItems.map((item) => (
+            <span key={item.stockItemId} className="alloc-chip">
+              {item.serialNumber}
+              <button
+                type="button"
+                className="alloc-chip-remove"
+                aria-label={`Remove ${item.serialNumber}`}
+                onClick={() => onRemove(lineId, item.stockItemId)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {remaining > 0 && availableItems.length < needed && (
+        <div className="alloc-shortage-warning">
+          Only {availableItems.length} serial{availableItems.length !== 1 ? "s" : ""} available · {remaining} more needed
+        </div>
+      )}
+    </div>
+  );
 }
+
+// ── Available serial cards grid ───────────────────────────────────────────────
+
+function SerialStockGrid({ lineId, availableItems, selectedIds, onAdd, onRemove }) {
+  if (!availableItems.length) {
+    return (
+      <div className="alloc-empty-state">
+        <strong>No serials available</strong>
+        <p>This line is awaiting stock before it can be allocated.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="alloc-serials-grid">
+      {availableItems.map((item) => {
+        const isSelected = selectedIds.includes(item.stockItemId);
+        return (
+          <div key={item.stockItemId} className={`alloc-serial-card ${isSelected ? "alloc-serial-card--selected" : ""}`}>
+            <div className="alloc-serial-card-main">
+              <span className="alloc-serial-number">{item.serialNumber}</span>
+              <div className="alloc-serial-meta">
+                {item.actualLocationCode || item.stockLocationCode ? (
+                  <span className="alloc-meta-chip">
+                    {item.actualLocationCode || item.stockLocationCode}
+                  </span>
+                ) : null}
+                {item.purchaseOrderNumber ? (
+                  <span className="alloc-meta-chip">{item.purchaseOrderNumber}</span>
+                ) : null}
+                {item.receivedAt ? (
+                  <span className="alloc-meta-chip">Rcvd {formatDate(item.receivedAt)}</span>
+                ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              className={`btn-xs ${isSelected ? "btn-selected" : "btn-secondary"}`}
+              onClick={() =>
+                isSelected
+                  ? onRemove(lineId, item.stockItemId)
+                  : onAdd(lineId, item.stockItemId)
+              }
+            >
+              {isSelected ? "✓ Selected" : "Select"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Non-serial quantity allocator ─────────────────────────────────────────────
+
+function QuantityAllocator({ lineId, line, availableItems, quantityValue, onQuantityChange }) {
+  const totalAvailable = availableItems.reduce(
+    (sum, item) => sum + Number(item.availableQuantity || 0),
+    0,
+  );
+
+  const maxAlloc = Math.min(totalAvailable, line.remainingQuantity);
+  const parsedValue = parseFloat(quantityValue) || 0;
+  const hasShortage = totalAvailable < line.remainingQuantity;
+
+  if (!availableItems.length) {
+    return (
+      <div className="alloc-empty-state">
+        <strong>No stock available</strong>
+        <p>This line is awaiting stock before it can be allocated.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="alloc-qty-section">
+      <div className="alloc-qty-context">
+        <span className="alloc-qty-available">
+          {fmtQty(totalAvailable, line.product.unitOfMeasure)} available
+        </span>
+        {hasShortage && (
+          <span className="alloc-shortage-warning alloc-shortage-warning--inline">
+            Short by {fmtQty(line.remainingQuantity - totalAvailable, line.product.unitOfMeasure)}
+          </span>
+        )}
+      </div>
+
+      <div className="alloc-qty-row">
+        <input
+          id={`qty-${lineId}`}
+          className="text-input alloc-qty-input"
+          type="number"
+          min="0"
+          step="1"
+          max={maxAlloc}
+          value={quantityValue}
+          onChange={(e) => onQuantityChange(lineId, e.target.value)}
+          placeholder="0"
+        />
+        <label className="alloc-qty-label" htmlFor={`qty-${lineId}`}>
+          of {fmtQty(line.remainingQuantity, line.product.unitOfMeasure)} remaining
+        </label>
+        {parsedValue > maxAlloc && (
+          <span className="alloc-qty-over">Exceeds available</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Allocation line card ──────────────────────────────────────────────────────
+
+function AllocationLineCard({
+  line,
+  stock,
+  stockStatus,
+  serialSelections,
+  quantitySelections,
+  onSerialAdd,
+  onSerialRemove,
+  onQuantityChange,
+}) {
+  const availableItems = stock?.items || [];
+  const selectedSerialIds = serialSelections[line.id] || [];
+  const qtyValue = quantitySelections[line.id] || "";
+  const isFullyAllocated = line.remainingQuantity <= 0;
+
+  return (
+    <article className="alloc-line-card">
+      <div className="alloc-line-header">
+        <div className="alloc-line-title-block">
+          <h4 className="alloc-line-name">{line.product.name}</h4>
+          <span className="alloc-line-sku">{line.product.sku}</span>
+        </div>
+        <AllocationStatusPill allocationStatus={line.allocationStatus} />
+      </div>
+
+      <div className="alloc-line-metrics">
+        <div className="alloc-metric-item">
+          <span className="alloc-metric-label">Ordered</span>
+          <strong className="alloc-metric-value">{fmtQty(line.quantityOrdered, line.product.unitOfMeasure)}</strong>
+        </div>
+        <div className="alloc-metric-item">
+          <span className="alloc-metric-label">Allocated</span>
+          <strong className="alloc-metric-value alloc-metric-value--allocated">{fmtQty(line.quantityAllocated, line.product.unitOfMeasure)}</strong>
+        </div>
+        <div className="alloc-metric-item">
+          <span className="alloc-metric-label">Remaining</span>
+          <strong className={`alloc-metric-value ${line.remainingQuantity > 0 ? "alloc-metric-value--remaining" : "alloc-metric-value--done"}`}>
+            {fmtQty(line.remainingQuantity, line.product.unitOfMeasure)}
+          </strong>
+        </div>
+        <div className="alloc-metric-item alloc-metric-item--progress">
+          <LineProgressBar ordered={line.quantityOrdered} allocated={line.quantityAllocated} />
+        </div>
+      </div>
+
+      {isFullyAllocated ? (
+        <div className="alloc-line-done">
+          <span className="alloc-done-icon">✓</span> Fully allocated
+        </div>
+      ) : stockStatus === "loading" ? (
+        <div className="alloc-loading">Loading available stock…</div>
+      ) : stockStatus === "error" ? (
+        <div className="alloc-empty-state alloc-empty-state--error">
+          <strong>Unable to load stock</strong>
+          <p>Refresh the page to retry.</p>
+        </div>
+      ) : line.product.isSerialTracked ? (
+        <>
+          <SerialChipInput
+            lineId={line.id}
+            needed={line.remainingQuantity}
+            availableItems={availableItems}
+            selectedIds={selectedSerialIds}
+            onAdd={onSerialAdd}
+            onRemove={onSerialRemove}
+          />
+          <SerialStockGrid
+            lineId={line.id}
+            availableItems={availableItems}
+            selectedIds={selectedSerialIds}
+            onAdd={onSerialAdd}
+            onRemove={onSerialRemove}
+          />
+        </>
+      ) : (
+        <QuantityAllocator
+          lineId={line.id}
+          line={line}
+          availableItems={availableItems}
+          quantityValue={qtyValue}
+          onQuantityChange={onQuantityChange}
+        />
+      )}
+    </article>
+  );
+}
+
+// ── Dispatch celebration ──────────────────────────────────────────────────────
+
+function DispatchCelebration({ orderNumber, customerName, onAllocateAnother }) {
+  return (
+    <div className="dispatch-hero">
+      <div className="dispatch-hero-icon">🚚</div>
+      <h2 className="dispatch-hero-title">Ready to Dispatch</h2>
+      <p className="dispatch-hero-subtitle">
+        <strong>{orderNumber}</strong> for {customerName} is fully allocated and ready to go.
+      </p>
+      <div className="dispatch-hero-actions">
+        <button type="button" className="btn-primary dispatch-go-btn" onClick={onAllocateAnother}>
+          Allocate Another Order
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Allocation draft builder ──────────────────────────────────────────────────
 
 function buildAllocationDraft(orderDetail, stockByProduct, serialSelections, quantitySelections) {
-  if (!orderDetail) {
-    return {
-      allocations: [],
-      summaryItems: [],
-      errors: [],
-    };
-  }
+  if (!orderDetail) return { allocations: [], summaryItems: [], errors: [] };
 
   const allocations = [];
   const summaryItems = [];
   const errors = [];
-  const duplicateSerialTracker = new Set();
-  const quantityByStockItem = new Map();
 
   for (const line of orderDetail.lines) {
-    if (line.remainingQuantity <= 0) {
-      continue;
-    }
+    if (line.remainingQuantity <= 0) continue;
 
     const stock = stockByProduct[line.productId];
-    const availableItems = new Map((stock?.items || []).map((item) => [item.stockItemId, item]));
+    const availableById = new Map((stock?.items || []).map((item) => [item.stockItemId, item]));
 
     if (line.product.isSerialTracked) {
-      const selectedIds = (serialSelections[line.id] || []).map(Number).filter(Number.isFinite);
-      if (!selectedIds.length) {
+      const ids = (serialSelections[line.id] || []).map(Number).filter(Number.isFinite);
+      if (!ids.length) continue;
+      if (ids.length > line.remainingQuantity) {
+        errors.push(`${line.product.name}: selected more serials than remaining quantity.`);
+      }
+      const serials = ids.map((id) => availableById.get(id)?.serialNumber || `#${id}`);
+      allocations.push({ salesOrderLineId: line.id, serialStockItemIds: ids });
+      summaryItems.push({ lineId: line.id, productName: line.product.name, mode: "serial", quantity: ids.length, uom: line.product.unitOfMeasure, serials });
+    } else {
+      const rawQty = parseFloat(quantitySelections[line.id]) || 0;
+      if (rawQty <= 0) continue;
+      if (rawQty > line.remainingQuantity) {
+        errors.push(`${line.product.name}: quantity exceeds remaining.`);
+      }
+      const stockItems = stock?.items || [];
+      if (!stockItems.length) {
+        errors.push(`${line.product.name}: no available stock.`);
         continue;
       }
-
-      if (selectedIds.length > line.remainingQuantity) {
-        errors.push(`${line.product.name}: selected serials exceed the remaining quantity.`);
-      }
-
-      const serialNumbers = [];
-
-      for (const stockItemId of selectedIds) {
-        if (duplicateSerialTracker.has(stockItemId)) {
-          errors.push(`${line.product.name}: duplicate serial selection is not allowed.`);
-          continue;
-        }
-
-        duplicateSerialTracker.add(stockItemId);
-        const item = availableItems.get(stockItemId);
-
-        if (!item) {
-          errors.push(`${line.product.name}: one or more selected serials are no longer available.`);
-          continue;
-        }
-
-        serialNumbers.push(item.serialNumber || `Stock ${stockItemId}`);
-      }
-
+      // Allocate against the first available stock item (simplest strategy)
+      const firstItem = stockItems[0];
       allocations.push({
         salesOrderLineId: line.id,
-        serialStockItemIds: selectedIds,
+        quantityAllocations: [{ stockItemId: firstItem.stockItemId, quantity: rawQty }],
       });
-
-      summaryItems.push({
-        lineId: line.id,
-        productName: line.product.name,
-        mode: "serial",
-        quantity: selectedIds.length,
-        unitOfMeasure: line.product.unitOfMeasure,
-        serialNumbers,
-      });
-
-      continue;
+      summaryItems.push({ lineId: line.id, productName: line.product.name, mode: "quantity", quantity: rawQty, uom: line.product.unitOfMeasure });
     }
-
-    const quantityMap = toNumericMap(quantitySelections[line.id]);
-    const quantityAllocations = Object.entries(quantityMap).map(([stockItemId, quantity]) => ({
-      stockItemId: Number(stockItemId),
-      quantity,
-    }));
-
-    if (!quantityAllocations.length) {
-      continue;
-    }
-
-    let lineQuantity = 0;
-
-    for (const entry of quantityAllocations) {
-      const item = availableItems.get(entry.stockItemId);
-      if (!item) {
-        errors.push(`${line.product.name}: selected stock is no longer available.`);
-        continue;
-      }
-
-      const existingRequested = Number(quantityByStockItem.get(entry.stockItemId) || 0);
-      if (existingRequested + entry.quantity > Number(item.availableQuantity || 0)) {
-        errors.push(`${line.product.name}: insufficient stock for the requested quantity.`);
-      }
-
-      quantityByStockItem.set(entry.stockItemId, existingRequested + entry.quantity);
-      lineQuantity += entry.quantity;
-    }
-
-    if (lineQuantity > line.remainingQuantity) {
-      errors.push(`${line.product.name}: entered quantity exceeds the remaining quantity.`);
-    }
-
-    allocations.push({
-      salesOrderLineId: line.id,
-      quantityAllocations,
-    });
-
-    summaryItems.push({
-      lineId: line.id,
-      productName: line.product.name,
-      mode: "quantity",
-      quantity: lineQuantity,
-      unitOfMeasure: line.product.unitOfMeasure,
-    });
   }
 
   if (!allocations.length) {
-    errors.push("Add at least one allocation before confirming.");
+    errors.push("Select serials or enter quantities above before confirming.");
   }
 
-  return {
-    allocations,
-    summaryItems,
-    errors,
-  };
+  return { allocations, summaryItems, errors };
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 function SalesOrdersPage() {
+  const { currentUser } = useUser();
   const salesOrders = useApiResource("/sales-orders");
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedOrderNumber, setSelectedOrderNumber] = useState("");
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState(null);
   const [orderDetail, setOrderDetail] = useState(null);
-  const [detailStatus, setDetailStatus] = useState("idle");
+  const [detailStatus, setDetailStatus] = useState("idle"); // idle | loading | success | error
   const [detailError, setDetailError] = useState("");
   const [stockByProduct, setStockByProduct] = useState({});
   const [stockStatus, setStockStatus] = useState("idle");
-  const [stockError, setStockError] = useState("");
-  const [serialSelections, setSerialSelections] = useState({});
-  const [quantitySelections, setQuantitySelections] = useState({});
-  const [submitState, setSubmitState] = useState({
-    status: "idle",
-    error: "",
-    success: "",
-  });
+  const [serialSelections, setSerialSelections] = useState({});       // { lineId: [stockItemId, ...] }
+  const [quantitySelections, setQuantitySelections] = useState({});   // { lineId: "string" }
+  const [submitStatus, setSubmitStatus] = useState("idle"); // idle | submitting | success | error
+  const [submitError, setSubmitError] = useState("");
+  const [celebrateOrder, setCelebrateOrder] = useState(null);         // order payload when fully allocated
 
   const allOrders = salesOrders.data?.items || [];
-  const filteredOrders = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return allOrders;
-    }
 
-    return allOrders.filter((order) => {
-      return (
-        order.orderNumber.toLowerCase().includes(normalizedSearch) ||
-        order.customerName.toLowerCase().includes(normalizedSearch)
-      );
-    });
+  const filteredOrders = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return allOrders;
+    return allOrders.filter(
+      (o) =>
+        o.orderNumber.toLowerCase().includes(q) ||
+        o.customerName.toLowerCase().includes(q),
+    );
   }, [allOrders, searchTerm]);
 
+  // Auto-select first order when list loads
   useEffect(() => {
-    if (!filteredOrders.length) {
-      setSelectedOrderNumber("");
-      return;
-    }
-
-    const hasSelectedOrder = filteredOrders.some(
-      (order) => order.orderNumber === selectedOrderNumber,
-    );
-
-    if (!selectedOrderNumber || !hasSelectedOrder) {
+    if (!filteredOrders.length) return;
+    if (!selectedOrderNumber || !filteredOrders.find((o) => o.orderNumber === selectedOrderNumber)) {
       setSelectedOrderNumber(filteredOrders[0].orderNumber);
     }
   }, [filteredOrders, selectedOrderNumber]);
 
+  // Load order detail when selection changes
   useEffect(() => {
     let cancelled = false;
 
-    async function loadOrderDetail() {
+    async function load() {
       if (!selectedOrderNumber) {
         setOrderDetail(null);
+        setDetailStatus("idle");
         return;
       }
 
       setDetailStatus("loading");
       setDetailError("");
-      setSubmitState((current) => ({ ...current, error: "" }));
+      setCelebrateOrder(null);
 
       try {
         const detail = await apiFetch(`/sales-orders/${selectedOrderNumber}`);
-        if (cancelled) {
-          return;
-        }
-
+        if (cancelled) return;
         setOrderDetail(detail);
         setDetailStatus("success");
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
+      } catch (err) {
+        if (cancelled) return;
         setOrderDetail(null);
         setDetailStatus("error");
-        setDetailError(error.message || "Unable to load the selected sales order.");
+        setDetailError(err.message || "Unable to load order.");
       }
     }
 
-    void loadOrderDetail();
-
-    return () => {
-      cancelled = true;
-    };
+    void load();
+    return () => { cancelled = true; };
   }, [selectedOrderNumber]);
 
+  // Load available stock when order changes
   useEffect(() => {
     let cancelled = false;
 
-    async function loadAvailableStock() {
+    async function loadStock() {
       if (!orderDetail) {
         setStockByProduct({});
         return;
       }
 
-      const productIds = Array.from(
-        new Set(
+      const productIds = [
+        ...new Set(
           orderDetail.lines
-            .filter((line) => line.remainingQuantity > 0)
-            .map((line) => line.productId),
+            .filter((l) => l.remainingQuantity > 0)
+            .map((l) => l.productId),
         ),
-      );
+      ];
 
       if (!productIds.length) {
         setStockByProduct({});
         setStockStatus("success");
-        setStockError("");
         return;
       }
 
       setStockStatus("loading");
-      setStockError("");
 
       try {
-        const stockResponses = await Promise.all(
-          productIds.map((productId) =>
-            apiFetch(`/allocation/available-stock/${productId}`),
-          ),
+        const responses = await Promise.all(
+          productIds.map((id) => apiFetch(`/allocation/available-stock/${id}`)),
         );
-
-        if (cancelled) {
-          return;
-        }
-
-        const nextStockByProduct = stockResponses.reduce((accumulator, stockResponse) => {
-          accumulator[stockResponse.product.id] = stockResponse;
-          return accumulator;
-        }, {});
-
-        setStockByProduct(nextStockByProduct);
+        if (cancelled) return;
+        setStockByProduct(
+          responses.reduce((acc, r) => { acc[r.product.id] = r; return acc; }, {}),
+        );
         setStockStatus("success");
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
+      } catch (err) {
+        if (cancelled) return;
         setStockByProduct({});
         setStockStatus("error");
-        setStockError(error.message || "Unable to load available stock.");
       }
     }
 
-    void loadAvailableStock();
-
-    return () => {
-      cancelled = true;
-    };
+    void loadStock();
+    return () => { cancelled = true; };
   }, [orderDetail]);
 
+  // Clear selections when order changes
   useEffect(() => {
     setSerialSelections({});
     setQuantitySelections({});
-    setSubmitState({
-      status: "idle",
-      error: "",
-      success: "",
-    });
+    setSubmitStatus("idle");
+    setSubmitError("");
+    setCelebrateOrder(null);
   }, [selectedOrderNumber]);
 
   const allocationDraft = useMemo(
@@ -324,410 +588,291 @@ function SalesOrdersPage() {
     [orderDetail, stockByProduct, serialSelections, quantitySelections],
   );
 
-  async function refreshSelection(orderNumber) {
-    salesOrders.reload();
-    const detail = await apiFetch(`/sales-orders/${orderNumber}`);
-    setOrderDetail(detail);
-
-    const productIds = Array.from(
-      new Set(detail.lines.filter((line) => line.remainingQuantity > 0).map((line) => line.productId)),
-    );
-
-    const stockResponses = await Promise.all(
-      productIds.map((productId) => apiFetch(`/allocation/available-stock/${productId}`)),
-    );
-
-    setStockByProduct(
-      stockResponses.reduce((accumulator, stockResponse) => {
-        accumulator[stockResponse.product.id] = stockResponse;
-        return accumulator;
-      }, {}),
-    );
+  function handleSelectOrder(orderNumber) {
+    setSelectedOrderNumber(orderNumber);
   }
 
-  function handleSerialToggle(lineId, stockItemId, checked) {
-    setSerialSelections((current) => {
-      const existing = new Set(current[lineId] || []);
-      if (checked) {
-        existing.add(stockItemId);
-      } else {
-        existing.delete(stockItemId);
-      }
-
-      return {
-        ...current,
-        [lineId]: Array.from(existing),
-      };
-    });
-  }
-
-  function handleQuantityChange(lineId, stockItemId, value) {
-    setQuantitySelections((current) => ({
-      ...current,
-      [lineId]: {
-        ...(current[lineId] || {}),
-        [stockItemId]: value,
-      },
+  function handleSerialAdd(lineId, stockItemId) {
+    setSerialSelections((prev) => ({
+      ...prev,
+      [lineId]: [...(prev[lineId] || []), stockItemId],
     }));
   }
 
-  async function handleConfirmAllocation() {
-    if (!orderDetail) {
-      return;
-    }
+  function handleSerialRemove(lineId, stockItemId) {
+    setSerialSelections((prev) => ({
+      ...prev,
+      [lineId]: (prev[lineId] || []).filter((id) => id !== stockItemId),
+    }));
+  }
+
+  function handleQuantityChange(lineId, value) {
+    setQuantitySelections((prev) => ({ ...prev, [lineId]: value }));
+  }
+
+  async function handleConfirm() {
+    if (!orderDetail || submitStatus === "submitting") return;
 
     if (allocationDraft.errors.length) {
-      setSubmitState({
-        status: "error",
-        error: allocationDraft.errors[0],
-        success: "",
-      });
+      setSubmitError(allocationDraft.errors[0]);
       return;
     }
 
-    setSubmitState({
-      status: "submitting",
-      error: "",
-      success: "",
-    });
+    setSubmitStatus("submitting");
+    setSubmitError("");
 
     try {
-      const response = await apiFetch(`/sales-orders/${orderDetail.order.orderNumber}/allocate`, {
-        method: "POST",
-        body: {
-          allocations: allocationDraft.allocations,
+      const response = await apiFetch(
+        `/sales-orders/${orderDetail.order.orderNumber}/allocate`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            allocations: allocationDraft.allocations,
+            allocatedBy: currentUser?.full_name || "System",
+          }),
         },
-      });
+      );
 
-      setSerialSelections({});
-      setQuantitySelections({});
-      setSubmitState({
-        status: "success",
-        error: "",
-        success: response.message || "Allocation completed successfully.",
-      });
-      await refreshSelection(orderDetail.order.orderNumber);
-    } catch (error) {
-      setSubmitState({
-        status: "error",
-        error: error.message || "Unable to save allocation.",
-        success: "",
-      });
+      salesOrders.reload();
+
+      const isReady = response.order?.summary?.allocationStatus === "Ready to Dispatch";
+
+      if (isReady) {
+        setCelebrateOrder(response.order);
+        setSubmitStatus("success");
+      } else {
+        // Refresh and stay in the allocation view for more work
+        setOrderDetail({ order: response.order, lines: response.lines });
+        setSerialSelections({});
+        setQuantitySelections({});
+        setSubmitStatus("idle");
+
+        // Reload stock for remaining lines
+        const productIds = [
+          ...new Set(
+            response.lines
+              .filter((l) => l.remainingQuantity > 0)
+              .map((l) => l.productId),
+          ),
+        ];
+        if (productIds.length) {
+          const responses = await Promise.all(
+            productIds.map((id) => apiFetch(`/allocation/available-stock/${id}`)),
+          );
+          setStockByProduct(
+            responses.reduce((acc, r) => { acc[r.product.id] = r; return acc; }, {}),
+          );
+        } else {
+          setStockByProduct({});
+        }
+      }
+    } catch (err) {
+      setSubmitStatus("error");
+      setSubmitError(err.message || "Unable to save allocation.");
     }
   }
+
+  function handleAllocateAnother() {
+    setCelebrateOrder(null);
+    setSubmitStatus("idle");
+    setSelectedOrderNumber(null);
+    salesOrders.reload();
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="page-stack">
       <PageHeader
         eyebrow="Outbound"
         title="Sales Orders"
-        description="Search customer orders, review open demand, and allocate available stock with a single confirmation step."
+        description="Search customer orders, review open demand, and allocate available stock."
         actions={
           <Button variant="secondary" onClick={salesOrders.reload}>
-            Refresh Orders
+            Refresh
           </Button>
         }
       />
 
-      <div className="sales-order-layout">
-        <Card title="Order Queue" subtitle="Search">
-          <div className="sales-order-search">
-            <label className="field-label" htmlFor="sales-order-search">
-              Search by SO number or customer
-            </label>
+      <div className="so-layout">
+        {/* ── Left: order queue ──────────────────────────────────────────── */}
+        <aside className="so-queue">
+          <div className="so-queue-search">
             <input
-              id="sales-order-search"
-              className="text-input"
+              className="text-input so-search-input"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="SO-1001 or Alpha Veterinary"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search SO number or customer…"
             />
           </div>
 
-          {salesOrders.status === "loading" ? (
-            <div className="table-state">
-              <strong>Loading orders</strong>
-              <p>Fetching live sales orders from the API.</p>
+          {salesOrders.status === "loading" && (
+            <div className="so-queue-state">Loading orders…</div>
+          )}
+          {salesOrders.status === "error" && (
+            <div className="so-queue-state so-queue-state--error">
+              {salesOrders.error || "Unable to load orders."}
             </div>
-          ) : null}
-
-          {salesOrders.status === "error" ? (
-            <div className="table-state error">
-              <strong>Unable to load orders</strong>
-              <p>{salesOrders.error}</p>
-            </div>
-          ) : null}
-
-          {salesOrders.status === "success" ? (
-            <div className="order-list">
-              {filteredOrders.length ? (
-                filteredOrders.map((order) => (
-                  <button
-                    key={order.orderNumber}
-                    type="button"
-                    className={`order-list-item ${
-                      selectedOrderNumber === order.orderNumber ? "active" : ""
-                    }`}
-                    onClick={() => setSelectedOrderNumber(order.orderNumber)}
-                  >
-                    <div className="order-list-head">
-                      <strong>{order.orderNumber}</strong>
-                      <StatusBadge value={order.summary.allocationStatus} />
-                    </div>
-                    <p>{order.customerName}</p>
-                    <div className="order-list-meta">
-                      <span>Due {formatDate(order.dispatchDueAt)}</span>
-                      <span>{formatQuantity(order.summary.quantityRemaining)} remaining</span>
-                    </div>
-                  </button>
-                ))
+          )}
+          {salesOrders.status === "success" && (
+            <div className="so-queue-list">
+              {filteredOrders.length === 0 ? (
+                <div className="so-queue-state">No orders match your search.</div>
               ) : (
-                <div className="table-state">
-                  <strong>No matching sales orders</strong>
-                  <p>Try a different SO number or customer search.</p>
-                </div>
+                filteredOrders.map((order) => {
+                  const dateCls = classifyDispatchDate(order.dispatchDueAt);
+                  const isActive = order.orderNumber === selectedOrderNumber;
+                  return (
+                    <button
+                      key={order.orderNumber}
+                      type="button"
+                      className={`so-queue-item ${isActive ? "so-queue-item--active" : ""}`}
+                      onClick={() => handleSelectOrder(order.orderNumber)}
+                    >
+                      <div className="so-queue-item-top">
+                        <span className="so-queue-number">{order.orderNumber}</span>
+                        <StatusPill status={order.status} />
+                      </div>
+                      <p className="so-queue-customer">{order.customerName}</p>
+                      <div className="so-queue-item-bottom">
+                        <DispatchTag dateStr={order.dispatchDueAt} />
+                        {order.summary.quantityRemaining > 0 && (
+                          <span className="so-remaining-badge">
+                            {formatNumber(order.summary.quantityRemaining)} remaining
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </div>
-          ) : null}
-        </Card>
+          )}
+        </aside>
 
-        <div className="sales-order-detail-stack">
-          <Card title="Allocation Workspace" subtitle="Selected Order">
-            {detailStatus === "loading" ? (
-              <div className="table-state">
-                <strong>Loading order detail</strong>
-                <p>Pulling lines, remaining quantities, and allocation status.</p>
+        {/* ── Right: workspace ───────────────────────────────────────────── */}
+        <main className="so-workspace">
+          {/* Celebrate dispatch-ready state */}
+          {celebrateOrder ? (
+            <DispatchCelebration
+              orderNumber={celebrateOrder.orderNumber}
+              customerName={celebrateOrder.customerName}
+              onAllocateAnother={handleAllocateAnother}
+            />
+          ) : !selectedOrderNumber ? (
+            <div className="so-workspace-empty">
+              <div className="so-empty-icon">📋</div>
+              <h3>Select an order</h3>
+              <p>Choose a sales order from the queue to view and allocate stock.</p>
+            </div>
+          ) : detailStatus === "loading" ? (
+            <div className="so-workspace-loading">
+              <div className="so-loading-spinner" />
+              <p>Loading order…</p>
+            </div>
+          ) : detailStatus === "error" ? (
+            <div className="so-workspace-empty">
+              <div className="so-empty-icon">⚠️</div>
+              <h3>Unable to load order</h3>
+              <p>{detailError}</p>
+            </div>
+          ) : detailStatus === "success" && orderDetail ? (
+            <>
+              {/* Order header */}
+              <div className="alloc-order-header">
+                <div className="alloc-order-header-left">
+                  <div className="alloc-order-eyebrow">Sales Order</div>
+                  <h2 className="alloc-order-number">{orderDetail.order.orderNumber}</h2>
+                  <p className="alloc-order-customer">{orderDetail.order.customerName}</p>
+                </div>
+                <div className="alloc-order-header-right">
+                  <AllocationStatusPill allocationStatus={orderDetail.order.summary.allocationStatus} />
+                  <DispatchTag dateStr={orderDetail.order.dispatchDueAt} />
+                </div>
               </div>
-            ) : null}
 
-            {detailStatus === "error" ? (
-              <div className="table-state error">
-                <strong>Unable to load order detail</strong>
-                <p>{detailError}</p>
-              </div>
-            ) : null}
-
-            {detailStatus === "success" && orderDetail ? (
-              <div className="detail-stack">
-                <div className="detail-summary">
-                  <div>
-                    <p className="eyebrow">Sales Order</p>
-                    <h3>{orderDetail.order.orderNumber}</h3>
-                    <p className="page-description">
-                      {orderDetail.order.customerName} · Requested {formatDate(orderDetail.order.requestedAt)} ·
-                      Dispatch due {formatDate(orderDetail.order.dispatchDueAt)}
-                    </p>
+              {/* Summary metrics */}
+              <div className="alloc-summary-bar">
+                <div className="alloc-summary-metric">
+                  <span className="alloc-summary-label">Lines</span>
+                  <strong className="alloc-summary-value">{orderDetail.order.summary.lineCount}</strong>
+                </div>
+                <div className="alloc-summary-metric">
+                  <span className="alloc-summary-label">Ordered</span>
+                  <strong className="alloc-summary-value">{formatNumber(orderDetail.order.summary.quantityOrdered)}</strong>
+                </div>
+                <div className="alloc-summary-metric">
+                  <span className="alloc-summary-label">Allocated</span>
+                  <strong className="alloc-summary-value alloc-summary-value--allocated">{formatNumber(orderDetail.order.summary.quantityAllocated)}</strong>
+                </div>
+                <div className="alloc-summary-metric">
+                  <span className="alloc-summary-label">Remaining</span>
+                  <strong className={`alloc-summary-value ${orderDetail.order.summary.quantityRemaining > 0 ? "alloc-summary-value--remaining" : "alloc-summary-value--done"}`}>
+                    {formatNumber(orderDetail.order.summary.quantityRemaining)}
+                  </strong>
+                </div>
+                {orderDetail.order.requestedAt && (
+                  <div className="alloc-summary-metric">
+                    <span className="alloc-summary-label">Requested</span>
+                    <strong className="alloc-summary-value alloc-summary-value--date">{formatDate(orderDetail.order.requestedAt)}</strong>
                   </div>
-                  <StatusBadge value={orderDetail.order.summary.allocationStatus} />
-                </div>
-
-                <div className="summary-grid allocation-summary-grid">
-                  <article className="card summary-card">
-                    <div className="card-body">
-                      <p className="summary-label">Lines</p>
-                      <strong className="summary-value">{orderDetail.order.summary.lineCount}</strong>
-                      <p className="summary-detail">Open products on this order.</p>
-                    </div>
-                  </article>
-                  <article className="card summary-card">
-                    <div className="card-body">
-                      <p className="summary-label">Ordered</p>
-                      <strong className="summary-value">
-                        {formatNumber(orderDetail.order.summary.quantityOrdered)}
-                      </strong>
-                      <p className="summary-detail">Total requested quantity.</p>
-                    </div>
-                  </article>
-                  <article className="card summary-card">
-                    <div className="card-body">
-                      <p className="summary-label">Allocated</p>
-                      <strong className="summary-value">
-                        {formatNumber(orderDetail.order.summary.quantityAllocated)}
-                      </strong>
-                      <p className="summary-detail">Reserved against stock.</p>
-                    </div>
-                  </article>
-                  <article className="card summary-card">
-                    <div className="card-body">
-                      <p className="summary-label">Remaining</p>
-                      <strong className="summary-value">
-                        {formatNumber(orderDetail.order.summary.quantityRemaining)}
-                      </strong>
-                      <p className="summary-detail">Still waiting on allocation.</p>
-                    </div>
-                  </article>
-                </div>
-
-                <div className="line-stack">
-                  {orderDetail.lines.map((line) => {
-                    const availableStock = stockByProduct[line.productId];
-                    const availableItems = availableStock?.items || [];
-
-                    return (
-                      <article key={line.id} className="allocation-line-card">
-                        <div className="allocation-line-head">
-                          <div>
-                            <h4>
-                              {line.product.name} <span className="line-sku">({line.product.sku})</span>
-                            </h4>
-                            <p>
-                              Ordered {formatQuantity(line.quantityOrdered, line.product.unitOfMeasure)} · Allocated{" "}
-                              {formatQuantity(line.quantityAllocated, line.product.unitOfMeasure)} · Remaining{" "}
-                              {formatQuantity(line.remainingQuantity, line.product.unitOfMeasure)}
-                            </p>
-                          </div>
-                          <StatusBadge value={line.allocationStatus} />
-                        </div>
-
-                        <div className="allocation-line-meta">
-                          <span className="pill subtle">{formatLabel(line.product.trackingMode)}</span>
-                          <span className="pill subtle">
-                            Source PO {line.purchaseOrderNumber || "Unlinked"}
-                          </span>
-                          <span className="pill subtle">
-                            Available {formatQuantity(availableStock?.totalAvailableQuantity || 0, line.product.unitOfMeasure)}
-                          </span>
-                        </div>
-
-                        {line.remainingQuantity <= 0 ? (
-                          <div className="table-state">
-                            <strong>Line already fully allocated</strong>
-                            <p>No further stock selection is needed for this product.</p>
-                          </div>
-                        ) : null}
-
-                        {line.remainingQuantity > 0 && stockStatus === "loading" ? (
-                          <div className="table-state">
-                            <strong>Loading available stock</strong>
-                            <p>Checking live stock records for this product.</p>
-                          </div>
-                        ) : null}
-
-                        {line.remainingQuantity > 0 && stockStatus === "error" ? (
-                          <div className="table-state error">
-                            <strong>Unable to load stock</strong>
-                            <p>{stockError}</p>
-                          </div>
-                        ) : null}
-
-                        {line.remainingQuantity > 0 && stockStatus === "success" ? (
-                          <>
-                            {availableItems.length ? (
-                              <div className="stock-option-list">
-                                {availableItems.map((item) => (
-                                  <div key={item.stockItemId} className="stock-option-card">
-                                    <div>
-                                      <strong>
-                                        {line.product.isSerialTracked
-                                          ? item.serialNumber
-                                          : `${formatQuantity(item.availableQuantity, line.product.unitOfMeasure)} available`}
-                                      </strong>
-                                      <p>
-                                        {item.actualLocationCode || item.stockLocationCode || "Unknown location"} ·{" "}
-                                        {item.purchaseOrderNumber || "No PO"}
-                                      </p>
-                                    </div>
-
-                                    {line.product.isSerialTracked ? (
-                                      <label className="checkbox-field">
-                                        <input
-                                          type="checkbox"
-                                          checked={(serialSelections[line.id] || []).includes(item.stockItemId)}
-                                          onChange={(event) =>
-                                            handleSerialToggle(
-                                              line.id,
-                                              item.stockItemId,
-                                              event.target.checked,
-                                            )
-                                          }
-                                        />
-                                        <span>Select serial</span>
-                                      </label>
-                                    ) : (
-                                      <div className="quantity-field">
-                                        <label className="field-label" htmlFor={`qty-${line.id}-${item.stockItemId}`}>
-                                          Allocate quantity
-                                        </label>
-                                        <input
-                                          id={`qty-${line.id}-${item.stockItemId}`}
-                                          className="text-input quantity-input"
-                                          type="number"
-                                          min="0"
-                                          step="1"
-                                          max={item.availableQuantity}
-                                          value={quantitySelections[line.id]?.[item.stockItemId] || ""}
-                                          onChange={(event) =>
-                                            handleQuantityChange(
-                                              line.id,
-                                              item.stockItemId,
-                                              event.target.value,
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="table-state">
-                                <strong>No available stock</strong>
-                                <p>This line is still awaiting stock before it can be allocated.</p>
-                              </div>
-                            )}
-                          </>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
+                )}
               </div>
-            ) : null}
-          </Card>
 
-          <Card title="Allocation Summary" subtitle="Review Before Confirm">
-            {submitState.success ? <div className="alert success">{submitState.success}</div> : null}
-            {submitState.error ? <div className="alert error">{submitState.error}</div> : null}
-            {allocationDraft.errors.length && !submitState.error ? (
-              <div className="alert warning">{allocationDraft.errors[0]}</div>
-            ) : null}
-
-            {allocationDraft.summaryItems.length ? (
-              <div className="draft-summary-list">
-                {allocationDraft.summaryItems.map((item) => (
-                  <div key={item.lineId} className="draft-summary-item">
-                    <div>
-                      <strong>{item.productName}</strong>
-                      <p>
-                        {item.mode === "serial"
-                          ? `${item.quantity} serial number${item.quantity === 1 ? "" : "s"} selected`
-                          : `${formatQuantity(item.quantity, item.unitOfMeasure)} selected`}
-                      </p>
-                      {item.mode === "serial" && item.serialNumbers.length ? (
-                        <p className="serial-chip-row">{item.serialNumbers.join(", ")}</p>
-                      ) : null}
-                    </div>
-                    <span className="pill subtle">{formatLabel(item.mode)}</span>
-                  </div>
+              {/* Line allocation cards */}
+              <div className="alloc-lines">
+                {orderDetail.lines.map((line) => (
+                  <AllocationLineCard
+                    key={line.id}
+                    line={line}
+                    stock={stockByProduct[line.productId]}
+                    stockStatus={stockStatus}
+                    serialSelections={serialSelections}
+                    quantitySelections={quantitySelections}
+                    onSerialAdd={handleSerialAdd}
+                    onSerialRemove={handleSerialRemove}
+                    onQuantityChange={handleQuantityChange}
+                  />
                 ))}
               </div>
-            ) : (
-              <div className="table-state">
-                <strong>No draft allocation yet</strong>
-                <p>Select serials or enter quantities above to build the confirmation summary.</p>
-              </div>
-            )}
 
-            <div className="allocation-actions">
-              <Button
-                onClick={handleConfirmAllocation}
-                disabled={submitState.status === "submitting" || detailStatus !== "success"}
-              >
-                {submitState.status === "submitting" ? "Saving Allocation..." : "Confirm Allocation"}
-              </Button>
-            </div>
-          </Card>
-        </div>
+              {/* Confirm panel */}
+              <div className="alloc-confirm-panel">
+                {submitError && (
+                  <div className="alloc-confirm-error">{submitError}</div>
+                )}
+
+                {allocationDraft.summaryItems.length > 0 && (
+                  <div className="alloc-draft-summary">
+                    {allocationDraft.summaryItems.map((item) => (
+                      <div key={item.lineId} className="alloc-draft-item">
+                        <strong>{item.productName}</strong>
+                        <span className="alloc-draft-detail">
+                          {item.mode === "serial"
+                            ? `${item.quantity} serial${item.quantity !== 1 ? "s" : ""}: ${item.serials?.join(", ")}`
+                            : fmtQty(item.quantity, item.uom)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="alloc-confirm-actions">
+                  <Button
+                    onClick={handleConfirm}
+                    disabled={
+                      submitStatus === "submitting" ||
+                      allocationDraft.allocations.length === 0 ||
+                      detailStatus !== "success"
+                    }
+                  >
+                    {submitStatus === "submitting" ? "Saving…" : "Confirm Allocation"}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </main>
       </div>
     </div>
   );

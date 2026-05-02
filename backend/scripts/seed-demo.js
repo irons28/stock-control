@@ -339,13 +339,13 @@ async function seedDemoData() {
     [pTill.id, locHold.id, locHold.id, po1002.id, pol1002Till.id],
   );
 
-  // LABEL-001 qty stock — 30 units received, awaiting allocation
+  // LABEL-001 qty stock — 30 units available, awaiting allocation to SO-2003
   await run(
     `INSERT INTO stock_items
        (product_id, stock_location_id, actual_location_id, serial_number,
         quantity_on_hand, quantity_allocated, hold_status,
         linked_purchase_order_id, linked_purchase_order_line_id, status)
-     VALUES (?, ?, ?, NULL, 30, 0, 'received', ?, ?, 'active')`,
+     VALUES (?, ?, ?, NULL, 30, 0, 'available', ?, ?, 'active')`,
     [pLabel.id, locConsumables.id, locConsumables.id, po1004.id, pol1004Label.id],
   );
 
