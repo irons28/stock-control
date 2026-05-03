@@ -6242,4 +6242,510 @@ textarea.form-control {
   border-color: var(--navy-700);
 }
 
+/* ── Scanner mode ─────────────────────────────────────────────────────────── */
+
+/* Toggle button (in normal mode) */
+.scanner-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--surface-secondary, #f8fafc);
+  border: 1.5px dashed var(--border, #cbd5e1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.scanner-mode-toggle:hover {
+  border-color: var(--navy-500, #475569);
+  background: var(--sky-50, #f0f9ff);
+}
+
+.scanner-mode-toggle-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.scanner-mode-toggle-text {
+  flex: 1;
+}
+
+.scanner-mode-toggle-title {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+.scanner-mode-toggle-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+  margin-top: 0.15rem;
+}
+
+.scanner-mode-toggle-arrow {
+  font-size: 1rem;
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+/* Scanner panel wrapper */
+.scanner-panel {
+  background: #0f172a;
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  color: #fff;
+}
+
+/* Header row */
+.scanner-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.scanner-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scanner-mode-badge {
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.22em 0.65em;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Multi-line tab nav */
+.scanner-line-nav {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.scanner-line-tab {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  padding: 0.3em 0.7em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  font-family: var(--font-mono, monospace);
+}
+
+.scanner-line-tab:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.scanner-line-tab.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.scanner-line-tab.done {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.25);
+  color: #4ade80;
+}
+
+.scanner-line-tab-count {
+  font-weight: 400;
+  opacity: 0.75;
+  margin-left: 0.15em;
+}
+
+.scanner-exit-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.65);
+  border-radius: 6px;
+  padding: 0.4em 0.9em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.scanner-exit-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.scanner-exit-btn--secondary {
+  font-size: 0.78rem;
+  padding: 0.35em 0.75em;
+}
+
+/* Product info */
+.scanner-line-info {
+  text-align: center;
+  padding: 0.25rem 0;
+}
+
+.scanner-product-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.scanner-product-sku {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 0.2rem;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.06em;
+}
+
+/* Big counter */
+.scanner-counter {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.2rem;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.25s;
+}
+
+.scanner-counter--progress { color: #60a5fa; }
+.scanner-counter--done    { color: #4ade80; }
+.scanner-counter--over    { color: #f87171; }
+
+.scanner-counter-value {
+  font-size: 4.5rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.scanner-counter-sep {
+  font-size: 2.75rem;
+  font-weight: 200;
+  opacity: 0.45;
+  margin: 0 0.1rem;
+}
+
+.scanner-counter-target {
+  font-size: 2.75rem;
+  font-weight: 300;
+}
+
+.scanner-counter-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.4;
+  margin-left: 0.5rem;
+  align-self: center;
+}
+
+/* Progress bar */
+.scanner-progress-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.scanner-progress-fill {
+  height: 100%;
+  background: #60a5fa;
+  border-radius: 2px;
+  transition: width 0.2s ease, background 0.2s;
+}
+
+.scanner-progress-fill--done {
+  background: #4ade80;
+}
+
+/* Feedback toast */
+.scanner-feedback {
+  text-align: center;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  animation: scanner-pop-in 0.14s ease;
+}
+
+.scanner-feedback--ok {
+  background: rgba(74, 222, 128, 0.13);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.28);
+}
+
+.scanner-feedback--dup {
+  background: rgba(248, 113, 113, 0.13);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+}
+
+@keyframes scanner-pop-in {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Scan input */
+.scanner-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scanner-scan-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 500;
+  padding: 0.9rem 1.25rem;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  caret-color: #60a5fa;
+  letter-spacing: 0.04em;
+  box-sizing: border-box;
+}
+
+.scanner-scan-input::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.scanner-scan-input:focus {
+  border-color: #60a5fa;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scanner-scan-input--ok {
+  border-color: #4ade80;
+  animation: scanner-flash-ok 0.35s ease forwards;
+}
+
+.scanner-scan-input--error {
+  border-color: #f87171;
+  animation: scanner-flash-err 0.35s ease forwards;
+}
+
+@keyframes scanner-flash-ok {
+  0%   { background: rgba(74, 222, 128, 0.18); }
+  100% { background: rgba(255, 255, 255, 0.1); }
+}
+
+@keyframes scanner-flash-err {
+  0%   { background: rgba(248, 113, 113, 0.18); }
+  100% { background: rgba(255, 255, 255, 0.07); }
+}
+
+/* Keyboard hint strip */
+.scanner-input-hints {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  font-size: 0.71rem;
+  color: rgba(255, 255, 255, 0.3);
+  flex-wrap: wrap;
+}
+
+.scanner-input-hints kbd {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-right: 0.25em;
+}
+
+/* Qty-only lines (compact, inside scanner panel) */
+.scanner-qty-lines {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding-top: 1rem;
+}
+
+.scanner-qty-lines-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 0.65rem;
+}
+
+.scanner-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scanner-qty-row:last-child {
+  border-bottom: none;
+}
+
+.scanner-qty-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.scanner-qty-label strong {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-mono, monospace);
+}
+
+.scanner-qty-line-name {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.scanner-qty-remaining {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+}
+
+.scanner-qty-input {
+  width: 80px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.4em 0.6em;
+  text-align: right;
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.scanner-qty-input:focus {
+  border-color: #60a5fa;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Scanned chips list */
+.scanner-scanned-list {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding-top: 1rem;
+}
+
+.scanner-scanned-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 0.65rem;
+}
+
+.scanner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.scanner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.76rem;
+  font-family: var(--font-mono, monospace);
+  padding: 0.22em 0.45em 0.22em 0.6em;
+  border-radius: 5px;
+  letter-spacing: 0.03em;
+  transition: background 0.1s;
+}
+
+/* Most-recent chip highlighted */
+.scanner-chip:first-child {
+  background: rgba(74, 222, 128, 0.11);
+  border-color: rgba(74, 222, 128, 0.24);
+  color: #86efac;
+}
+
+.scanner-chip-remove {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.scanner-chip-remove:hover {
+  color: #f87171;
+}
+
+/* No serial lines fallback */
+.scanner-no-lines {
+  text-align: center;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+}
+
+/* Form actions inside scanner panel */
+.scanner-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  flex-wrap: wrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .scanner-counter-value { font-size: 3.5rem; }
+  .scanner-counter-sep,
+  .scanner-counter-target { font-size: 2.25rem; }
+  .scanner-scan-input { font-size: 1.25rem; padding: 0.75rem 1rem; }
+  .scanner-panel { padding: 1.1rem; }
+}
+
 
