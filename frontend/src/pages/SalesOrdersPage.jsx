@@ -32,6 +32,16 @@ function allocationLabel(status) {
   return STATUS_LABELS[status] || status || "—";
 }
 
+// Sort stock items by received date ascending (earliest first), then by id
+function sortByEarliestReceived(items) {
+  return [...items].sort((a, b) => {
+    if (!a.receivedAt && !b.receivedAt) return a.stockItemId - b.stockItemId;
+    if (!a.receivedAt) return 1;
+    if (!b.receivedAt) return -1;
+    return new Date(a.receivedAt) - new Date(b.receivedAt);
+  });
+}
+
 // ── Small presentational components ──────────────────────────────────────────
 
 function StatusPill({ status }) {
@@ -83,18 +93,14 @@ function SerialChipInput({ lineId, needed, availableItems, selectedIds, onAdd, o
   const [flashError, setFlashError] = useState("");
   const inputRef = useRef(null);
 
-  // Build a lookup map from serial number (lowercased) → stock item
   const serialMap = useMemo(() => {
     const m = new Map();
     for (const item of availableItems) {
-      if (item.serialNumber) {
-        m.set(item.serialNumber.toLowerCase(), item);
-      }
+      if (item.serialNumber) m.set(item.serialNumber.toLowerCase(), item);
     }
     return m;
   }, [availableItems]);
 
-  // Items that are currently selected
   const selectedItems = useMemo(
     () => availableItems.filter((item) => selectedIds.includes(item.stockItemId)),
     [availableItems, selectedIds],
@@ -103,21 +109,18 @@ function SerialChipInput({ lineId, needed, availableItems, selectedIds, onAdd, o
   function tryAdd(raw) {
     const val = raw.trim();
     if (!val) return;
-
     const item = serialMap.get(val.toLowerCase());
     if (!item) {
       setFlashError(`Serial "${val}" not found in available stock`);
       setTimeout(() => setFlashError(""), 3000);
       return;
     }
-
     if (selectedIds.includes(item.stockItemId)) {
       setFlashError(`Serial "${val}" already selected`);
       setTimeout(() => setFlashError(""), 2000);
       setInputValue("");
       return;
     }
-
     onAdd(lineId, item.stockItemId);
     setInputValue("");
     setFlashError("");
@@ -155,11 +158,7 @@ function SerialChipInput({ lineId, needed, availableItems, selectedIds, onAdd, o
           autoComplete="off"
           spellCheck={false}
         />
-        <button
-          type="button"
-          className="btn-sm btn-secondary"
-          onClick={() => tryAdd(inputValue)}
-        >
+        <button type="button" className="btn-sm btn-secondary" onClick={() => tryAdd(inputValue)}>
           Add
         </button>
       </div>
@@ -214,27 +213,21 @@ function SerialStockGrid({ lineId, availableItems, selectedIds, onAdd, onRemove 
             <div className="alloc-serial-card-main">
               <span className="alloc-serial-number">{item.serialNumber}</span>
               <div className="alloc-serial-meta">
-                {item.actualLocationCode || item.stockLocationCode ? (
-                  <span className="alloc-meta-chip">
-                    {item.actualLocationCode || item.stockLocationCode}
-                  </span>
-                ) : null}
-                {item.purchaseOrderNumber ? (
+                {(item.actualLocationCode || item.stockLocationCode) && (
+                  <span className="alloc-meta-chip">{item.actualLocationCode || item.stockLocationCode}</span>
+                )}
+                {item.purchaseOrderNumber && (
                   <span className="alloc-meta-chip">{item.purchaseOrderNumber}</span>
-                ) : null}
-                {item.receivedAt ? (
+                )}
+                {item.receivedAt && (
                   <span className="alloc-meta-chip">Rcvd {formatDate(item.receivedAt)}</span>
-                ) : null}
+                )}
               </div>
             </div>
             <button
               type="button"
               className={`btn-xs ${isSelected ? "btn-selected" : "btn-secondary"}`}
-              onClick={() =>
-                isSelected
-                  ? onRemove(lineId, item.stockItemId)
-                  : onAdd(lineId, item.stockItemId)
-              }
+              onClick={() => isSelected ? onRemove(lineId, item.stockItemId) : onAdd(lineId, item.stockItemId)}
             >
               {isSelected ? "✓ Selected" : "Select"}
             </button>
@@ -252,7 +245,6 @@ function QuantityAllocator({ lineId, line, availableItems, quantityValue, onQuan
     (sum, item) => sum + Number(item.availableQuantity || 0),
     0,
   );
-
   const maxAlloc = Math.min(totalAvailable, line.remainingQuantity);
   const parsedValue = parseFloat(quantityValue) || 0;
   const hasShortage = totalAvailable < line.remainingQuantity;
@@ -278,7 +270,6 @@ function QuantityAllocator({ lineId, line, availableItems, quantityValue, onQuan
           </span>
         )}
       </div>
-
       <div className="alloc-qty-row">
         <input
           id={`qty-${lineId}`}
@@ -312,7 +303,6 @@ function QuickApplyBanner({ line, availableItems, selectedSerialIds, onQuickAppl
     const needed = line.remainingQuantity - selectedSerialIds.length;
     if (needed <= 0 || !unselected.length) return null;
 
-    // Group by PO for context
     const poCounts = new Map();
     for (const item of availableItems) {
       const po = item.purchaseOrderNumber || "Unknown PO";
@@ -339,7 +329,6 @@ function QuickApplyBanner({ line, availableItems, selectedSerialIds, onQuickAppl
     );
   }
 
-  // Qty line
   const totalAvail = availableItems.reduce((s, i) => s + i.availableQuantity, 0);
   const suggestQty = Math.min(totalAvail, line.remainingQuantity);
   const currentQty = parseFloat(quantityValue) || 0;
@@ -370,16 +359,10 @@ function QuickApplyBanner({ line, availableItems, selectedSerialIds, onQuickAppl
 // ── Allocation line card ──────────────────────────────────────────────────────
 
 function AllocationLineCard({
-  line,
-  stock,
-  stockStatus,
-  serialSelections,
-  quantitySelections,
-  onSerialAdd,
-  onSerialRemove,
-  onQuantityChange,
-  onQuickApplySerials,
-  onQuickApplyQty,
+  line, stock, stockStatus,
+  serialSelections, quantitySelections,
+  onSerialAdd, onSerialRemove, onQuantityChange,
+  onQuickApplySerials, onQuickApplyQty,
 }) {
   const availableItems = stock?.items || [];
   const selectedSerialIds = serialSelections[line.id] || [];
@@ -488,6 +471,272 @@ function DispatchCelebration({ orderNumber, customerName, onAllocateAnother }) {
   );
 }
 
+// ── Bulk allocation: auto-suggestion algorithm ────────────────────────────────
+
+/**
+ * Builds a full allocation suggestion for every unallocated line in the order.
+ * Serials: sorted by receivedAt ascending (earliest-in, first-out).
+ * Qty: fill to min(available, needed), spread across stock items earliest-first.
+ *
+ * Returns { serialSelections, quantitySelections, lines, totals } where
+ * lines is an array of per-line coverage objects used to render the preview.
+ */
+function buildAutoAllocationSuggestions(orderDetail, stockByProduct) {
+  const serialSelections = {};
+  const quantitySelections = {};
+  const lines = [];
+
+  for (const line of orderDetail.lines) {
+    if (line.remainingQuantity <= 0) continue;
+
+    const stock = stockByProduct[line.productId];
+    const items = stock?.items || [];
+    const needed = line.remainingQuantity;
+
+    if (line.product.isSerialTracked) {
+      const sorted = sortByEarliestReceived(items);
+      const toSelect = sorted.slice(0, needed);
+      const selected = toSelect.length;
+
+      if (selected > 0) {
+        serialSelections[line.id] = toSelect.map((i) => i.stockItemId);
+      }
+
+      lines.push({
+        lineId: line.id,
+        productName: line.product.name,
+        sku: line.product.sku,
+        mode: "serial",
+        needed,
+        available: items.length,
+        selected,
+        // Show first few serial numbers for preview
+        serialPreview: toSelect
+          .slice(0, 5)
+          .map((i) => i.serialNumber)
+          .filter(Boolean),
+        hasMore: selected > 5,
+        coverage: selected >= needed ? "full" : selected > 0 ? "partial" : "none",
+      });
+    } else {
+      const sorted = sortByEarliestReceived(items);
+      const totalAvailable = sorted.reduce((s, i) => s + Number(i.availableQuantity || 0), 0);
+      const qty = Math.min(totalAvailable, needed);
+
+      if (qty > 0) {
+        quantitySelections[line.id] = String(qty);
+      }
+
+      lines.push({
+        lineId: line.id,
+        productName: line.product.name,
+        sku: line.product.sku,
+        uom: line.product.unitOfMeasure,
+        mode: "quantity",
+        needed,
+        available: totalAvailable,
+        selected: qty,
+        coverage: qty >= needed ? "full" : qty > 0 ? "partial" : "none",
+      });
+    }
+  }
+
+  const coveredLines = lines.filter((l) => l.coverage === "full").length;
+  const shortageLines = lines.filter((l) => l.coverage === "partial").length;
+  const noStockLines = lines.filter((l) => l.coverage === "none").length;
+
+  return {
+    serialSelections,
+    quantitySelections,
+    lines,
+    totalLines: lines.length,
+    coveredLines,
+    shortageLines,
+    noStockLines,
+    hasAnyStock: lines.some((l) => l.selected > 0),
+  };
+}
+
+// ── Bulk allocation preview modal ─────────────────────────────────────────────
+
+function BulkAllocationPreview({ orderNumber, customerName, suggestions, onApply, onCancel }) {
+  const { lines, coveredLines, shortageLines, noStockLines, totalLines, hasAnyStock } = suggestions;
+  const hasShortages = shortageLines > 0 || noStockLines > 0;
+
+  // Close on Escape
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onCancel]);
+
+  function handleOverlayClick(e) {
+    if (e.target === e.currentTarget) onCancel();
+  }
+
+  return (
+    <div className="bulk-overlay" onClick={handleOverlayClick} role="presentation">
+      <div
+        className="bulk-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-modal-title"
+      >
+        {/* Header */}
+        <div className="bulk-modal-header">
+          <div>
+            <div className="bulk-modal-eyebrow">Auto-Allocate Preview</div>
+            <h3 id="bulk-modal-title" className="bulk-modal-title">{orderNumber}</h3>
+            {customerName && <p className="bulk-modal-customer">{customerName}</p>}
+          </div>
+          <button
+            type="button"
+            className="bulk-modal-close"
+            onClick={onCancel}
+            aria-label="Close preview"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="bulk-modal-body">
+          <p className="bulk-modal-sub">
+            Stock suggested using <strong>earliest-received first</strong>. Nothing is committed until
+            you confirm allocation below.
+          </p>
+
+          {/* Per-line coverage rows */}
+          <div className="bulk-lines-list" role="list">
+            {lines.map((line) => (
+              <div
+                key={line.lineId}
+                className={`bulk-line-row bulk-line-row--${line.coverage}`}
+                role="listitem"
+              >
+                <div className="bulk-line-icon" aria-hidden="true">
+                  {line.coverage === "full" ? "✓" : line.coverage === "partial" ? "⚠" : "✗"}
+                </div>
+
+                <div className="bulk-line-info">
+                  <div className="bulk-line-name">{line.productName}</div>
+                  <div className="bulk-line-sku">{line.sku}</div>
+                  {line.mode === "serial" && line.serialPreview?.length > 0 && (
+                    <div className="bulk-line-serials">
+                      {line.serialPreview.map((s) => (
+                        <span key={s} className="bulk-serial-chip">{s}</span>
+                      ))}
+                      {line.hasMore && (
+                        <span className="bulk-serial-more">+{line.selected - 5} more</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bulk-line-qty">
+                  <span className="bulk-qty-selected">
+                    {line.mode === "serial"
+                      ? `${line.selected} serial${line.selected !== 1 ? "s" : ""}`
+                      : fmtQty(line.selected, line.uom)}
+                  </span>
+                  <span className="bulk-qty-of">of</span>
+                  <span className="bulk-qty-needed">
+                    {line.mode === "serial"
+                      ? `${line.needed} needed`
+                      : fmtQty(line.needed, line.uom)}
+                  </span>
+                </div>
+
+                <div className="bulk-line-badge-col">
+                  {line.coverage === "full" && (
+                    <span className="bulk-badge bulk-badge--ok">Covered</span>
+                  )}
+                  {line.coverage === "partial" && (
+                    <span className="bulk-badge bulk-badge--warn">
+                      Short {line.mode === "serial"
+                        ? `${line.needed - line.selected} unit${line.needed - line.selected !== 1 ? "s" : ""}`
+                        : fmtQty(line.needed - line.selected, line.uom)}
+                    </span>
+                  )}
+                  {line.coverage === "none" && (
+                    <span className="bulk-badge bulk-badge--none">No stock</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary chips */}
+          <div className="bulk-modal-summary">
+            {coveredLines > 0 && (
+              <span className="bulk-summary-chip bulk-summary-chip--ok">
+                {coveredLines} line{coveredLines !== 1 ? "s" : ""} covered
+              </span>
+            )}
+            {shortageLines > 0 && (
+              <span className="bulk-summary-chip bulk-summary-chip--warn">
+                {shortageLines} short
+              </span>
+            )}
+            {noStockLines > 0 && (
+              <span className="bulk-summary-chip bulk-summary-chip--none">
+                {noStockLines} no stock
+              </span>
+            )}
+          </div>
+
+          {/* Shortage note */}
+          {hasShortages && hasAnyStock && (
+            <div className="bulk-shortage-note">
+              Shortages highlighted above. You can still apply partial allocations — wait for remaining
+              stock to arrive before confirming the rest.
+            </div>
+          )}
+
+          {!hasAnyStock && (
+            <div className="bulk-no-stock-note">
+              No available stock found for any line on this order. Check that goods have been received
+              and are in a holding location.
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="bulk-modal-footer">
+          <button type="button" className="btn-sm btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <Button onClick={onApply} disabled={!hasAnyStock}>
+            Apply Suggestions
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Auto-allocate CTA banner ──────────────────────────────────────────────────
+
+function AutoAllocateBanner({ stockStatus, hasUnallocatedLines, onAutoAllocate }) {
+  if (stockStatus !== "success" || !hasUnallocatedLines) return null;
+
+  return (
+    <div className="bulk-auto-cta">
+      <div className="bulk-auto-cta-body">
+        <span className="bulk-auto-cta-title">Auto-allocate available stock</span>
+        <span className="bulk-auto-cta-sub">
+          Fills all lines using earliest-received stock · review before applying
+        </span>
+      </div>
+      <button type="button" className="bulk-auto-btn" onClick={onAutoAllocate}>
+        ⚡ Auto-Allocate
+      </button>
+    </div>
+  );
+}
+
 // ── Allocation draft builder ──────────────────────────────────────────────────
 
 function buildAllocationDraft(orderDetail, stockByProduct, serialSelections, quantitySelections) {
@@ -511,25 +760,52 @@ function buildAllocationDraft(orderDetail, stockByProduct, serialSelections, qua
       }
       const serials = ids.map((id) => availableById.get(id)?.serialNumber || `#${id}`);
       allocations.push({ salesOrderLineId: line.id, serialStockItemIds: ids });
-      summaryItems.push({ lineId: line.id, productName: line.product.name, mode: "serial", quantity: ids.length, uom: line.product.unitOfMeasure, serials });
+      summaryItems.push({
+        lineId: line.id,
+        productName: line.product.name,
+        mode: "serial",
+        quantity: ids.length,
+        uom: line.product.unitOfMeasure,
+        serials,
+      });
     } else {
       const rawQty = parseFloat(quantitySelections[line.id]) || 0;
       if (rawQty <= 0) continue;
       if (rawQty > line.remainingQuantity) {
         errors.push(`${line.product.name}: quantity exceeds remaining.`);
       }
-      const stockItems = stock?.items || [];
+
+      const stockItems = sortByEarliestReceived(stock?.items || []);
       if (!stockItems.length) {
         errors.push(`${line.product.name}: no available stock.`);
         continue;
       }
-      // Allocate against the first available stock item (simplest strategy)
-      const firstItem = stockItems[0];
-      allocations.push({
-        salesOrderLineId: line.id,
-        quantityAllocations: [{ stockItemId: firstItem.stockItemId, quantity: rawQty }],
+
+      // Spread allocation across stock items (earliest-received first)
+      let qtyLeft = rawQty;
+      const qtyAllocations = [];
+      for (const item of stockItems) {
+        if (qtyLeft <= 0) break;
+        const fromThis = Math.min(qtyLeft, Number(item.availableQuantity || 0));
+        if (fromThis > 0) {
+          qtyAllocations.push({ stockItemId: item.stockItemId, quantity: fromThis });
+          qtyLeft -= fromThis;
+        }
+      }
+
+      if (!qtyAllocations.length) {
+        errors.push(`${line.product.name}: no available quantity.`);
+        continue;
+      }
+
+      allocations.push({ salesOrderLineId: line.id, quantityAllocations: qtyAllocations });
+      summaryItems.push({
+        lineId: line.id,
+        productName: line.product.name,
+        mode: "quantity",
+        quantity: rawQty,
+        uom: line.product.unitOfMeasure,
       });
-      summaryItems.push({ lineId: line.id, productName: line.product.name, mode: "quantity", quantity: rawQty, uom: line.product.unitOfMeasure });
     }
   }
 
@@ -549,13 +825,12 @@ function SalesOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // Allow deep-linking from ReceiveGoodsPage suggestions via ?so= query param
   const [selectedOrderNumber, setSelectedOrderNumber] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("so") || null;
   });
 
-  // Clean ?so= from URL after we've captured it, so the back button works cleanly
+  // Clean ?so= from URL after capturing it
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has("so")) {
@@ -568,28 +843,30 @@ function SalesOrdersPage() {
       );
     }
   }, []);
+
   const [orderDetail, setOrderDetail] = useState(null);
-  const [detailStatus, setDetailStatus] = useState("idle"); // idle | loading | success | error
+  const [detailStatus, setDetailStatus] = useState("idle");
   const [detailError, setDetailError] = useState("");
   const [stockByProduct, setStockByProduct] = useState({});
   const [stockStatus, setStockStatus] = useState("idle");
-  const [serialSelections, setSerialSelections] = useState({});       // { lineId: [stockItemId, ...] }
-  const [quantitySelections, setQuantitySelections] = useState({});   // { lineId: "string" }
-  const [submitStatus, setSubmitStatus] = useState("idle"); // idle | submitting | success | error
+  const [serialSelections, setSerialSelections] = useState({});
+  const [quantitySelections, setQuantitySelections] = useState({});
+  const [submitStatus, setSubmitStatus] = useState("idle");
   const [submitError, setSubmitError] = useState("");
-  const [celebrateOrder, setCelebrateOrder] = useState(null);         // order payload when fully allocated
+  const [celebrateOrder, setCelebrateOrder] = useState(null);
+
+  // Bulk allocation state
+  const [showBulkPreview, setShowBulkPreview] = useState(false);
+  const [bulkSuggestions, setBulkSuggestions] = useState(null);
 
   const allOrders = salesOrders.data?.items || [];
 
   const filteredOrders = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     let orders = allOrders;
-
-    // By default hide dispatched and cancelled orders; toggle reveals them
     if (!showCompleted) {
       orders = orders.filter((o) => !["dispatched", "cancelled"].includes(o.status));
     }
-
     if (!q) return orders;
     return orders.filter(
       (o) =>
@@ -616,11 +893,9 @@ function SalesOrdersPage() {
         setDetailStatus("idle");
         return;
       }
-
       setDetailStatus("loading");
       setDetailError("");
       setCelebrateOrder(null);
-
       try {
         const detail = await apiFetch(`/sales-orders/${selectedOrderNumber}`);
         if (cancelled) return;
@@ -647,7 +922,6 @@ function SalesOrdersPage() {
         setStockByProduct({});
         return;
       }
-
       const productIds = [
         ...new Set(
           orderDetail.lines
@@ -655,15 +929,12 @@ function SalesOrdersPage() {
             .map((l) => l.productId),
         ),
       ];
-
       if (!productIds.length) {
         setStockByProduct({});
         setStockStatus("success");
         return;
       }
-
       setStockStatus("loading");
-
       try {
         const responses = await Promise.all(
           productIds.map((id) => apiFetch(`/allocation/available-stock/${id}`)),
@@ -673,7 +944,7 @@ function SalesOrdersPage() {
           responses.reduce((acc, r) => { acc[r.product.id] = r; return acc; }, {}),
         );
         setStockStatus("success");
-      } catch (err) {
+      } catch {
         if (cancelled) return;
         setStockByProduct({});
         setStockStatus("error");
@@ -684,13 +955,15 @@ function SalesOrdersPage() {
     return () => { cancelled = true; };
   }, [orderDetail]);
 
-  // Clear selections when order changes
+  // Clear all selections when order changes
   useEffect(() => {
     setSerialSelections({});
     setQuantitySelections({});
     setSubmitStatus("idle");
     setSubmitError("");
     setCelebrateOrder(null);
+    setShowBulkPreview(false);
+    setBulkSuggestions(null);
   }, [selectedOrderNumber]);
 
   const allocationDraft = useMemo(
@@ -720,28 +993,51 @@ function SalesOrdersPage() {
     setQuantitySelections((prev) => ({ ...prev, [lineId]: value }));
   }
 
-  // Quick-apply: pre-select serials (up to `count` unselected items)
   function handleQuickApplySerials(lineId, unselectedItems, count) {
-    const toAdd = unselectedItems.slice(0, count).map((item) => item.stockItemId);
+    const sorted = sortByEarliestReceived(unselectedItems);
+    const toAdd = sorted.slice(0, count).map((item) => item.stockItemId);
     setSerialSelections((prev) => ({
       ...prev,
       [lineId]: [...new Set([...(prev[lineId] || []), ...toAdd])],
     }));
   }
 
-  // Quick-apply: fill quantity
   function handleQuickApplyQty(lineId, value) {
     setQuantitySelections((prev) => ({ ...prev, [lineId]: value }));
   }
 
+  // ── Bulk allocation handlers ──────────────────────────────────────────────
+
+  function handleAutoAllocate() {
+    if (!orderDetail || stockStatus !== "success") return;
+    const suggestions = buildAutoAllocationSuggestions(orderDetail, stockByProduct);
+    if (!suggestions.lines.length) return;
+    setBulkSuggestions(suggestions);
+    setShowBulkPreview(true);
+  }
+
+  function handleApplyBulkSuggestions() {
+    if (!bulkSuggestions) return;
+    // Merge suggestions into existing selections (don't overwrite manual changes)
+    setSerialSelections((prev) => ({ ...prev, ...bulkSuggestions.serialSelections }));
+    setQuantitySelections((prev) => ({ ...prev, ...bulkSuggestions.quantitySelections }));
+    setShowBulkPreview(false);
+    setBulkSuggestions(null);
+  }
+
+  function handleCancelBulkPreview() {
+    setShowBulkPreview(false);
+    setBulkSuggestions(null);
+  }
+
+  // ── Confirm allocation ────────────────────────────────────────────────────
+
   async function handleConfirm() {
     if (!orderDetail || submitStatus === "submitting") return;
-
     if (allocationDraft.errors.length) {
       setSubmitError(allocationDraft.errors[0]);
       return;
     }
-
     setSubmitStatus("submitting");
     setSubmitError("");
 
@@ -758,20 +1054,17 @@ function SalesOrdersPage() {
       );
 
       salesOrders.reload();
-
       const isReady = response.order?.summary?.allocationStatus === "Ready to Dispatch";
 
       if (isReady) {
         setCelebrateOrder(response.order);
         setSubmitStatus("success");
       } else {
-        // Refresh and stay in the allocation view for more work
         setOrderDetail({ order: response.order, lines: response.lines });
         setSerialSelections({});
         setQuantitySelections({});
         setSubmitStatus("idle");
 
-        // Reload stock for remaining lines
         const productIds = [
           ...new Set(
             response.lines
@@ -805,6 +1098,8 @@ function SalesOrdersPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const hasUnallocatedLines = orderDetail?.lines?.some((l) => l.remainingQuantity > 0) ?? false;
+
   return (
     <div className="page-stack">
       <PageHeader
@@ -819,7 +1114,7 @@ function SalesOrdersPage() {
       />
 
       <div className="so-layout">
-        {/* ── Left: order queue ──────────────────────────────────────────── */}
+        {/* ── Left: order queue ─────────────────────────────────────────────── */}
         <aside className="so-queue">
           <div className="so-queue-search">
             <input
@@ -840,7 +1135,6 @@ function SalesOrdersPage() {
           )}
           {salesOrders.status === "success" && (
             <div className="so-queue-list">
-              {/* Filter toggle */}
               <div className="so-queue-filter-row">
                 <span className="so-queue-filter-count">
                   {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
@@ -894,9 +1188,8 @@ function SalesOrdersPage() {
           )}
         </aside>
 
-        {/* ── Right: workspace ───────────────────────────────────────────── */}
+        {/* ── Right: workspace ──────────────────────────────────────────────── */}
         <main className="so-workspace">
-          {/* Celebrate dispatch-ready state */}
           {celebrateOrder ? (
             <DispatchCelebration
               orderNumber={celebrateOrder.orderNumber}
@@ -948,7 +1241,9 @@ function SalesOrdersPage() {
                 </div>
                 <div className="alloc-summary-metric">
                   <span className="alloc-summary-label">Allocated</span>
-                  <strong className="alloc-summary-value alloc-summary-value--allocated">{formatNumber(orderDetail.order.summary.quantityAllocated)}</strong>
+                  <strong className="alloc-summary-value alloc-summary-value--allocated">
+                    {formatNumber(orderDetail.order.summary.quantityAllocated)}
+                  </strong>
                 </div>
                 <div className="alloc-summary-metric">
                   <span className="alloc-summary-label">Remaining</span>
@@ -959,10 +1254,19 @@ function SalesOrdersPage() {
                 {orderDetail.order.requestedAt && (
                   <div className="alloc-summary-metric">
                     <span className="alloc-summary-label">Requested</span>
-                    <strong className="alloc-summary-value alloc-summary-value--date">{formatDate(orderDetail.order.requestedAt)}</strong>
+                    <strong className="alloc-summary-value alloc-summary-value--date">
+                      {formatDate(orderDetail.order.requestedAt)}
+                    </strong>
                   </div>
                 )}
               </div>
+
+              {/* Auto-allocate CTA */}
+              <AutoAllocateBanner
+                stockStatus={stockStatus}
+                hasUnallocatedLines={hasUnallocatedLines}
+                onAutoAllocate={handleAutoAllocate}
+              />
 
               {/* Line allocation cards */}
               <div className="alloc-lines">
@@ -1017,6 +1321,17 @@ function SalesOrdersPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Bulk allocation preview modal (rendered inside workspace for proper z-index stacking) */}
+              {showBulkPreview && bulkSuggestions && (
+                <BulkAllocationPreview
+                  orderNumber={orderDetail.order.orderNumber}
+                  customerName={orderDetail.order.customerName}
+                  suggestions={bulkSuggestions}
+                  onApply={handleApplyBulkSuggestions}
+                  onCancel={handleCancelBulkPreview}
+                />
+              )}
             </>
           ) : null}
         </main>
