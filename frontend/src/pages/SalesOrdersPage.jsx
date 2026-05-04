@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import PageHeader from "../components/PageHeader";
+import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import { useApiResource } from "../hooks/useApiResource";
+import { usePermission } from "../hooks/usePermission";
 import { apiFetch } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/formatters";
 import { useUser } from "../context/UserContext";
@@ -818,8 +820,10 @@ function buildAllocationDraft(orderDetail, stockByProduct, serialSelections, qua
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-function SalesOrdersPage() {
+function SalesOrdersPage({ onNavigate }) {
   const { currentUser } = useUser();
+  const canAllocate = usePermission("so:allocate");
+  const canCreateSO = usePermission("so:create");
   const salesOrders = useApiResource("/sales-orders");
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -1107,9 +1111,12 @@ function SalesOrdersPage() {
         title="Sales Orders"
         description="Search customer orders, review open demand, and allocate available stock."
         actions={
-          <Button variant="secondary" onClick={salesOrders.reload}>
-            Refresh
-          </Button>
+          <>
+            <Button variant="secondary" onClick={salesOrders.reload}>Refresh</Button>
+            {canCreateSO && (
+              <Button onClick={() => onNavigate?.("/sales-orders/new")}>New Sales Order</Button>
+            )}
+          </>
         }
       />
 
@@ -1262,11 +1269,13 @@ function SalesOrdersPage() {
               </div>
 
               {/* Auto-allocate CTA */}
-              <AutoAllocateBanner
-                stockStatus={stockStatus}
-                hasUnallocatedLines={hasUnallocatedLines}
-                onAutoAllocate={handleAutoAllocate}
-              />
+              {canAllocate && (
+                <AutoAllocateBanner
+                  stockStatus={stockStatus}
+                  hasUnallocatedLines={hasUnallocatedLines}
+                  onAutoAllocate={handleAutoAllocate}
+                />
+              )}
 
               {/* Line allocation cards */}
               <div className="alloc-lines">
@@ -1309,16 +1318,20 @@ function SalesOrdersPage() {
                 )}
 
                 <div className="alloc-confirm-actions">
-                  <Button
-                    onClick={handleConfirm}
-                    disabled={
-                      submitStatus === "submitting" ||
-                      allocationDraft.allocations.length === 0 ||
-                      detailStatus !== "success"
-                    }
-                  >
-                    {submitStatus === "submitting" ? "Saving…" : "Confirm Allocation"}
-                  </Button>
+                  {canAllocate ? (
+                    <Button
+                      onClick={handleConfirm}
+                      disabled={
+                        submitStatus === "submitting" ||
+                        allocationDraft.allocations.length === 0 ||
+                        detailStatus !== "success"
+                      }
+                    >
+                      {submitStatus === "submitting" ? "Saving…" : "Confirm Allocation"}
+                    </Button>
+                  ) : (
+                    <PermissionGate permission="so:allocate" />
+                  )}
                 </div>
               </div>
 

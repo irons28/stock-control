@@ -745,7 +745,7 @@ async function allocateSalesOrder(orderNumber, allocationsInput, context = {}) {
   });
 }
 
-router.post("/", requireRole("admin", "purchasing"), async (req, res, next) => {
+router.post("/", requireRole("admin", "office", "purchasing"), async (req, res, next) => {
   try {
     const customerId = Number(req.body?.customerId);
     const orderDate = String(req.body?.orderDate || "").trim();
@@ -954,7 +954,7 @@ router.get("/:soNumber", async (req, res, next) => {
   }
 });
 
-router.post("/:soNumber/allocate", async (req, res, next) => {
+router.post("/:soNumber/allocate", requireRole("admin", "office", "purchasing", "dispatch"), async (req, res, next) => {
   try {
     const allocatedBy =
       String(req.body?.allocatedBy || req.user?.full_name || "").trim() || "System";

@@ -215,7 +215,7 @@ router.get("/dashboard/summary", async (_req, res, next) => {
 });
 
 router.use("/sales-orders", salesOrdersRouter);
-router.use("/dispatch", requireRole("admin", "dispatch"), dispatchRouter);
+router.use("/dispatch", requireRole("admin", "office", "dispatch"), dispatchRouter);
 router.use("/import", importsRouter);
 
 router.get("/suppliers", async (req, res, next) => {
@@ -232,7 +232,7 @@ router.get("/suppliers", async (req, res, next) => {
   }
 });
 
-router.post("/suppliers", requireRole("admin", "purchasing"), async (req, res, next) => {
+router.post("/suppliers", requireRole("admin", "office", "purchasing"), async (req, res, next) => {
   try {
     const supplier = await createSupplier(req.body, {
       userId: req.user?.id,
@@ -248,7 +248,7 @@ router.post("/suppliers", requireRole("admin", "purchasing"), async (req, res, n
   }
 });
 
-router.put("/suppliers/:id", requireRole("admin", "purchasing"), async (req, res, next) => {
+router.put("/suppliers/:id", requireRole("admin", "office", "purchasing"), async (req, res, next) => {
   try {
     const supplier = await updateSupplier(req.params.id, req.body, {
       userId: req.user?.id,
@@ -278,7 +278,7 @@ router.get("/products", async (req, res, next) => {
   }
 });
 
-router.post("/products", requireRole("admin", "purchasing"), async (req, res, next) => {
+router.post("/products", requireRole("admin", "office", "purchasing"), async (req, res, next) => {
   try {
     const product = await createProduct(req.body, {
       userId: req.user?.id,
@@ -294,7 +294,7 @@ router.post("/products", requireRole("admin", "purchasing"), async (req, res, ne
   }
 });
 
-router.put("/products/:id", requireRole("admin", "purchasing"), async (req, res, next) => {
+router.put("/products/:id", requireRole("admin", "office", "purchasing"), async (req, res, next) => {
   try {
     const product = await updateProduct(req.params.id, req.body, {
       userId: req.user?.id,
@@ -310,7 +310,7 @@ router.put("/products/:id", requireRole("admin", "purchasing"), async (req, res,
   }
 });
 
-router.get("/allocation/available-stock/:productId", requireRole("admin", "warehouse", "dispatch", "purchasing"), async (req, res, next) => {
+router.get("/allocation/available-stock/:productId", requireRole("admin", "office", "warehouse", "dispatch", "purchasing"), async (req, res, next) => {
   try {
     const payload = await fetchAvailableStockByProduct(Number(req.params.productId));
     res.json(payload);
@@ -354,7 +354,7 @@ router.get("/purchase-orders", async (req, res, next) => {
   }
 });
 
-router.post("/purchase-orders", requireRole("admin", "purchasing"), async (req, res, next) => {
+router.post("/purchase-orders", requireRole("admin", "office", "purchasing"), async (req, res, next) => {
   try {
     const purchaseOrder = await createPurchaseOrder(req.body, {
       userId: req.user?.id,
@@ -470,7 +470,7 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
 
 router.post(
   "/purchase-orders/:poNumber/receive",
-  requireRole("admin", "warehouse", "purchasing"),
+  requireRole("admin", "office", "warehouse", "purchasing"),
   async (req, res, next) => {
     try {
       const userContext = {
@@ -525,7 +525,7 @@ function buildSuggestionReasons(row) {
 
 router.get(
   "/allocation/suggestions/:purchaseOrderNumber",
-  requireRole("admin", "warehouse", "dispatch", "purchasing"),
+  requireRole("admin", "office", "warehouse", "dispatch", "purchasing"),
   async (req, res, next) => {
     try {
       const { purchaseOrderNumber } = req.params;
@@ -718,7 +718,7 @@ router.get("/customers", async (req, res, next) => {
 // POST /customers — quick create
 router.post(
   "/customers",
-  requireRole("admin", "purchasing", "dispatch"),
+  requireRole("admin", "office", "purchasing", "dispatch"),
   async (req, res, next) => {
     try {
       const name = String(req.body?.name || "").trim();

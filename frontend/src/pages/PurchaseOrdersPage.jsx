@@ -3,6 +3,7 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
+import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatDate, formatNumber } from "../lib/formatters";
 
@@ -144,7 +145,7 @@ function PurchaseOrdersPage({ onNavigate }) {
             >
               Refresh Results
             </Button>
-            <Button onClick={() => onNavigate?.("/purchase-orders/new")}>New Purchase Order</Button>
+            <PermissionButton permission="po:create" className="btn" onClick={() => onNavigate?.("/purchase-orders/new")}>New Purchase Order</PermissionButton>
           </>
         }
       />
@@ -223,12 +224,13 @@ function PurchaseOrdersPage({ onNavigate }) {
                 </div>
                 <div className="purchase-orders-detail-actions">
                   <span className={getStatusBadgeClass(detailData.status)}>{detailData.status}</span>
-                  <Button
-                    variant="secondary"
+                  <PermissionButton
+                    permission="po:receive"
+                    className="btn btn--secondary"
                     onClick={() => onNavigate?.(`/receive-goods?po=${encodeURIComponent(detailData.poNumber)}`)}
                   >
                     Receive Goods
-                  </Button>
+                  </PermissionButton>
                 </div>
               </div>
 

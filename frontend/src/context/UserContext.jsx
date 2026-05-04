@@ -3,11 +3,9 @@ import { createContext, useContext, useState } from "react";
 export const UserContext = createContext(null);
 
 export const DEMO_USERS = [
-  { id: "1", role: "admin", full_name: "Alex Admin", email: "admin@ops.example" },
-  { id: "2", role: "purchasing", full_name: "Priya Purchasing", email: "purchase@ops.example" },
+  { id: "1", role: "admin",     full_name: "Alex Admin",      email: "admin@ops.example" },
+  { id: "2", role: "office",    full_name: "Olivia Office",   email: "office@ops.example" },
   { id: "3", role: "warehouse", full_name: "Wayne Warehouse", email: "warehouse@ops.example" },
-  { id: "4", role: "dispatch", full_name: "Diana Dispatch", email: "dispatch@ops.example" },
-  { id: "5", role: "management", full_name: "Marcus Management", email: "manager@ops.example" },
 ];
 
 export function UserProvider({ children }) {

@@ -22,9 +22,13 @@ export async function apiFetch(endpoint, options = {}) {
 }
 
 export async function apiPost(endpoint, body) {
+  const userId = localStorage.getItem("stock_user_id");
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(userId ? { "X-User-Id": userId } : {}),
+    },
     body: JSON.stringify(body),
   });
 
@@ -37,8 +41,10 @@ export async function apiPost(endpoint, body) {
 }
 
 export async function apiPostFile(endpoint, formData) {
+  const userId = localStorage.getItem("stock_user_id");
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
+    headers: { ...(userId ? { "X-User-Id": userId } : {}) },
     body: formData,
   });
 

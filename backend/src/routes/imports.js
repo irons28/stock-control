@@ -3,9 +3,12 @@ const multer = require("multer");
 const csvParser = require("csv-parser");
 const { Readable } = require("stream");
 const { run, get, all } = require("../db/connection");
+const { requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+router.use(requireRole("admin", "office", "purchasing", "management"));
 
 // ─── Schema definitions ───────────────────────────────────────────────────────
 

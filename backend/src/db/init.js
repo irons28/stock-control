@@ -400,10 +400,11 @@ async function applySchemaMigrations() {
 
 async function seedReferenceData() {
   await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (1, 'admin@ops.example', 'Alex Admin', 'admin', 'active')`);
-  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (2, 'purchase@ops.example', 'Priya Purchasing', 'purchasing', 'active')`);
+  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (2, 'office@ops.example', 'Olivia Office', 'office', 'active')`);
   await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (3, 'warehouse@ops.example', 'Wayne Warehouse', 'warehouse', 'active')`);
-  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (4, 'dispatch@ops.example', 'Diana Dispatch', 'dispatch', 'active')`);
-  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (5, 'manager@ops.example', 'Marcus Management', 'management', 'active')`);
+  // Migrate legacy demo users to current 3-role model
+  await run(`UPDATE users SET role = 'office', full_name = 'Olivia Office', email = 'office@ops.example' WHERE id = 2`);
+  await run(`UPDATE users SET role = 'office' WHERE id IN (4, 5)`);
 
   await run(`INSERT OR IGNORE INTO customers (
     code, name, contact_name, email, phone, address_line1, city, postcode, country
