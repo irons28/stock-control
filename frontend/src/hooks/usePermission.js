@@ -1,4 +1,5 @@
 import { useUser } from "../context/UserContext";
+import { normalizeRole } from "../config/users";
 
 // Roles: admin (full), office (PO/SO create, allocate, dispatch), warehouse (receive, scan, view only)
 const PERMISSIONS = {
@@ -27,7 +28,7 @@ const PERMISSIONS = {
 export function canDo(role, action) {
   const allowed = PERMISSIONS[action];
   if (!allowed) return false;
-  return allowed.includes(role);
+  return allowed.includes(normalizeRole(role));
 }
 
 export function usePermission(action) {

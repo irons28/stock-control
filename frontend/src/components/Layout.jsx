@@ -119,13 +119,14 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
           <div style={{ position: "relative" }}>
             <div className="sidebar-user">
               <div className="sidebar-user-avatar">
-                {getInitials(currentUser.full_name)}
+                {getInitials(currentUser.name)}
               </div>
               <div className="sidebar-user-info">
-                <span className="sidebar-user-name">{currentUser.full_name}</span>
+                <span className="sidebar-user-name">{currentUser.name}</span>
                 <span className={`sidebar-user-role role-${currentUser.role}`}>
-                  {currentUser.role}
+                  {currentUser.roleLabel}
                 </span>
+                <span className="sidebar-user-role-label">Current role: {currentUser.roleLabel}</span>
               </div>
               <button
                 type="button"
@@ -147,8 +148,8 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
                     className={`sidebar-user-option${user.id === currentUser.id ? " active" : ""}`}
                     onClick={() => { switchUser(user.id); setUserDropdownOpen(false); }}
                   >
-                    <span className="sidebar-user-option-name">{user.full_name}</span>
-                    <span className="sidebar-user-option-role">{user.role}</span>
+                    <span className="sidebar-user-option-name">{user.name}</span>
+                    <span className="sidebar-user-option-role">{user.roleLabel}</span>
                   </button>
                 ))}
               </div>

@@ -3,7 +3,7 @@ import PageHeader from "../components/PageHeader";
 import { useApiResource } from "../hooks/useApiResource";
 import { apiFetch } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/formatters";
-import { useUser } from "../context/UserContext";
+import { usePermission } from "../hooks/usePermission";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -413,7 +413,7 @@ function SuccessScreen({ result, onNavigate, onCreateAnother }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function NewSalesOrderPage({ onNavigate }) {
-  const { currentUser } = useUser();
+  const canCreate = usePermission("so:create");
 
   const [step, setStep] = useState("form"); // "form" | "review" | "success"
   const [form, setForm] = useState(emptyForm);
@@ -428,15 +428,12 @@ export default function NewSalesOrderPage({ onNavigate }) {
   const customers = customersResource.data?.items || [];
   const products = productsResource.data?.items || [];
 
-  // Check role permission
-  const canCreate = ["admin", "purchasing"].includes(currentUser?.role);
-
   if (!canCreate) {
     return (
       <div className="access-denied-card">
         <div className="access-denied-icon">🔒</div>
         <h3>Access Denied</h3>
-        <p>Only Admin and Purchasing users can create sales orders.</p>
+        <p>Only Admin and Office users can create sales orders.</p>
       </div>
     );
   }

@@ -4,7 +4,7 @@ const { requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-const GUEST = { id: null, role: "guest", full_name: "Guest", email: "" };
+const GUEST = { id: null, role: "guest", name: "Guest", full_name: "Guest", email: "" };
 
 router.get("/me", (req, res) => {
   if (!req.user) {

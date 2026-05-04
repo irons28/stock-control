@@ -1,11 +1,26 @@
+import { getStoredCurrentUser } from "../config/users";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
 
+export { API_BASE_URL };
+
+export function buildUserHeaders(user = getStoredCurrentUser()) {
+  if (!user?.id) {
+    return {};
+  }
+
+  return {
+    "x-user-id": user.id,
+    "x-user-name": user.name,
+    "x-user-role": user.role,
+  };
+}
+
 export async function apiFetch(endpoint, options = {}) {
-  const userId = localStorage.getItem("stock_user_id");
   const config = {
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(userId ? { "X-User-Id": userId } : {}),
+      ...buildUserHeaders(),
       ...(options.headers || {}),
     },
     ...options,
@@ -22,12 +37,11 @@ export async function apiFetch(endpoint, options = {}) {
 }
 
 export async function apiPost(endpoint, body) {
-  const userId = localStorage.getItem("stock_user_id");
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(userId ? { "X-User-Id": userId } : {}),
+      ...buildUserHeaders(),
     },
     body: JSON.stringify(body),
   });
@@ -41,10 +55,9 @@ export async function apiPost(endpoint, body) {
 }
 
 export async function apiPostFile(endpoint, formData) {
-  const userId = localStorage.getItem("stock_user_id");
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
-    headers: { ...(userId ? { "X-User-Id": userId } : {}) },
+    headers: buildUserHeaders(),
     body: formData,
   });
 

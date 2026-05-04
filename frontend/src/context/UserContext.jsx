@@ -1,28 +1,36 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import {
+  getDefaultUser,
+  getStoredCurrentUser,
+  getUserById,
+  persistCurrentUser,
+  USERS,
+} from "../config/users";
 
 export const UserContext = createContext(null);
 
-export const DEMO_USERS = [
-  { id: "1", role: "admin",     full_name: "Alex Admin",      email: "admin@ops.example" },
-  { id: "2", role: "office",    full_name: "Olivia Office",   email: "office@ops.example" },
-  { id: "3", role: "warehouse", full_name: "Wayne Warehouse", email: "warehouse@ops.example" },
-];
-
 export function UserProvider({ children }) {
   const [currentUserId, setCurrentUserId] = useState(
-    () => localStorage.getItem("stock_user_id") || "1"
+    () => getStoredCurrentUser().id || getDefaultUser().id
   );
 
-  const currentUser =
-    DEMO_USERS.find((u) => u.id === currentUserId) || DEMO_USERS[0];
+  const currentUser = getUserById(currentUserId) || getDefaultUser();
+
+  useEffect(() => {
+    persistCurrentUser(currentUser);
+  }, [currentUser]);
 
   function switchUser(id) {
-    localStorage.setItem("stock_user_id", String(id));
-    setCurrentUserId(String(id));
+    const nextUser = getUserById(id);
+    if (!nextUser) {
+      return;
+    }
+    persistCurrentUser(nextUser);
+    setCurrentUserId(nextUser.id);
   }
 
   return (
-    <UserContext.Provider value={{ currentUser, users: DEMO_USERS, switchUser }}>
+    <UserContext.Provider value={{ currentUser, users: USERS, switchUser }}>
       {children}
     </UserContext.Provider>
   );

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "../context/UserContext";
+import { API_BASE_URL, apiFetch, buildUserHeaders } from "../lib/api";
+import { usePermission } from "../hooks/usePermission";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -265,8 +267,8 @@ function ImportLogList({ logs }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function ImportPage() {
-  const { user } = useUser();
-  const canImport = user?.role === "admin" || user?.role === "purchasing" || user?.role === "management";
+  const { currentUser } = useUser();
+  const canImport = usePermission("import:use");
 
   const [step, setStep] = useState("upload");
   const [entityType, setEntityType] = useState("products");
@@ -289,12 +291,10 @@ function ImportPage() {
 
   // Load schemas and logs on mount
   useEffect(() => {
-    fetch("/api/import/schemas")
-      .then((r) => r.json())
+    apiFetch("/import/schemas")
       .then((d) => setSchemas(d.schemas))
       .catch(() => {});
-    fetch("/api/import/logs")
-      .then((r) => r.json())
+    apiFetch("/import/logs")
       .then((d) => setImportLogs(d.logs || []))
       .catch(() => {});
   }, []);
@@ -363,13 +363,10 @@ function ImportPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/import/${entityType}/validate`, {
+      const data = await apiFetch(`/import/${entityType}/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csvText, mapping }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Validation failed");
       setPreview(data);
       setStep("preview");
     } catch (err) {
@@ -383,18 +380,14 @@ function ImportPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/import/${entityType}`, {
+      const data = await apiFetch(`/import/${entityType}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csvText, mapping, filename }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Import failed");
       setImportResult(data);
       setStep("done");
       // Refresh logs
-      fetch("/api/import/logs")
-        .then((r) => r.json())
+      apiFetch("/import/logs")
         .then((d) => setImportLogs(d.logs || []))
         .catch(() => {});
     } catch (err) {
@@ -415,15 +408,38 @@ function ImportPage() {
     setStep("upload");
   }
 
-  function handleDownloadTemplate() {
-    window.open(`/api/import/${entityType}/template`, "_blank");
+  async function handleDownloadTemplate() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/import/${entityType}/template`, {
+        headers: buildUserHeaders(),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || payload.error || "Template download failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${entityType}-import-template.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   if (!canImport) {
     return (
       <div className="page-content">
         <div className="page-header">
-          <h1 className="page-title">Import Data</h1>
+          <div>
+            <h1 className="page-title">Import Data</h1>
+            <p className="page-description">Signed in as {currentUser.name} · {currentUser.roleLabel}</p>
+          </div>
         </div>
         <div className="empty-state">
           <p>You don't have permission to import data. Contact an administrator.</p>
@@ -443,6 +459,7 @@ function ImportPage() {
             Upload a CSV file to bulk-import products, customers, suppliers or orders. Map your
             columns, preview errors, then apply — partial imports are allowed.
           </p>
+          <p className="page-description">Signed in as {currentUser.name} · {currentUser.roleLabel}</p>
         </div>
         <button
           type="button"

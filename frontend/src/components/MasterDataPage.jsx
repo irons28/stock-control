@@ -62,7 +62,7 @@ function MasterDataModal({
 
         {!canManage ? (
           <div className="master-data-banner warning">
-            Your role has read-only access to master data. Switch to an admin or purchasing user to make edits.
+            Your role has read-only access to master data. Switch to an admin or office user to make edits.
           </div>
         ) : null}
 
@@ -307,7 +307,7 @@ function MasterDataPage({
 
       {!canManage ? (
         <div className="master-data-banner warning">
-          You can review {pluralLabel.toLowerCase()} here, but only admin and purchasing roles can add or edit records.
+          You can review {pluralLabel.toLowerCase()} here, but only admin and office roles can add or edit records.
         </div>
       ) : null}
 

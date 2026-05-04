@@ -310,6 +310,13 @@ textarea {
   border: 1px solid rgba(106, 174, 232, 0.22);
 }
 
+.sidebar-user-role-label {
+  display: block;
+  margin-top: 0.28rem;
+  font-size: 0.72rem;
+  color: rgba(246, 251, 255, 0.62);
+}
+
 .sidebar-user-role.role-admin      { background: rgba(220, 100, 100, 0.15); color: #f5a0a0; border-color: rgba(220, 100, 100, 0.25); }
 .sidebar-user-role.role-warehouse  { background: rgba(93, 203, 150, 0.13); color: #6edcae; border-color: rgba(93, 203, 150, 0.22); }
 .sidebar-user-role.role-dispatch   { background: rgba(160, 130, 230, 0.15); color: #c8b4f5; border-color: rgba(160, 130, 230, 0.25); }

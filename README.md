@@ -194,7 +194,7 @@ npm run test         # Vitest unit tests
 
 ## Security Notes
 
-- Authentication is **header-based** (`X-User-Id`). This is a trusted-network internal tool — it assumes users on the network are authorised staff.
+- Authentication is **header-based** (`x-user-id`, `x-user-name`, `x-user-role`). This is a trusted-network internal tool — it assumes users on the network are authorised staff.
 - HTTPS is not handled by the app. For internet-facing deployments, put it behind a reverse proxy (nginx, Caddy) with TLS.
 - The `helmet` package sets secure HTTP response headers on all responses.
 - Write operations are rate-limited to 200 requests per IP per minute.

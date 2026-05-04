@@ -11,6 +11,18 @@ const { createApp } = require("../src/app");
 let server;
 let baseUrl;
 
+function demoUserHeaders({
+  id = "admin-1",
+  name = "Alex Admin",
+  role = "admin",
+} = {}) {
+  return {
+    "X-User-Id": id,
+    "X-User-Name": name,
+    "X-User-Role": role,
+  };
+}
+
 function request(path, options = {}) {
   return new Promise((resolve, reject) => {
     const requestOptions = {
@@ -156,7 +168,7 @@ describe("master data routes", () => {
     const supplierCode = `SUP-T-${Date.now()}`;
     const createResponse = await request("/api/suppliers", {
       method: "POST",
-      headers: { "X-User-Id": "1" },
+      headers: demoUserHeaders(),
       body: {
         supplierCode,
         name: "Test Supplier",
@@ -175,7 +187,7 @@ describe("master data routes", () => {
 
     const updateResponse = await request(`/api/suppliers/${createResponse.body.item.id}`, {
       method: "PUT",
-      headers: { "X-User-Id": "1" },
+      headers: demoUserHeaders(),
       body: {
         ...createResponse.body.item,
         name: "Test Supplier Updated",
@@ -219,7 +231,7 @@ describe("master data routes", () => {
     const sku = `SKU-T-${Date.now()}`;
     const createResponse = await request("/api/products", {
       method: "POST",
-      headers: { "X-User-Id": "1" },
+      headers: demoUserHeaders(),
       body: {
         sku,
         name: "Test Product",
@@ -237,7 +249,7 @@ describe("master data routes", () => {
 
     const updateResponse = await request(`/api/products/${createResponse.body.item.id}`, {
       method: "PUT",
-      headers: { "X-User-Id": "1" },
+      headers: demoUserHeaders(),
       body: {
         ...createResponse.body.item,
         name: "Test Product Updated",
@@ -347,7 +359,7 @@ describe("purchase order creation", () => {
 
     const createResponse = await request("/api/purchase-orders", {
       method: "POST",
-      headers: { "X-User-Id": "1" },
+      headers: demoUserHeaders(),
       body: {
         supplierId: supplierResult.id,
         orderDate: "2026-04-30",
@@ -437,7 +449,7 @@ describe("purchase order creation", () => {
   test("POST /api/purchase-orders rejects invalid payloads", async () => {
     const invalidResponse = await request("/api/purchase-orders", {
       method: "POST",
-      headers: { "X-User-Id": "1" },
+      headers: demoUserHeaders(),
       body: {
         supplierId: null,
         orderDate: "2026-04-30",
@@ -448,5 +460,78 @@ describe("purchase order creation", () => {
     assert.equal(invalidResponse.status, 400);
     assert.equal(invalidResponse.body.error, true);
     assert.match(invalidResponse.body.message, /Supplier is required|At least one purchase order line is required/);
+  });
+});
+
+describe("import permissions", () => {
+  test("admin can access import schemas with synced role headers", async () => {
+    const { status, body } = await request("/api/import/schemas", {
+      headers: demoUserHeaders(),
+    });
+
+    assert.equal(status, 200);
+    assert.ok(body.schemas?.products);
+  });
+
+  test("office can access import schemas", async () => {
+    const { status, body } = await request("/api/import/schemas", {
+      headers: demoUserHeaders({
+        id: "office-1",
+        name: "Olivia Office",
+        role: "office",
+      }),
+    });
+
+    assert.equal(status, 200);
+    assert.ok(body.schemas?.customers);
+  });
+
+  test("warehouse receives currentRole in permission denied response", async () => {
+    const { status, body } = await request("/api/import/schemas", {
+      headers: demoUserHeaders({
+        id: "warehouse-1",
+        name: "Wayne Warehouse",
+        role: "warehouse",
+      }),
+    });
+
+    assert.equal(status, 403);
+    assert.equal(body.error, true);
+    assert.equal(body.message, "You don't have permission to perform this action.");
+    assert.equal(body.currentRole, "warehouse");
+    assert.equal(body.requiredRole, "admin, office");
+  });
+
+  test("imports log the acting user details into activity_log", async () => {
+    const customerCode = `CUST-IMP-${Date.now()}`;
+    const { status, body } = await request("/api/import/customers", {
+      method: "POST",
+      headers: demoUserHeaders(),
+      body: {
+        filename: "customers.csv",
+        csvText: `code,name\n${customerCode},Imported Customer`,
+        mapping: {
+          code: "code",
+          name: "name",
+        },
+      },
+    });
+
+    assert.equal(status, 200);
+    assert.equal(body.imported, 1);
+
+    const auditRow = await get(
+      `
+        SELECT user_id, user_role, user_name
+        FROM activity_log
+        WHERE action_type = 'csv_import'
+        ORDER BY id DESC
+        LIMIT 1
+      `
+    );
+
+    assert.equal(String(auditRow.user_id), "1");
+    assert.equal(auditRow.user_role, "admin");
+    assert.equal(auditRow.user_name, "Alex Admin");
   });
 });

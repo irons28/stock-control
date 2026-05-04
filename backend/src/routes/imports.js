@@ -8,7 +8,7 @@ const { requireRole } = require("../middleware/auth");
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-router.use(requireRole("admin", "office", "purchasing", "management"));
+router.use(requireRole("admin", "office"));
 
 // ─── Schema definitions ───────────────────────────────────────────────────────
 
@@ -387,7 +387,7 @@ async function validateRows(resourceType, rawRows, mapping) {
   };
 }
 
-async function executeImport(resourceType, rawRows, mapping, filename, userId) {
+async function executeImport(resourceType, rawRows, mapping, filename, userContext = {}) {
   const schema = IMPORT_SCHEMAS[resourceType];
   const importer = IMPORTERS[resourceType];
   const results = [];
@@ -417,16 +417,19 @@ async function executeImport(resourceType, rawRows, mapping, filename, userId) {
       `INSERT INTO import_logs (entity_type, filename, total_rows, imported_rows, skipped_rows, error_rows, errors_json, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [resourceType, filename || "", rawRows.length, imported, skipped, errorDetails.length,
-       JSON.stringify(errorDetails), userId || null],
+       JSON.stringify(errorDetails), userContext.userId || null],
     );
   } catch (_e) { /* non-fatal */ }
 
   // Also write to activity_log
   try {
     await run(
-      `INSERT INTO activity_log (action_type, summary, entity_type, details_json)
-       VALUES ('csv_import', ?, 'import', ?)`,
+      `INSERT INTO activity_log (user_id, user_role, user_name, action_type, summary, entity_type, details_json)
+       VALUES (?, ?, ?, 'csv_import', ?, 'import', ?)`,
       [
+        userContext.userId || null,
+        userContext.userRole || "system",
+        userContext.userName || "System",
         `CSV import: ${imported} ${resourceType} imported (${skipped} skipped, ${errorDetails.length} errors)`,
         JSON.stringify({ resource: resourceType, total: rawRows.length, imported, skipped, errors: errorDetails.length }),
       ],
@@ -511,9 +514,12 @@ Object.keys(IMPORT_SCHEMAS).forEach((resourceType) => {
       const schema = IMPORT_SCHEMAS[resourceType];
       const mapping = resolveMapping(req.body, csvHeaders, schema);
       const filename = req.file?.originalname || req.body?.filename || "";
-      const userId = req.user?.id || null;
 
-      const result = await executeImport(resourceType, rawRows, mapping, filename, userId);
+      const result = await executeImport(resourceType, rawRows, mapping, filename, {
+        userId: req.user?.id || null,
+        userRole: req.user?.role || "system",
+        userName: req.user?.full_name || req.user?.name || "System",
+      });
       res.json(result);
     } catch (err) {
       next(err);
