@@ -508,8 +508,8 @@ async function allocateSalesOrder(orderNumber, allocationsInput, context = {}) {
             userRole,
             userName,
             actionType: "serial_allocated",
-            entityType: "stock_item",
-            entityRef: String(stockItemId),
+            entityType: "sales_order",
+            entityRef: order.order_number,
             summary: `Allocated serial ${stockItem.serial_number} to ${order.order_number}`,
             details: {
               salesOrderNumber: order.order_number,
@@ -701,8 +701,8 @@ async function allocateSalesOrder(orderNumber, allocationsInput, context = {}) {
           userRole,
           userName,
           actionType: "quantity_allocated",
-          entityType: "stock_item",
-          entityRef: String(allocationRecord.id),
+          entityType: "sales_order",
+          entityRef: order.order_number,
           summary: `Allocated ${entry.quantity} ${line.unit_of_measure || "units"} of ${line.product_name} to ${order.order_number}`,
           details: {
             salesOrderNumber: order.order_number,
@@ -949,6 +949,22 @@ router.get("/:soNumber", async (req, res, next) => {
   try {
     const payload = await getSalesOrderPayload(req.params.soNumber);
     res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:soNumber/timeline", async (req, res, next) => {
+  try {
+    const events = await all(
+      `SELECT id, action_type, entity_type, entity_ref,
+              user_name, user_role, summary, details_json, created_at
+       FROM activity_log
+       WHERE entity_type = 'sales_order' AND entity_ref = ?
+       ORDER BY created_at ASC`,
+      [req.params.soNumber],
+    );
+    res.json({ events });
   } catch (error) {
     next(error);
   }

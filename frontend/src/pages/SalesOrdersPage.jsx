@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
+import ActivityTimeline from "../components/ActivityTimeline";
 import { useApiResource } from "../hooks/useApiResource";
 import { usePermission } from "../hooks/usePermission";
 import { apiFetch } from "../lib/api";
@@ -825,6 +826,7 @@ function SalesOrdersPage({ onNavigate }) {
   const canAllocate = usePermission("so:allocate");
   const canCreateSO = usePermission("so:create");
   const salesOrders = useApiResource("/sales-orders");
+  const [timelineVisible, setTimelineVisible] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
@@ -847,6 +849,12 @@ function SalesOrdersPage({ onNavigate }) {
       );
     }
   }, []);
+
+  const timeline = useApiResource(
+    selectedOrderNumber && timelineVisible
+      ? `/sales-orders/${encodeURIComponent(selectedOrderNumber)}/timeline`
+      : null,
+  );
 
   const [orderDetail, setOrderDetail] = useState(null);
   const [detailStatus, setDetailStatus] = useState("idle");
@@ -1093,10 +1101,16 @@ function SalesOrdersPage({ onNavigate }) {
     }
   }
 
+  function handleSelectOrderWithReset(orderNumber) {
+    setTimelineVisible(false);
+    handleSelectOrder(orderNumber);
+  }
+
   function handleAllocateAnother() {
     setCelebrateOrder(null);
     setSubmitStatus("idle");
     setSelectedOrderNumber(null);
+    setTimelineVisible(false);
     salesOrders.reload();
   }
 
@@ -1171,7 +1185,7 @@ function SalesOrdersPage({ onNavigate }) {
                       key={order.orderNumber}
                       type="button"
                       className={`so-queue-item ${isActive ? "so-queue-item--active" : ""} ${order.priority === "urgent" ? "so-queue-item--urgent" : ""}`}
-                      onClick={() => handleSelectOrder(order.orderNumber)}
+                      onClick={() => handleSelectOrderWithReset(order.orderNumber)}
                     >
                       <div className="so-queue-item-top">
                         <span className="so-queue-number">{order.orderNumber}</span>
@@ -1333,6 +1347,26 @@ function SalesOrdersPage({ onNavigate }) {
                     <PermissionGate permission="so:allocate" />
                   )}
                 </div>
+              </div>
+
+              {/* Activity timeline */}
+              <div className="so-timeline-section">
+                <button
+                  type="button"
+                  className="so-timeline-toggle"
+                  onClick={() => setTimelineVisible((v) => !v)}
+                >
+                  {timelineVisible ? "Hide activity" : "Show activity"}
+                  <span className="so-timeline-toggle-arrow">{timelineVisible ? "▲" : "▼"}</span>
+                </button>
+                {timelineVisible && (
+                  <ActivityTimeline
+                    events={timeline.data?.events}
+                    loading={timeline.status === "loading"}
+                    error={timeline.status === "error" ? "Unable to load activity." : null}
+                    emptyMessage="No activity recorded for this order yet."
+                  />
+                )}
               </div>
 
               {/* Bulk allocation preview modal (rendered inside workspace for proper z-index stacking) */}

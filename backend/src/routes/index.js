@@ -468,6 +468,22 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
   }
 });
 
+router.get("/purchase-orders/:poNumber/timeline", async (req, res, next) => {
+  try {
+    const events = await all(
+      `SELECT id, action_type, entity_type, entity_ref,
+              user_name, user_role, summary, details_json, created_at
+       FROM activity_log
+       WHERE entity_type = 'purchase_order' AND entity_ref = ?
+       ORDER BY created_at ASC`,
+      [req.params.poNumber],
+    );
+    res.json({ events });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post(
   "/purchase-orders/:poNumber/receive",
   requireRole("admin", "office", "warehouse", "purchasing"),

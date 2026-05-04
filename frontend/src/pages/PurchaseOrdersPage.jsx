@@ -4,6 +4,7 @@ import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
+import ActivityTimeline from "../components/ActivityTimeline";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatDate, formatNumber } from "../lib/formatters";
 
@@ -127,6 +128,9 @@ function PurchaseOrdersPage({ onNavigate }) {
   }
 
   const detailData = detail.data;
+  const timeline = useApiResource(
+    selectedPoNumber ? `/purchase-orders/${encodeURIComponent(selectedPoNumber)}/timeline` : null,
+  );
 
   return (
     <div className="page-stack">
@@ -288,6 +292,16 @@ function PurchaseOrdersPage({ onNavigate }) {
                   row.remainingQuantity > 0 ? "data-row line-needs-receiving" : "data-row"
                 }
               />
+
+              <div className="po-timeline-section">
+                <h4 className="po-timeline-heading">Activity</h4>
+                <ActivityTimeline
+                  events={timeline.data?.events}
+                  loading={timeline.status === "loading"}
+                  error={timeline.status === "error" ? "Unable to load activity." : null}
+                  emptyMessage="No activity recorded for this purchase order yet."
+                />
+              </div>
             </div>
           ) : null}
         </Card>

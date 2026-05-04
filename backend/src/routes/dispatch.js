@@ -250,7 +250,7 @@ async function getDispatchReadyOrder(salesOrderId) {
   return payload;
 }
 
-async function dispatchSalesOrder({ salesOrderId, dispatchedBy, dispatchReference, serialNumbers = [] }) {
+async function dispatchSalesOrder({ salesOrderId, dispatchedBy, dispatchReference, serialNumbers = [], userContext = {} }) {
   return withTransaction(async () => {
     if (!Number.isFinite(Number(salesOrderId))) {
       throw createError(400, "Sales order id is required.");
@@ -403,27 +403,22 @@ async function dispatchSalesOrder({ salesOrderId, dispatchedBy, dispatchReferenc
         );
 
         await run(
-          `
-            INSERT INTO activity_log (
-              stock_item_id,
-              serial_number,
-              activity_type,
-              summary,
-              reference_type,
-              reference_id,
-              payload_json
-            ) VALUES (?, ?, 'dispatched', ?, 'dispatch', ?, ?)
-          `,
+          `INSERT INTO activity_log (
+            user_id, user_role, user_name, action_type,
+            entity_type, entity_ref, summary, details_json
+          ) VALUES (?, ?, ?, 'dispatched', 'sales_order', ?, ?, ?)`,
           [
-            item.stockItemId,
-            item.serialNumber || "",
+            userContext.userId || null,
+            userContext.userRole || "system",
+            userContext.userName || cleanDispatchedBy || "System",
+            readyOrder.orderNumber,
             `${readyOrder.orderNumber} dispatched on ${cleanDispatchReference} by ${cleanDispatchedBy}`,
-            dispatchRecord.id,
             JSON.stringify({
               dispatchReference: cleanDispatchReference,
               dispatchedBy: cleanDispatchedBy,
               salesOrderId: readyOrder.salesOrderId,
               salesOrderLineId: line.salesOrderLineId,
+              serialNumber: item.serialNumber || null,
               quantityDispatched: quantityToDispatch,
             }),
           ],
@@ -508,6 +503,11 @@ router.post("/", async (req, res, next) => {
       dispatchedBy: req.body?.dispatchedBy,
       dispatchReference: req.body?.dispatchReference,
       serialNumbers: req.body?.serialNumbers,
+      userContext: {
+        userId: req.user?.id ?? null,
+        userRole: req.user?.role ?? "system",
+        userName: req.user?.full_name ?? null,
+      },
     });
 
     res.json(payload);
