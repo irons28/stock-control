@@ -15,6 +15,7 @@ import SearchPage from "./pages/SearchPage";
 import ReturnsPage from "./pages/ReturnsPage";
 import ExceptionDashboardPage from "./pages/ExceptionDashboardPage";
 import AuditLogPage from "./pages/AuditLogPage";
+import ImportPage from "./pages/ImportPage";
 import { useApiResource } from "./hooks/useApiResource";
 import { UserProvider } from "./context/UserContext";
 
@@ -103,6 +104,12 @@ const navigationItems = [
     path: "/audit-log",
     description: "User activity and action history for compliance and accountability.",
   },
+  {
+    key: "import",
+    label: "Import Data",
+    path: "/import",
+    description: "Bulk-import products, customers, suppliers and orders from CSV.",
+  },
 ];
 
 const pageComponents = {
@@ -121,6 +128,7 @@ const pageComponents = {
   returns: ReturnsPage,
   exceptions: ExceptionDashboardPage,
   "audit-log": AuditLogPage,
+  import: ImportPage,
 };
 
 // navPath lets sub-routes highlight their parent nav item in the sidebar
