@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import { useUser } from "../context/UserContext";
+import { useDemo, DEMO_STEPS } from "../context/DemoContext";
+import DemoBanner from "./DemoBanner";
 
 function getInitials(name) {
   return name
@@ -10,15 +12,32 @@ function getInitials(name) {
     .toUpperCase();
 }
 
+function LiveFeedTicker({ message }) {
+  if (!message) return null;
+  return (
+    <div className="demo-live-feed" aria-live="polite" aria-label="Live activity">
+      <span className="demo-live-dot" aria-hidden="true" />
+      <div className="demo-live-content">
+        <span className={`demo-live-user demo-live-user--${message.role}`}>{message.user}</span>
+        <span className="demo-live-text">{message.text}</span>
+      </div>
+    </div>
+  );
+}
+
 function Layout({ navigationItems, activePath, onNavigate, onSearch, health, children }) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
 
   const { currentUser, users, switchUser } = useUser();
+  const { isDemoMode, step, enterDemoMode, exitDemoMode, feedMessage } = useDemo();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const [quickQuery, setQuickQuery] = useState("");
   const quickRef = useRef(null);
+
+  // Which navKey is the current demo step pointing at?
+  const activeStepNavKey = isDemoMode ? DEMO_STEPS[step]?.navKey : null;
 
   function handleQuickKeyDown(e) {
     if (e.key === "Enter" && quickQuery.trim()) {
@@ -33,7 +52,7 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isDemoMode ? " app-shell--demo" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-section">
           <p className="eyebrow">Stock Control</p>
@@ -71,17 +90,28 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
         </div>
 
         <nav className="nav-list" aria-label="Primary">
-          {navigationItems.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={item.path === activePath ? "nav-item active" : "nav-item"}
-              onClick={() => onNavigate(item.path)}
-            >
-              <span>{item.label}</span>
-              <small>{item.description}</small>
-            </button>
-          ))}
+          {navigationItems.map((item) => {
+            const isActive = item.path === activePath;
+            const isDemoTarget = isDemoMode && item.key === activeStepNavKey;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={[
+                  "nav-item",
+                  isActive ? "active" : "",
+                  isDemoTarget ? "nav-item--demo-target" : "",
+                ].filter(Boolean).join(" ")}
+                onClick={() => onNavigate(item.path)}
+              >
+                <span>
+                  {isDemoTarget && <span className="demo-nav-pulse" aria-hidden="true" />}
+                  {item.label}
+                </span>
+                <small>{item.description}</small>
+              </button>
+            );
+          })}
         </nav>
 
         <div className="sidebar-section sidebar-footer">
@@ -125,6 +155,23 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
             )}
           </div>
 
+          {/* Demo mode toggle */}
+          <div className="demo-mode-toggle">
+            {isDemoMode ? (
+              <button type="button" className="demo-toggle-btn demo-toggle-btn--active" onClick={exitDemoMode}>
+                <span className="demo-toggle-dot" aria-hidden="true" />
+                Demo Mode On
+              </button>
+            ) : (
+              <button type="button" className="demo-toggle-btn" onClick={enterDemoMode}>
+                ▶ Start Demo Mode
+              </button>
+            )}
+          </div>
+
+          {/* Live activity ticker (demo only) */}
+          <LiveFeedTicker message={feedMessage} />
+
           {/* API status */}
           <div className={backendOnline ? "system-status online" : "system-status"}>
             <span className="status-dot" aria-hidden="true" />
@@ -140,7 +187,10 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
         </div>
       </aside>
 
-      <main className="content">{children}</main>
+      <main className="content">
+        <DemoBanner />
+        {children}
+      </main>
     </div>
   );
 }

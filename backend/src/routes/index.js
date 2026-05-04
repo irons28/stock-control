@@ -21,6 +21,7 @@ const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./s
 const { resolveUser, requireRole } = require("../middleware/auth");
 const auditRouter = require("./audit");
 const usersRouter = require("./users");
+const demoRouter = require("./demo");
 
 const router = express.Router();
 
@@ -697,6 +698,7 @@ router.use("/returns", returnsRouter);
 router.use("/dashboard/exceptions", exceptionsRouter);
 router.use("/audit-log", auditRouter);
 router.use("/users", usersRouter);
+router.use("/demo", demoRouter);
 
 // Dedicated GET /products with optional ?active=true filter
 router.get("/products", async (req, res, next) => {

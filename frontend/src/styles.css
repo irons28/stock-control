@@ -8136,3 +8136,365 @@ button.btn-permission-denied {
 
 .so-timeline-toggle:hover { color: var(--c-text); }
 .so-timeline-toggle-arrow { font-size: 0.65rem; }
+
+/* ── Demo Mode ────────────────────────────────────────────────────────────── */
+
+/* Shell modifier — subtle warm tint behind content */
+.app-shell--demo .content {
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.04) 0%, transparent 120px);
+}
+
+/* ── Demo banner (top of content area) ─────────────────────────────────── */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1c1917;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.demo-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.demo-banner-badge {
+  background: #1c1917;
+  color: #fbbf24;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+}
+
+.demo-banner-text {
+  opacity: 0.85;
+}
+
+.demo-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.demo-banner-btn {
+  background: rgba(28, 25, 23, 0.12);
+  border: 1px solid rgba(28, 25, 23, 0.2);
+  color: #1c1917;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.demo-banner-btn:hover { background: rgba(28, 25, 23, 0.22); }
+.demo-banner-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.demo-banner-btn--exit {
+  background: rgba(28, 25, 23, 0.18);
+}
+
+/* ── Walkthrough card (floating bottom-right) ───────────────────────────── */
+.demo-walkthrough {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 300px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 200;
+  overflow: hidden;
+  animation: demo-wt-appear 0.25s ease;
+}
+
+@keyframes demo-wt-appear {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.demo-wt-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  color: #1c1917;
+}
+
+.demo-wt-badge {
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  background: #1c1917;
+  color: #fbbf24;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.demo-wt-counter {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.8;
+  flex: 1;
+}
+
+.demo-wt-exit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #1c1917;
+  opacity: 0.6;
+  padding: 0.1rem 0.25rem;
+  line-height: 1;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+.demo-wt-exit:hover { opacity: 1; }
+
+.demo-wt-body {
+  padding: 1rem 0.875rem 0.75rem;
+}
+
+.demo-wt-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.demo-wt-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--c-text, #0f172a);
+  margin: 0 0 0.375rem;
+  line-height: 1.3;
+}
+
+.demo-wt-description {
+  font-size: 0.8125rem;
+  color: var(--c-text-muted, #64748b);
+  line-height: 1.5;
+  margin: 0 0 0.75rem;
+}
+
+.demo-wt-action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.78125rem;
+}
+
+.demo-wt-action-label {
+  font-weight: 700;
+  color: #b45309;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.demo-wt-action span:last-child {
+  color: var(--c-text, #0f172a);
+  line-height: 1.45;
+}
+
+/* Step dots */
+.demo-wt-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem 0.25rem;
+}
+
+.demo-wt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, transform 0.15s;
+}
+.demo-wt-dot:hover { background: #94a3b8; transform: scale(1.2); }
+.demo-wt-dot--done { background: #fde68a; }
+.demo-wt-dot--active { background: #f59e0b; transform: scale(1.3); }
+
+/* Navigation */
+.demo-wt-nav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem 0.875rem;
+}
+
+.demo-wt-btn {
+  flex: 1;
+  padding: 0.4375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, opacity 0.15s;
+}
+.demo-wt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.demo-wt-btn--secondary {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: var(--c-text-muted, #64748b);
+}
+.demo-wt-btn--secondary:hover:not(:disabled) { background: #f1f5f9; }
+
+.demo-wt-btn--primary {
+  background: #f59e0b;
+  color: #1c1917;
+  border-color: #d97706;
+}
+.demo-wt-btn--primary:hover { background: #d97706; }
+
+.demo-wt-btn--reset {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+.demo-wt-btn--reset:hover:not(:disabled) { background: #ffedd5; }
+
+.demo-wt-error {
+  font-size: 0.75rem;
+  color: #dc2626;
+  padding: 0 0.875rem 0.75rem;
+  margin: 0;
+}
+
+/* ── Sidebar: demo mode toggle ──────────────────────────────────────────── */
+.demo-mode-toggle {
+  margin-bottom: 0.5rem;
+}
+
+.demo-toggle-btn {
+  width: 100%;
+  padding: 0.4375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.78125rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: var(--c-text-muted, #64748b);
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.demo-toggle-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+.demo-toggle-btn--active {
+  background: linear-gradient(90deg, #fffbeb, #fef3c7);
+  border-color: #fde68a;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.demo-toggle-btn--active:hover { background: linear-gradient(90deg, #fef3c7, #fde68a); }
+
+.demo-toggle-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  display: inline-block;
+  animation: demo-dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes demo-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+
+/* ── Sidebar: nav item demo target highlight ────────────────────────────── */
+.nav-item--demo-target {
+  border-color: #f59e0b !important;
+  background: linear-gradient(90deg, #fffbeb, #fef9ec) !important;
+  color: #92400e !important;
+}
+
+.demo-nav-pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-right: 0.375rem;
+  vertical-align: middle;
+  animation: demo-dot-pulse 1.2s ease-in-out infinite;
+}
+
+/* ── Sidebar: live feed ticker ──────────────────────────────────────────── */
+.demo-live-feed {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  animation: demo-feed-in 0.3s ease;
+}
+
+@keyframes demo-feed-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.demo-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  animation: demo-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.demo-live-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.demo-live-user {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.demo-live-user--admin     { color: #7c3aed; }
+.demo-live-user--office    { color: #2563eb; }
+.demo-live-user--warehouse { color: #0891b2; }
+
+.demo-live-text {
+  font-size: 0.6875rem;
+  color: var(--c-text-muted, #64748b);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

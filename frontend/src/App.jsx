@@ -19,6 +19,8 @@ import ImportPage from "./pages/ImportPage";
 import { useApiResource } from "./hooks/useApiResource";
 import { UserProvider, useUser } from "./context/UserContext";
 import { canDo } from "./hooks/usePermission";
+import { DemoProvider } from "./context/DemoContext";
+import DemoWalkthrough from "./components/DemoWalkthrough";
 
 // permission = which permission key guards this nav item (undefined = always visible)
 const allNavigationItems = [
@@ -240,15 +242,18 @@ function AppShell() {
   }
 
   return (
-    <Layout
-      navigationItems={navigationItems}
-      activePath={activeNavPath}
-      onNavigate={handleNavigate}
-      onSearch={handleSearch}
-      health={health}
-    >
-      <ActivePage {...pageProps} />
-    </Layout>
+    <DemoProvider onNavigate={handleNavigate}>
+      <Layout
+        navigationItems={navigationItems}
+        activePath={activeNavPath}
+        onNavigate={handleNavigate}
+        onSearch={handleSearch}
+        health={health}
+      >
+        <ActivePage {...pageProps} />
+        <DemoWalkthrough />
+      </Layout>
+    </DemoProvider>
   );
 }
 
