@@ -8025,10 +8025,6 @@ button.btn-permission-denied {
 }
 
 .help-popover {
-  position: absolute;
-  top: calc(100% + 0.75rem);
-  right: 0;
-  z-index: 200;
   width: min(26rem, 88vw);
   padding: 1rem;
   border-radius: 1rem;
@@ -8036,6 +8032,13 @@ button.btn-permission-denied {
   background: #fff;
   color: #0f172a;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
+
+/* Portal variant — positioned via inline style from PageHelpButton */
+.help-popover--portal {
+  position: fixed;
+  z-index: 1200;
+  width: min(28rem, calc(100vw - 2rem));
 }
 
 .help-popover-header {
@@ -8395,6 +8398,22 @@ button.btn-permission-denied {
   flex-wrap: wrap;
 }
 
+/* Label text — dotted underline hints that help is available */
+.field-help-label-text {
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: rgba(36, 72, 109, 0.35);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+label:hover .field-help-label-text,
+label:focus-within .field-help-label-text {
+  color: var(--accent, #1e6bc5);
+  text-decoration-color: var(--accent, #1e6bc5);
+}
+
 /* (duplicate .help-tooltip-trigger block removed — see canonical definition above) */
 
 .help-tooltip--portal {
@@ -8424,10 +8443,6 @@ button.btn-permission-denied {
   color: #16324f;
   font-weight: 700;
   cursor: pointer;
-}
-
-.help-popover {
-  width: min(28rem, calc(100vw - 1.5rem));
 }
 
 @media (max-width: 900px) {

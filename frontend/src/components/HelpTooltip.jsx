@@ -1,63 +1,83 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+const MARGIN = 14;
+const GAP = 10;
+
 function HelpTooltip({ text, label = "Help", className = "", align = "center" }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
+  const tooltipRef = useRef(null);
   const tooltipId = useId();
-  const [style, setStyle] = useState(null);
+
+  // Start off-screen hidden so we can measure before revealing
+  const [style, setStyle] = useState({
+    position: "fixed",
+    top: -9999,
+    left: -9999,
+    visibility: "hidden",
+    zIndex: 1200,
+  });
 
   useLayoutEffect(() => {
-    if (!open) return undefined;
+    if (!open) return;
 
-    function updatePosition() {
+    function measure() {
       const trigger = triggerRef.current;
+      const tooltip = tooltipRef.current;
       if (!trigger) return;
 
       const rect = trigger.getBoundingClientRect();
-      const left =
-        align === "right"
-          ? rect.right
-          : align === "left"
-          ? rect.left
-          : rect.left + rect.width / 2;
+      const tw = tooltip ? tooltip.offsetWidth : 300;
+      const th = tooltip ? tooltip.offsetHeight : 80;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-      setStyle({
-        position: "fixed",
-        top: rect.bottom + 10,
-        left,
-        transform:
-          align === "right"
-            ? "translateX(-100%)"
-            : align === "left"
-            ? "translateX(0)"
-            : "translateX(-50%)",
-        zIndex: 1000,
-      });
+      // Initial horizontal position based on align prop
+      let left;
+      if (align === "right") left = rect.right - tw;
+      else if (align === "left") left = rect.left;
+      else left = rect.left + rect.width / 2 - tw / 2; // center
+
+      // Start below trigger
+      let top = rect.bottom + GAP;
+
+      // Flip above if overflows bottom
+      if (top + th > vh - MARGIN) {
+        top = rect.top - th - GAP;
+      }
+      if (top < MARGIN) top = MARGIN;
+
+      // Clamp horizontal
+      if (left + tw > vw - MARGIN) left = vw - MARGIN - tw;
+      if (left < MARGIN) left = MARGIN;
+
+      setStyle({ position: "fixed", top, left, visibility: "visible", zIndex: 1200 });
     }
 
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
+    // Reset to hidden so tooltip renders once before measuring
+    setStyle({ position: "fixed", top: -9999, left: -9999, visibility: "hidden", zIndex: 1200 });
+    measure();
+
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
     return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
     };
-  }, [align, open]);
+  }, [open, align]);
 
+  // Close on click-outside and Escape
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) return;
 
-    function handlePointerDown(event) {
-      if (triggerRef.current && !triggerRef.current.contains(event.target)) {
+    function handlePointerDown(e) {
+      if (triggerRef.current && !triggerRef.current.contains(e.target)) {
         setOpen(false);
       }
     }
-
-    function handleEscape(event) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
+    function handleEscape(e) {
+      if (e.key === "Escape") setOpen(false);
     }
 
     document.addEventListener("mousedown", handlePointerDown);
@@ -81,17 +101,18 @@ function HelpTooltip({ text, label = "Help", className = "", align = "center" })
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onClick={(event) => {
-          event.preventDefault();
-          setOpen((value) => !value);
+        onClick={(e) => {
+          e.preventDefault();
+          setOpen((v) => !v);
         }}
       >
         ?
       </button>
-      {open && style && typeof document !== "undefined"
+      {open && typeof document !== "undefined"
         ? createPortal(
             <div
               id={tooltipId}
+              ref={tooltipRef}
               className="help-tooltip help-tooltip--portal"
               style={style}
               role="tooltip"
