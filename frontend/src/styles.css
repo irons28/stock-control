@@ -10190,3 +10190,423 @@ body::after {
     max-width: 6rem;
   }
 }
+
+/* ── SwanRetail Light Glass Tuning ────────────────────────────────────────── */
+
+:root {
+  --shell-purple: #2b1363;
+  --shell-purple-dark: #241052;
+  --shell-purple-deep: #1c0c43;
+  --shell-cyan: #11c5e8;
+  --shell-cyan-bright: #19d4ff;
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-shadow: 0 14px 34px rgba(28, 13, 74, 0.18);
+  --surface-light: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.92),
+    rgba(243, 239, 255, 0.82)
+  );
+  --surface-light-strong: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.96),
+    rgba(247, 244, 255, 0.9)
+  );
+  --surface-purple: linear-gradient(
+    145deg,
+    rgba(88, 61, 166, 0.42),
+    rgba(51, 27, 116, 0.34)
+  );
+  --text-ink: #1d2340;
+  --text-ink-soft: #58617f;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at top left, rgba(25, 212, 255, 0.08), transparent 18%),
+    radial-gradient(circle at 78% 16%, rgba(129, 103, 220, 0.12), transparent 20%),
+    linear-gradient(160deg, #25105a 0%, #2b1363 62%, #22104f 100%);
+}
+
+body::before {
+  opacity: 0.08;
+  background-image:
+    linear-gradient(30deg, rgba(25, 212, 255, 0.92) 12%, transparent 12.5%, transparent 87%, rgba(25, 212, 255, 0.92) 87.5%, rgba(25, 212, 255, 0.92)),
+    linear-gradient(150deg, rgba(25, 212, 255, 0.92) 12%, transparent 12.5%, transparent 87%, rgba(25, 212, 255, 0.92) 87.5%, rgba(25, 212, 255, 0.92)),
+    linear-gradient(90deg, rgba(25, 212, 255, 0.78) 2%, transparent 2.5%, transparent 97%, rgba(25, 212, 255, 0.78) 97.5%, rgba(25, 212, 255, 0.78));
+  background-size: 78px 135px, 78px 135px, 78px 135px;
+  background-position: 0 0, 0 0, 39px 67px;
+}
+
+body::after {
+  background:
+    linear-gradient(180deg, rgba(10, 4, 30, 0.01), rgba(10, 4, 30, 0.12)),
+    radial-gradient(circle at center, rgba(17, 197, 232, 0.03), transparent 48%);
+}
+
+.content--topnav {
+  padding-top: 0.9rem;
+  padding-bottom: 2rem;
+}
+
+.page-stack {
+  gap: 1rem;
+}
+
+.app-topbar {
+  padding: 0.8rem 1.15rem;
+  background: linear-gradient(
+    135deg,
+    rgba(43, 19, 99, 0.78),
+    rgba(33, 15, 79, 0.72)
+  );
+  box-shadow: 0 12px 24px rgba(20, 10, 53, 0.18);
+}
+
+.app-topbar::before {
+  opacity: 0.06;
+  background-size: 54px 94px, 54px 94px, 54px 94px;
+  background-position: 0 0, 0 0, 27px 47px;
+}
+
+.app-topbar::after,
+.page-header::before {
+  content: none;
+}
+
+.app-topbar-brand {
+  gap: 0.85rem;
+}
+
+.app-brand-logo {
+  height: 2.55rem;
+  max-width: 5.5rem;
+}
+
+.app-brand-wordmark {
+  gap: 0.08rem;
+}
+
+.app-brand-title {
+  font-size: clamp(1.45rem, 2.5vw, 1.95rem);
+}
+
+.app-brand-subtitle {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+.app-topbar-copy {
+  max-width: 27rem;
+  font-size: 0.8rem;
+  color: rgba(231, 235, 247, 0.82);
+}
+
+.topbar-search,
+.topbar-user-card,
+.system-status,
+.demo-toggle-btn {
+  background: var(--surface-purple);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 24px rgba(20, 10, 53, 0.14);
+}
+
+.topbar-search {
+  min-width: min(21rem, 100%);
+  padding: 0.18rem 0.72rem;
+}
+
+.topbar-user-card {
+  padding: 0.38rem 0.48rem 0.38rem 0.4rem;
+}
+
+.app-navigation-shell {
+  top: 74px;
+  gap: 0.55rem;
+  padding: 0.7rem 1.15rem 0.75rem;
+  background: rgba(29, 13, 70, 0.34);
+}
+
+.top-tabs,
+.sub-tabs {
+  gap: 0.5rem;
+  padding: 0.16rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.top-tab {
+  padding: 0.72rem 0.92rem;
+}
+
+.sub-tab {
+  padding: 0.38rem 0.82rem;
+  font-size: 0.84rem;
+}
+
+.top-tab.active,
+.sub-tab.active,
+.button,
+.login-submit,
+.btn,
+.btn-primary,
+.page-actions .button.secondary,
+.integrations-test-btn.button.secondary {
+  box-shadow: 0 10px 24px rgba(17, 197, 232, 0.24);
+}
+
+.app-utility-row {
+  padding: 0.75rem 1.15rem 0;
+  gap: 0.75rem;
+}
+
+.page-header {
+  padding: 1.2rem 1.35rem;
+  background: linear-gradient(
+    145deg,
+    rgba(85, 59, 161, 0.34),
+    rgba(50, 27, 113, 0.3)
+  );
+  box-shadow: 0 12px 28px rgba(20, 10, 53, 0.15);
+}
+
+.page-header h2,
+.page-description,
+.page-subtitle {
+  color: #f4f6fd;
+}
+
+.card,
+.dashboard-state-card,
+.po-inline-empty,
+.po-review-metrics div,
+.po-success-grid div,
+.master-data-banner,
+.master-data-toggle-card,
+.notice,
+.integrations-setup-hint {
+  background: var(--surface-light);
+  border-color: rgba(141, 126, 201, 0.18);
+  box-shadow: 0 12px 30px rgba(23, 15, 58, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.guided-help-panel,
+.system-status,
+.topbar-search,
+.topbar-user-card,
+.demo-toggle-btn,
+.page-header {
+  border-color: var(--glass-border);
+}
+
+.card-header h3,
+.card-header h4,
+.card strong,
+.definition-list dd,
+.table-state strong,
+.detail-state strong,
+.dashboard-state h3,
+.summary-value,
+.dashboard-card-value,
+.po-lines-toolbar strong,
+.po-review-section h4,
+.po-success-hero h3,
+.po-review-line strong,
+.po-sales-order-card strong,
+.master-data-primary-cell strong,
+.integrations-detail-list dd,
+.data-table td,
+.po-lines-table td {
+  color: var(--text-ink);
+}
+
+.card,
+.card-body,
+.card-header,
+.dashboard-card-label,
+.summary-label,
+.definition-list dt,
+.master-data-primary-cell span,
+.master-data-notes-preview,
+.master-data-toggle-help,
+.table-search-count,
+.result-meta,
+.po-sales-order-card span,
+.po-review-line span,
+.po-review-hero span,
+.po-lines-toolbar p,
+.po-review-section p,
+.po-success-hero p,
+.integrations-label,
+.integrations-test-detail,
+.integrations-message,
+.integrations-detail-list dt,
+.table-state,
+.detail-state {
+  color: var(--text-ink-soft);
+}
+
+.po-sales-order-card,
+.dashboard-summary-card-shell,
+.purchase-orders-results,
+.search-form,
+.receive-po-search-block {
+  background: var(--surface-light-strong);
+}
+
+.guided-help-panel {
+  background: linear-gradient(
+    145deg,
+    rgba(93, 69, 172, 0.48),
+    rgba(57, 34, 128, 0.4)
+  );
+  box-shadow: var(--glass-shadow);
+}
+
+.guided-help-header h3,
+.guided-help-toggle,
+.guided-help-panel .eyebrow {
+  color: #f7f9ff;
+}
+
+.guided-help-intro,
+.guided-help-list,
+.help-summary,
+.help-list {
+  color: rgba(236, 240, 250, 0.86);
+}
+
+.table-wrap,
+.po-lines-table-wrap,
+.imp-preview-table-wrap {
+  background: rgba(255, 255, 255, 0.84);
+  border-color: rgba(141, 126, 201, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.data-table th,
+.po-lines-table th {
+  color: #635a8a;
+  background: rgba(109, 93, 181, 0.08);
+}
+
+.data-table td,
+.po-lines-table td {
+  border-bottom-color: rgba(104, 93, 154, 0.12);
+}
+
+.data-table tbody tr:hover,
+.po-lines-table tbody tr:hover {
+  background: rgba(17, 197, 232, 0.05);
+}
+
+.master-data-field-label,
+.login-form label span,
+.integrations-label,
+.field-help-label,
+.receive-inline-help-label {
+  color: #f2f4fc;
+}
+
+.help-tooltip-trigger--field {
+  color: #9fe9fb;
+}
+
+.master-data-field input,
+.master-data-field textarea,
+.master-data-filter select,
+.table-search-input,
+.po-search-input,
+.po-lines-table td input,
+.po-lines-table td select,
+.serial-chip-input,
+.login-form input,
+.sidebar-search-input,
+.jira-key-input {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(131, 119, 188, 0.18);
+}
+
+.login-shell {
+  padding: 1.5rem;
+}
+
+.login-card {
+  width: min(30rem, 100%);
+  padding: 1.55rem;
+  background: linear-gradient(
+    160deg,
+    rgba(84, 59, 163, 0.62),
+    rgba(44, 24, 98, 0.5)
+  );
+  box-shadow: 0 22px 50px rgba(20, 10, 53, 0.22);
+}
+
+.login-card::before {
+  opacity: 0.06;
+  background-size: 66px 114px, 66px 114px, 66px 114px;
+  background-position: 0 0, 0 0, 33px 57px;
+}
+
+.login-brand-hero {
+  margin-bottom: 0.72rem;
+}
+
+.app-brand-logo--login {
+  height: 3.2rem;
+  max-width: 7rem;
+}
+
+.app-brand-title--login {
+  font-size: clamp(1.85rem, 4.6vw, 2.35rem);
+}
+
+.login-copy h2 {
+  margin-bottom: 0.35rem;
+  font-size: 1.52rem;
+}
+
+.login-copy p,
+.login-form label {
+  color: rgba(236, 240, 250, 0.86);
+}
+
+.login-form {
+  gap: 0.85rem;
+}
+
+.system-status,
+.integrations-test-result,
+.alert.warning,
+.alert.error,
+.alert.info,
+.login-error {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+  .app-navigation-shell {
+    top: 114px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-navigation-shell {
+    top: 150px;
+  }
+
+  .app-topbar {
+    padding: 0.72rem 0.95rem;
+  }
+
+  .app-navigation-shell,
+  .app-utility-row {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+
+  .login-card {
+    padding: 1.3rem;
+  }
+}
