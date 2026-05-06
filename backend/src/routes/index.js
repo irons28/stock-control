@@ -2,6 +2,7 @@ const express = require("express");
 const { all, get, run } = require("../db/connection");
 const { moduleDefinitions } = require("../config/modules");
 const { createPurchaseOrder, receivePurchaseOrder } = require("../services/purchase-orders");
+const jira = require("../services/jira");
 const {
   createProduct,
   createSupplier,
@@ -138,6 +139,7 @@ const purchaseOrderSummarySelect = `
     po.linked_sales_order_id,
     po.supplier_reference,
     po.notes,
+    po.jira_issue_key,
     s.name AS supplier,
     s.name AS supplier_name,
     po.ordered_at AS orderDate,
@@ -200,6 +202,10 @@ router.get("/navigation", (_req, res) => {
   res.json({
     items: moduleDefinitions,
   });
+});
+
+router.get("/admin/integrations/status", requireRole("admin"), (_req, res) => {
+  res.json({ jira: jira.getConfig() });
 });
 
 router.get("/dashboard/summary", async (_req, res, next) => {
@@ -439,6 +445,7 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
       expectedDeliveryDate: detail.expectedDeliveryDate,
       supplierReference: detail.supplier_reference || "",
       notes: detail.notes || "",
+      jiraIssueKey: detail.jira_issue_key || null,
       linkedSalesOrders: linkedSalesOrders.map((salesOrder) => ({
         id: salesOrder.id,
         orderNumber: salesOrder.order_number,

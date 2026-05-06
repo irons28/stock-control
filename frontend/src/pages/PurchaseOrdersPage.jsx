@@ -275,6 +275,14 @@ function PurchaseOrdersPage({ onNavigate }) {
                   <dt>Still Open</dt>
                   <dd>{detailData.openLineCount}</dd>
                 </div>
+                {detailData.jiraIssueKey && (
+                  <div>
+                    <dt>Jira Issue</dt>
+                    <dd>
+                      <span className="jira-issue-key">{detailData.jiraIssueKey}</span>
+                    </dd>
+                  </div>
+                )}
               </dl>
 
               <div className="receipt-progress">

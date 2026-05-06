@@ -2,11 +2,22 @@ import { cloneElement, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 const MARGIN = 14; // px gap from viewport edges
-const GAP = 10;    // px gap between anchor and tooltip
+const GAP = 8;     // px gap between anchor and tooltip
 
+/**
+ * TooltipBubble — portal-rendered tooltip with viewport-safe positioning.
+ *
+ * Two-pass approach:
+ *   1. Render off-screen (visibility:hidden) so the browser can calculate
+ *      the tooltip's real offsetWidth / offsetHeight.
+ *   2. useLayoutEffect measures anchor + tooltip, computes a position that
+ *      stays inside the viewport, then makes the tooltip visible.
+ *
+ * Repositions on scroll and resize.
+ */
 function TooltipBubble({ anchorRef, text, id }) {
   const tooltipRef = useRef(null);
-  // Start invisible so we can measure before showing
+
   const [style, setStyle] = useState({
     position: "fixed",
     top: -9999,
@@ -19,48 +30,62 @@ function TooltipBubble({ anchorRef, text, id }) {
     function measure() {
       const anchor = anchorRef.current;
       const tooltip = tooltipRef.current;
-      if (!anchor) return;
+      if (!anchor || !tooltip) return;
 
-      const anchorRect = anchor.getBoundingClientRect();
-      const tw = tooltip ? tooltip.offsetWidth : 300;
-      const th = tooltip ? tooltip.offsetHeight : 80;
+      const ar = anchor.getBoundingClientRect();
+      // Use real measured dimensions; fall back only if somehow zero
+      const tw = tooltip.offsetWidth || 300;
+      const th = tooltip.offsetHeight || 60;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // Start: below anchor, left-aligned to anchor
-      let top = anchorRect.bottom + GAP;
-      let left = anchorRect.left;
+      // Default: below anchor, left-aligned
+      let top = ar.bottom + GAP;
+      let left = ar.left;
 
       // Flip above if overflows bottom
       if (top + th > vh - MARGIN) {
-        top = anchorRect.top - th - GAP;
+        top = ar.top - th - GAP;
       }
-      // Clamp top
+      // If flipping above still clips (very tall tooltip / near top), clamp
       if (top < MARGIN) top = MARGIN;
 
-      // Clamp right → shift left
-      if (left + tw > vw - MARGIN) {
-        left = vw - MARGIN - tw;
-      }
+      // Clamp right
+      if (left + tw > vw - MARGIN) left = vw - MARGIN - tw;
       // Clamp left
       if (left < MARGIN) left = MARGIN;
 
       setStyle({ position: "fixed", top, left, visibility: "visible", zIndex: 1200 });
     }
 
-    measure(); // measure after initial hidden render
-    window.addEventListener("scroll", measure, true);
-    window.addEventListener("resize", measure);
+    // Reset to hidden so we measure the tooltip at its natural size,
+    // not at whatever position it was left at.
+    setStyle({ position: "fixed", top: -9999, left: -9999, visibility: "hidden", zIndex: 1200 });
+
+    // Use rAF so the hidden render completes before we measure.
+    const frame = requestAnimationFrame(measure);
+
+    window.addEventListener("scroll", measure, { capture: true, passive: true });
+    window.addEventListener("resize", measure, { passive: true });
     return () => {
-      window.removeEventListener("scroll", measure, true);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", measure, { capture: true });
       window.removeEventListener("resize", measure);
     };
-  }, [anchorRef]);
+  // anchorRef is stable — this effect runs once per TooltipBubble mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div id={id} ref={tooltipRef} className="help-tooltip help-tooltip--portal" style={style} role="tooltip">
+    <div
+      id={id}
+      ref={tooltipRef}
+      className="help-tooltip help-tooltip--portal"
+      style={style}
+      role="tooltip"
+    >
       {text}
     </div>,
     document.body
@@ -77,10 +102,14 @@ function mergeHandlers(original, injected) {
 /**
  * FieldHelp
  *
- * Wraps a form field with a label whose text is itself the help trigger.
+ * Wraps a form field with a label whose text IS the help trigger.
  * No "?" icon — the label word(s) get a dotted underline and accent hover.
- * Hovering the label, focusing the label text, or focusing the child input
- * all open the tooltip.
+ *
+ * Interactions that open the tooltip:
+ *   • Hover anywhere on the <label>
+ *   • Focus the label-text button (keyboard Tab)
+ *   • Focus the child input (keyboard Tab)
+ *   • Touch / click the label text
  */
 function FieldHelp({
   label,
@@ -92,10 +121,9 @@ function FieldHelp({
 }) {
   const tooltipId = useId();
   const labelTextRef = useRef(null);
-  const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
 
-  // Inject focus/blur into the child input so tooltip opens when input is focused
+  // Inject focus/blur into the child input so tooltip follows keyboard focus
   const child = children
     ? cloneElement(children, {
         "aria-describedby": open ? tooltipId : children.props["aria-describedby"],
@@ -107,12 +135,11 @@ function FieldHelp({
   return (
     <label
       className={className}
-      ref={wrapperRef}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
       <span className={`${labelClassName} field-help-label`}>
-        {/* The label text IS the trigger — styled as underlined text, no circle */}
+        {/* Label text is the trigger — styled with dotted underline */}
         <button
           ref={labelTextRef}
           type="button"
@@ -130,9 +157,11 @@ function FieldHelp({
         </button>
         {required ? <span className="master-data-required">*</span> : null}
       </span>
+
       {child}
+
       {open
-        ? <TooltipBubble anchorRef={labelTextRef.current ? labelTextRef : wrapperRef} text={help} id={tooltipId} />
+        ? <TooltipBubble anchorRef={labelTextRef} text={help} id={tooltipId} />
         : null}
     </label>
   );

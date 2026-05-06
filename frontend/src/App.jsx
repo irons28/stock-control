@@ -19,6 +19,7 @@ import ImportPage from "./pages/ImportPage";
 import DispatchPage from "./pages/DispatchPage";
 import CustomersPage from "./pages/CustomersPage";
 import UsersPage from "./pages/UsersPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
 import LoginPage from "./pages/LoginPage";
 import AccessDeniedPage from "./pages/AccessDeniedPage";
 import { useApiResource } from "./hooks/useApiResource";
@@ -136,6 +137,15 @@ const routes = [
     component: ImportPage,
     permission: "import:use",
     description: "Bulk import trusted operational data.",
+  },
+  {
+    key: "integrations",
+    label: "Integrations",
+    topTab: "admin",
+    path: "/integrations",
+    component: IntegrationsPage,
+    permission: "users:view",
+    description: "External service connections (Jira, etc.).",
   },
   {
     key: "products",

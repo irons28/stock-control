@@ -1138,6 +1138,15 @@ function ReceiveGoodsPage({ onNavigate }) {
           ))}
         </div>
 
+        {/* Jira integration result */}
+        {successSummary.jiraResult?.attempted && (
+          <div className={`alert ${successSummary.jiraResult.success ? "success" : "warning"}`}>
+            {successSummary.jiraResult.success
+              ? `Jira comment added to ${successSummary.jiraResult.issueKey}.`
+              : `Jira update could not be completed for ${successSummary.jiraResult.issueKey}. The receipt was still saved.`}
+          </div>
+        )}
+
         {showSuggestions && (
           <SuggestionsPanel
             poNumber={selectedPoNumber}

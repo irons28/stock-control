@@ -434,6 +434,10 @@ async function applySchemaMigrations() {
   await addColumnIfMissing("sales_orders", "priority TEXT NOT NULL DEFAULT 'normal'");
   await addColumnIfMissing("sales_orders", "customer_reference TEXT DEFAULT ''");
 
+  // Jira integration — optional issue keys on orders
+  await addColumnIfMissing("purchase_orders", "jira_issue_key TEXT DEFAULT NULL");
+  await addColumnIfMissing("sales_orders",    "jira_issue_key TEXT DEFAULT NULL");
+
   await run(`
     UPDATE users
     SET
