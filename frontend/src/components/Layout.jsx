@@ -1,12 +1,11 @@
 import { useRef, useState } from "react";
-import { useUser } from "../context/UserContext";
 import { useDemo, DEMO_STEPS } from "../context/DemoContext";
 import DemoBanner from "./DemoBanner";
 
 function getInitials(name) {
-  return name
+  return String(name || "")
     .split(" ")
-    .map((p) => p[0])
+    .map((part) => part[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
@@ -25,27 +24,30 @@ function LiveFeedTicker({ message }) {
   );
 }
 
-function Layout({ navigationItems, activePath, onNavigate, onSearch, health, children }) {
+function Layout({
+  navigationSections,
+  activePath,
+  onNavigate,
+  onSearch,
+  health,
+  currentUser,
+  onLogout,
+  children,
+}) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
-
-  const { currentUser, users, switchUser } = useUser();
   const { isDemoMode, step, enterDemoMode, exitDemoMode, feedMessage } = useDemo();
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-
   const [quickQuery, setQuickQuery] = useState("");
   const quickRef = useRef(null);
-
-  // Which navKey is the current demo step pointing at?
   const activeStepNavKey = isDemoMode ? DEMO_STEPS[step]?.navKey : null;
 
-  function handleQuickKeyDown(e) {
-    if (e.key === "Enter" && quickQuery.trim()) {
+  function handleQuickKeyDown(event) {
+    if (event.key === "Enter" && quickQuery.trim()) {
       onSearch(quickQuery.trim());
       setQuickQuery("");
       quickRef.current?.blur();
     }
-    if (e.key === "Escape") {
+    if (event.key === "Escape") {
       setQuickQuery("");
       quickRef.current?.blur();
     }
@@ -56,13 +58,12 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
       <aside className="sidebar">
         <div className="sidebar-section">
           <p className="eyebrow">Stock Control</p>
-          <h1>Operations</h1>
+          <h1>Operations Workspace</h1>
           <p className="sidebar-copy">
-            Purchasing, stock handling, and sales order fulfilment.
+            Authenticated purchasing, stock, and dispatch workflows with role-based access.
           </p>
         </div>
 
-        {/* Quick search */}
         <div className="sidebar-search">
           <span className="sidebar-search-icon" aria-hidden="true">⌕</span>
           <input
@@ -70,96 +71,82 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
             type="text"
             className="sidebar-search-input"
             value={quickQuery}
-            onChange={(e) => setQuickQuery(e.target.value)}
+            onChange={(event) => setQuickQuery(event.target.value)}
             onKeyDown={handleQuickKeyDown}
             placeholder="Quick search…"
             autoComplete="off"
             spellCheck={false}
-            aria-label="Quick search — press Enter to search"
+            aria-label="Quick search"
           />
-          {quickQuery && (
+          {quickQuery ? (
             <button
               type="button"
               className="sidebar-search-clear"
-              onClick={() => { setQuickQuery(""); quickRef.current?.focus(); }}
+              onClick={() => {
+                setQuickQuery("");
+                quickRef.current?.focus();
+              }}
               aria-label="Clear"
             >
               ×
             </button>
-          )}
+          ) : null}
         </div>
 
-        <nav className="nav-list" aria-label="Primary">
-          {navigationItems.map((item) => {
-            const isActive = item.path === activePath;
-            const isDemoTarget = isDemoMode && item.key === activeStepNavKey;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={[
-                  "nav-item",
-                  isActive ? "active" : "",
-                  isDemoTarget ? "nav-item--demo-target" : "",
-                ].filter(Boolean).join(" ")}
-                onClick={() => onNavigate(item.path)}
-              >
-                <span>
-                  {isDemoTarget && <span className="demo-nav-pulse" aria-hidden="true" />}
-                  {item.label}
-                </span>
-                <small>{item.description}</small>
-              </button>
-            );
-          })}
+        <nav className="nav-list nav-list--grouped" aria-label="Primary">
+          {navigationSections.map((section) => (
+            <div key={section.label} className="nav-group">
+              <p className="nav-group-label">{section.label}</p>
+              {section.items.map((item) => {
+                const isActive = item.path === activePath;
+                const isDemoTarget = isDemoMode && item.key === activeStepNavKey;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={[
+                      "nav-item",
+                      isActive ? "active" : "",
+                      isDemoTarget ? "nav-item--demo-target" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => onNavigate(item.path)}
+                  >
+                    <span>
+                      {isDemoTarget ? <span className="demo-nav-pulse" aria-hidden="true" /> : null}
+                      {item.label}
+                    </span>
+                    <small>{item.description}</small>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-section sidebar-footer">
-          {/* User panel */}
-          <div style={{ position: "relative" }}>
-            <div className="sidebar-user">
-              <div className="sidebar-user-avatar">
-                {getInitials(currentUser.name)}
-              </div>
-              <div className="sidebar-user-info">
-                <span className="sidebar-user-name">{currentUser.name}</span>
-                <span className={`sidebar-user-role role-${currentUser.role}`}>
-                  {currentUser.roleLabel}
-                </span>
-                <span className="sidebar-user-role-label">Current role: {currentUser.roleLabel}</span>
-              </div>
-              <button
-                type="button"
-                className="sidebar-user-switch"
-                onClick={() => setUserDropdownOpen((v) => !v)}
-                aria-label="Switch user"
-                aria-expanded={userDropdownOpen}
-              >
-                ⇅
-              </button>
+          <div className="sidebar-user sidebar-user--static">
+            <div className="sidebar-user-avatar">{getInitials(currentUser.name)}</div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">{currentUser.name}</span>
+              <span className={`sidebar-user-role role-${currentUser.role}`}>
+                {currentUser.roleLabel}
+              </span>
+              <span className="sidebar-user-role-label">@{currentUser.username}</span>
             </div>
-
-            {userDropdownOpen && (
-              <div className="sidebar-user-dropdown">
-                {users.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    className={`sidebar-user-option${user.id === currentUser.id ? " active" : ""}`}
-                    onClick={() => { switchUser(user.id); setUserDropdownOpen(false); }}
-                  >
-                    <span className="sidebar-user-option-name">{user.name}</span>
-                    <span className="sidebar-user-option-role">{user.roleLabel}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <button type="button" className="sidebar-logout-btn" onClick={onLogout}>
+              Log out
+            </button>
           </div>
 
-          {/* Demo mode toggle */}
           <div className="demo-mode-toggle">
             {isDemoMode ? (
-              <button type="button" className="demo-toggle-btn demo-toggle-btn--active" onClick={exitDemoMode}>
+              <button
+                type="button"
+                className="demo-toggle-btn demo-toggle-btn--active"
+                onClick={exitDemoMode}
+              >
                 <span className="demo-toggle-dot" aria-hidden="true" />
                 Demo Mode On
               </button>
@@ -170,10 +157,8 @@ function Layout({ navigationItems, activePath, onNavigate, onSearch, health, chi
             )}
           </div>
 
-          {/* Live activity ticker (demo only) */}
           <LiveFeedTicker message={feedMessage} />
 
-          {/* API status */}
           <div className={backendOnline ? "system-status online" : "system-status"}>
             <span className="status-dot" aria-hidden="true" />
             <div>

@@ -78,8 +78,8 @@ export function getStatusVariant(status) {
     case "received":
     case "available":
     case "completed":
-      return "positive";
     case "dispatched":
+      return "positive";
     case "ordered":
     case "confirmed":
     case "allocated":

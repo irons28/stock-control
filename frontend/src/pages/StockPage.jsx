@@ -1,7 +1,9 @@
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import PageHeader from "../components/PageHeader";
+import { HELP_CONTENT } from "../config/helpContent";
 import StatusPill from "../components/StatusPill";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatDateTime, formatNumber } from "../lib/formatters";
@@ -46,11 +48,18 @@ function StockPage() {
         eyebrow="Inventory"
         title="Stock"
         description="Review inventory movement history across receiving, transfers, dispatch, and exception handling."
+        help={HELP_CONTENT.stock}
         actions={
           <Button variant="secondary" onClick={stockMovements.reload}>
             Refresh
           </Button>
         }
+      />
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.stock.summary}
+        steps={HELP_CONTENT.stock.steps}
+        warnings={HELP_CONTENT.stock.warnings}
       />
 
       <Card title="Stock Movements" subtitle="Live Data">

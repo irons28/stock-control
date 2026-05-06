@@ -20,12 +20,14 @@ const exceptionsRouter = require("./exceptions");
 const { fetchAvailableStockByProduct, router: salesOrdersRouter } = require("./salesOrders");
 const { resolveUser, requireRole } = require("../middleware/auth");
 const auditRouter = require("./audit");
+const { router: authRouter } = require("./auth");
 const usersRouter = require("./users");
 const demoRouter = require("./demo");
 
 const router = express.Router();
 
 router.use(resolveUser);
+router.use("/auth", authRouter);
 
 const resourceQueries = {
   customers: "SELECT * FROM customers ORDER BY name ASC",
@@ -216,7 +218,7 @@ router.get("/dashboard/summary", async (_req, res, next) => {
 });
 
 router.use("/sales-orders", salesOrdersRouter);
-router.use("/dispatch", requireRole("admin", "office", "dispatch"), dispatchRouter);
+router.use("/dispatch", requireRole("admin", "office", "warehouse", "dispatch"), dispatchRouter);
 router.use("/import", importsRouter);
 
 router.get("/suppliers", async (req, res, next) => {
@@ -718,8 +720,16 @@ router.get("/products", async (req, res, next) => {
 // Dedicated GET /customers with optional ?search= filter (active only)
 router.get("/customers", async (req, res, next) => {
   const search = String(req.query.search || "").trim().toLowerCase();
+  const includeInactive =
+    req.query.includeInactive === true ||
+    req.query.includeInactive === "true" ||
+    req.query.includeInactive === "1";
   try {
-    const items = await all("SELECT * FROM customers WHERE status = 'active' ORDER BY name ASC");
+    const items = await all(
+      includeInactive
+        ? "SELECT * FROM customers ORDER BY name ASC"
+        : "SELECT * FROM customers WHERE status = 'active' ORDER BY name ASC"
+    );
     const filtered = search
       ? items.filter(
           (c) =>
@@ -764,6 +774,48 @@ router.post(
       );
       const customer = await get("SELECT * FROM customers WHERE id = ?", [result.id]);
       res.status(201).json(customer);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  "/customers/:id",
+  requireRole("admin", "office", "purchasing", "dispatch"),
+  async (req, res, next) => {
+    try {
+      const customerId = Number(req.params.id);
+      const existing = await get("SELECT * FROM customers WHERE id = ?", [customerId]);
+
+      if (!existing) {
+        return res.status(404).json({ error: true, message: "Customer not found." });
+      }
+
+      const name = String(req.body?.name || "").trim();
+      const contactName = String(req.body?.contactName || "").trim();
+      const email = String(req.body?.email || "").trim();
+      const phone = String(req.body?.phone || "").trim();
+      const active = req.body?.active === false ? 0 : 1;
+
+      if (!name) {
+        return res.status(400).json({ error: true, message: "Customer name is required." });
+      }
+
+      await run(
+        `UPDATE customers
+         SET name = ?,
+             contact_name = ?,
+             email = ?,
+             phone = ?,
+             status = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [name, contactName, email, phone, active ? "active" : "inactive", customerId]
+      );
+
+      const customer = await get("SELECT * FROM customers WHERE id = ?", [customerId]);
+      res.json(customer);
     } catch (error) {
       next(error);
     }

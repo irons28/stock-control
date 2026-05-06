@@ -1,6 +1,5 @@
-// Resolves req.user from X-User-Id header. Applied globally.
-// requireRole(...roles) factory for protecting mutation routes.
 const { get } = require("../db/connection");
+const { verifyAuthToken } = require("../auth/token");
 
 const ROLE_ALIASES = {
   management: "admin",
@@ -21,17 +20,63 @@ function formatRequiredRole(roles) {
   return roles.join(", ");
 }
 
+function normalizeDbUser(dbUser) {
+  if (!dbUser) {
+    return null;
+  }
+
+  const role = normalizeRole(dbUser.role);
+  const name = String(dbUser.display_name || dbUser.full_name || dbUser.username || "").trim();
+
+  return {
+    ...dbUser,
+    id: dbUser.id,
+    username: String(dbUser.username || "").trim(),
+    name,
+    full_name: name,
+    display_name: name,
+    role,
+    active:
+      dbUser.active === undefined || dbUser.active === null
+        ? String(dbUser.status || "").toLowerCase() === "active"
+        : Boolean(dbUser.active),
+  };
+}
+
+function getBearerToken(req) {
+  const authHeader = String(req.headers.authorization || "").trim();
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    return "";
+  }
+  return authHeader.slice(7).trim();
+}
+
 async function resolveUser(req, res, next) {
+  const token = getBearerToken(req);
   const userId = String(req.headers["x-user-id"] || "").trim();
   const userName = String(req.headers["x-user-name"] || "").trim();
   const userRole = normalizeRole(req.headers["x-user-role"]);
 
   let dbUser = null;
+  let tokenPayload = null;
 
-  if (userId) {
+  if (token) {
+    try {
+      tokenPayload = verifyAuthToken(token);
+      dbUser = await get(
+        `SELECT * FROM users WHERE id = ? AND COALESCE(active, CASE WHEN status = 'active' THEN 1 ELSE 0 END) = 1`,
+        [tokenPayload.sub]
+      );
+    } catch {
+      req.user = null;
+      return next();
+    }
+  }
+
+  if (!dbUser && userId) {
     try {
       dbUser = await get(
-        `SELECT * FROM users WHERE id = ? AND status = 'active'`,
+        `SELECT * FROM users WHERE id = ? AND COALESCE(active, CASE WHEN status = 'active' THEN 1 ELSE 0 END) = 1`,
         [userId]
       );
     } catch {
@@ -42,7 +87,10 @@ async function resolveUser(req, res, next) {
   if (!dbUser && userName && userRole) {
     try {
       dbUser = await get(
-        `SELECT * FROM users WHERE LOWER(full_name) = LOWER(?) AND role = ? AND status = 'active'`,
+        `SELECT * FROM users
+         WHERE LOWER(COALESCE(display_name, full_name)) = LOWER(?)
+           AND role = ?
+           AND COALESCE(active, CASE WHEN status = 'active' THEN 1 ELSE 0 END) = 1`,
         [userName, userRole]
       );
     } catch {
@@ -50,21 +98,28 @@ async function resolveUser(req, res, next) {
     }
   }
 
-  const resolvedRole = userRole || normalizeRole(dbUser?.role);
-  const resolvedName = userName || String(dbUser?.full_name || "").trim();
+  const normalizedUser = normalizeDbUser(dbUser);
+  const resolvedRole = normalizeRole(tokenPayload?.role || userRole || normalizedUser?.role);
+  const resolvedName =
+    tokenPayload?.displayName ||
+    userName ||
+    String(normalizedUser?.full_name || "").trim();
 
-  if (!dbUser && !resolvedRole && !resolvedName) {
+  if (!normalizedUser && !resolvedRole && !resolvedName) {
     req.user = null;
     return next();
   }
 
   req.user = {
-    ...(dbUser || {}),
-    id: dbUser?.id || userId || null,
-    selectedUserId: userId || dbUser?.id || null,
+    ...(normalizedUser || {}),
+    id: normalizedUser?.id || userId || null,
+    username: normalizedUser?.username || tokenPayload?.username || null,
+    selectedUserId: userId || normalizedUser?.id || null,
     name: resolvedName || "Unknown User",
     full_name: resolvedName || "Unknown User",
+    display_name: resolvedName || "Unknown User",
     role: resolvedRole || "guest",
+    active: normalizedUser?.active ?? false,
   };
 
   next();
@@ -81,7 +136,7 @@ function requireRole(...allowedRoles) {
     if (!req.user || !currentRole || currentRole === "guest") {
       return res.status(401).json({
         error: true,
-        message: "Authentication required. Provide a valid X-User-Id header.",
+        message: "Authentication required. Sign in with a valid username and password.",
         requiredRole: formatRequiredRole(normalizedAllowedRoles),
         currentRole: currentRole || null,
       });

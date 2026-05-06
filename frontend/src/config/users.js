@@ -1,83 +1,91 @@
 export const USER_STORAGE_KEY = "stock_current_user";
-export const USER_ID_STORAGE_KEY = "stock_user_id";
+export const AUTH_TOKEN_STORAGE_KEY = "stock_auth_token";
 
 const ROLE_LABELS = {
   admin: "Admin",
   office: "Office",
   warehouse: "Warehouse",
+  read_only: "Read Only",
+  guest: "Guest",
 };
 
 const ROLE_ALIASES = {
   management: "admin",
   purchasing: "office",
   dispatch: "office",
+  readonly: "read_only",
 };
 
 export function normalizeRole(role) {
   const value = String(role || "").trim().toLowerCase();
-  return ROLE_ALIASES[value] || value || "warehouse";
+  return ROLE_ALIASES[value] || value || "guest";
 }
 
 export function getRoleLabel(role) {
-  return ROLE_LABELS[normalizeRole(role)] || "Warehouse";
+  return ROLE_LABELS[normalizeRole(role)] || "Guest";
 }
 
 export function normalizeUser(user = {}) {
   const role = normalizeRole(user.role);
-  const name = String(user.name || user.full_name || "").trim();
+  const displayName = String(
+    user.display_name || user.full_name || user.name || user.username || ""
+  ).trim();
 
   return {
     id: String(user.id || ""),
-    name,
+    username: String(user.username || "").trim(),
+    name: displayName || "Guest",
+    display_name: displayName || "Guest",
+    full_name: displayName || "Guest",
     role,
     roleLabel: user.roleLabel || getRoleLabel(role),
     email: String(user.email || "").trim(),
-    full_name: name,
+    active: user.active !== false,
   };
 }
 
-export const USERS = [
-  {
-    id: "admin-1",
-    name: "Alex Admin",
-    role: "admin",
-    roleLabel: "Admin",
-  },
-  {
-    id: "office-1",
-    name: "Olivia Office",
-    role: "office",
-    roleLabel: "Office",
-  },
-  {
-    id: "warehouse-1",
-    name: "Wayne Warehouse",
-    role: "warehouse",
-    roleLabel: "Warehouse",
-  },
-].map(normalizeUser);
-
 export function getDefaultUser() {
-  return USERS[0];
-}
-
-export function getUserById(id) {
-  const userId = String(id || "").trim();
-  return USERS.find((user) => user.id === userId) || null;
+  return normalizeUser({
+    id: "",
+    username: "",
+    display_name: "Guest",
+    role: "guest",
+    email: "",
+    active: false,
+  });
 }
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-export function persistCurrentUser(user) {
+export function persistAuthSession({ token, user }) {
   if (!canUseStorage()) {
     return;
   }
 
   const normalized = normalizeUser(user);
-  window.localStorage.setItem(USER_ID_STORAGE_KEY, normalized.id);
+  if (token) {
+    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  }
   window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+export function clearAuthSession() {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  window.localStorage.removeItem(USER_STORAGE_KEY);
+}
+
+export function getStoredAuthToken() {
+  if (!canUseStorage()) {
+    return "";
+  }
+
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
 }
 
 export function getStoredCurrentUser() {
@@ -87,15 +95,13 @@ export function getStoredCurrentUser() {
   }
 
   const rawUser = window.localStorage.getItem(USER_STORAGE_KEY);
-  if (rawUser) {
-    try {
-      const parsed = normalizeUser(JSON.parse(rawUser));
-      return getUserById(parsed.id) || parsed;
-    } catch {
-      // Ignore corrupt storage and fall through to the id-based lookup.
-    }
+  if (!rawUser) {
+    return fallback;
   }
 
-  const storedId = window.localStorage.getItem(USER_ID_STORAGE_KEY);
-  return getUserById(storedId) || fallback;
+  try {
+    return normalizeUser(JSON.parse(rawUser));
+  } catch {
+    return fallback;
+  }
 }
