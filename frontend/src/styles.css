@@ -7980,29 +7980,117 @@ button.btn-permission-denied {
   align-items: center;
 }
 
+/* Help trigger button — dark by default so the "?" is visible on any light background */
 .page-help-button,
 .help-tooltip-trigger {
-  width: 2rem;
-  height: 2rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(255, 255, 255, 0.72);
-  color: #0f172a;
+  border: 1.5px solid rgba(22, 50, 79, 0.22);
+  background: rgba(22, 50, 79, 0.07);
+  color: #325d88;
   font-weight: 700;
+  font-size: 0.8rem;
   cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.page-help-button:hover,
+.help-tooltip-trigger:hover,
+.page-help-button:focus,
+.help-tooltip-trigger:focus {
+  background: rgba(22, 50, 79, 0.14);
+  color: #16324f;
+  border-color: rgba(22, 50, 79, 0.38);
+  outline: none;
+}
+
+/* ── Field-mode trigger ─────────────────────────────────────────────────────
+   No circle, no icon. The label/word itself is the trigger.
+   Used by HelpTooltip (children mode) and FieldHelp.
+   ─────────────────────────────────────────────────────────────────────────── */
+.help-tooltip-trigger--field {
+  /* Reset all button chrome */
+  display: inline;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  /* Inherit text context */
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  /* Hint that help is available */
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: rgba(22, 50, 79, 0.3);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.help-tooltip-trigger--field:hover,
+.help-tooltip-trigger--field:focus {
+  color: var(--accent, #1e6bc5);
+  text-decoration-color: var(--accent, #1e6bc5);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+/* On dark backgrounds the label text is already light; keep it, just brighten on hover */
+.scanner-panel .help-tooltip-trigger--field:hover,
+.scanner-panel .help-tooltip-trigger--field:focus,
+.guided-help-panel .help-tooltip-trigger--field:hover,
+.guided-help-panel .help-tooltip-trigger--field:focus {
+  color: #fff;
+  text-decoration-color: rgba(255, 255, 255, 0.7);
+}
+
+/* On genuinely dark backgrounds, flip to white */
+.scanner-panel .help-tooltip-trigger,
+.guided-help-panel .help-tooltip-trigger {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.scanner-panel .help-tooltip-trigger:hover,
+.scanner-panel .help-tooltip-trigger:focus,
+.guided-help-panel .help-tooltip-trigger:hover,
+.guided-help-panel .help-tooltip-trigger:focus {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+  outline: none;
 }
 
 .help-popover {
-  position: absolute;
-  top: calc(100% + 0.75rem);
-  right: 0;
-  z-index: 50;
   width: min(26rem, 88vw);
   padding: 1rem;
   border-radius: 1rem;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: #fff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+}
+
+/* Portal variant — positioned via inline style from PageHelpButton */
+.help-popover--portal {
+  position: fixed;
+  z-index: 1200;
+  width: min(28rem, calc(100vw - 2rem));
 }
 
 .help-popover-header {
@@ -8055,18 +8143,75 @@ button.btn-permission-denied {
 .guided-help-panel {
   padding: 1.2rem 1.25rem;
   border-radius: 1.1rem;
-  border: 1px solid rgba(59, 130, 246, 0.14);
-  background: linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(248, 250, 252, 1));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(30, 41, 75, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.guided-help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .guided-help-header h3 {
   margin: 0;
+  color: var(--text-primary, #e4e9f4);
+  font-size: 0.95rem;
+}
+
+.guided-help-header .eyebrow {
+  color: #6aaee8;
+}
+
+.guided-help-toggle {
+  flex-shrink: 0;
+  border: 1px solid rgba(99, 153, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.guided-help-toggle:hover {
+  background: rgba(59, 130, 246, 0.22);
+  color: #bfdbfe;
+}
+
+.guided-help-intro {
+  margin: 0.65rem 0 0;
+  color: var(--text-secondary, #aab4cc);
+  font-size: 0.88rem;
+}
+
+.help-list,
+.guided-help-list {
+  margin: 0.55rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary, #aab4cc);
+  font-size: 0.88rem;
+  line-height: 1.65;
 }
 
 .guided-help-warnings {
   margin-top: 1rem;
   display: grid;
   gap: 0.45rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.07);
+  border: 1px solid rgba(234, 179, 8, 0.18);
+  color: #fde68a;
+  font-size: 0.83rem;
+}
+
+.guided-help-warnings p {
+  margin: 0;
 }
 
 .guided-help-warnings p {
@@ -8125,6 +8270,15 @@ button.btn-permission-denied {
   justify-content: center;
 }
 
+.receive-inline-help {
+  display: inline-flex;
+}
+
+.receive-inline-help-label {
+  font-weight: 700;
+  color: var(--text-secondary, #aab4cc);
+}
+
 .app-loading {
   min-height: 100vh;
   display: grid;
@@ -8138,6 +8292,233 @@ button.btn-permission-denied {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: 1rem;
+}
+
+.app-shell--topnav {
+  display: block;
+  min-height: 100vh;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.4rem;
+  background: rgba(238, 243, 248, 0.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(22, 50, 79, 0.08);
+}
+
+.app-topbar-brand {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.app-topbar-brand h1 {
+  margin: 0;
+  color: #16324f;
+  font-size: 1.2rem;
+}
+
+.app-topbar-copy {
+  margin: 0;
+  color: #58708a;
+  font-size: 0.9rem;
+}
+
+.app-topbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+}
+
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: min(24rem, 100%);
+  padding: 0.2rem 0.75rem;
+  border: 1px solid rgba(22, 50, 79, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.topbar-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.55rem 0.45rem 0.45rem;
+  border: 1px solid rgba(22, 50, 79, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.app-navigation-shell {
+  position: sticky;
+  top: 86px;
+  z-index: 35;
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem 1.4rem 0.95rem;
+  background: rgba(238, 243, 248, 0.94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(22, 50, 79, 0.08);
+}
+
+.top-tabs,
+.sub-tabs {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+}
+
+.top-tabs::-webkit-scrollbar,
+.sub-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.top-tab,
+.sub-tab {
+  border: 1px solid rgba(22, 50, 79, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.top-tab {
+  flex: 0 0 auto;
+  padding: 0.8rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #24486d;
+  white-space: nowrap;
+}
+
+.top-tab.active {
+  background: linear-gradient(135deg, #16324f, #325d88);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(22, 50, 79, 0.18);
+}
+
+.sub-tab {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #24486d;
+  white-space: nowrap;
+}
+
+.sub-tab:hover {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+.sub-tab.active {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.32);
+  color: #1a3a66;
+  font-weight: 700;
+}
+
+.app-utility-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  justify-content: space-between;
+  padding: 0.95rem 1.4rem 0;
+}
+
+.content--topnav {
+  padding-top: 1rem;
+}
+
+.field-help-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+/* (field-help-label-text styling moved to .help-tooltip-trigger--field above) */
+
+.help-tooltip--portal {
+  /* Portal tooltips are rendered into document.body with position:fixed.
+     Override the base .help-tooltip rule which uses position:absolute,
+     left:50%, and transform:translateX(-50%) — those values conflict with
+     the JS-clamped inline style and push the bubble off-screen. */
+  position: fixed !important;
+  transform: none !important;
+  left: auto;                 /* inline style drives the actual value */
+  top: auto;                  /* inline style drives the actual value */
+
+  /* Width: capped at 22rem but never wider than the viewport minus 32px of
+     breathing room (2 × PAD=16). Text always wraps. */
+  max-width: min(22rem, calc(100vw - 32px));
+  width: max-content;         /* shrink-wrap short text */
+  word-wrap: break-word;
+  white-space: normal;
+  padding: 0.7rem 0.82rem;
+  border-radius: 0.85rem;
+  background: #16324f;
+  color: #f8fbff;
+  box-shadow: 0 18px 40px rgba(22, 50, 79, 0.24);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.page-help-button-wrap {
+  position: relative;
+}
+
+/* .page-help-button sizing override — slightly larger than field triggers */
+.page-help-button {
+  width: 2rem;
+  height: 2rem;
+}
+
+@media (max-width: 900px) {
+  .app-navigation-shell {
+    top: 118px;
+  }
+
+  .app-topbar,
+  .app-navigation-shell,
+  .app-utility-row {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .topbar-user-card {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-navigation-shell {
+    top: 156px;
+  }
+
+  .sub-tab {
+    min-width: 10.5rem;
+  }
+
+  .app-topbar-copy {
+    display: none;
+  }
 }
 
 /* ── Activity Timeline ──────────────────────────────────────────────────────── */
@@ -8721,4 +9102,95 @@ button.btn-permission-denied {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Integrations page ──────────────────────────────────────────────────────── */
+.integrations-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+}
+
+.integrations-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.integrations-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.integrations-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.status-badge--green { background: #dcfce7; color: #166534; }
+.status-badge--amber { background: #fef3c7; color: #92400e; }
+.status-badge--grey  { background: #f1f5f9; color: #475569; }
+
+.integrations-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #475569);
+  margin: 0;
+}
+
+.integrations-detail-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  font-size: 0.875rem;
+  margin: 0;
+}
+.integrations-detail-list dt {
+  color: var(--text-secondary, #475569);
+  font-weight: 600;
+}
+.integrations-detail-list dd {
+  margin: 0;
+  color: var(--navy-900, #0f172a);
+  word-break: break-all;
+}
+
+.integrations-setup-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+  padding: 0.75rem;
+  background: rgba(22, 50, 79, 0.04);
+  border-radius: 0.5rem;
+}
+.integrations-setup-hint p { margin: 0 0 0.4rem; }
+.integrations-setup-hint p:last-child { margin: 0; }
+.integrations-setup-hint code {
+  font-family: monospace;
+  font-size: 0.8em;
+  background: rgba(22, 50, 79, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+.integrations-active-hint { color: #166534; }
+
+/* Jira issue key chip on PO detail */
+.jira-issue-key {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 0.02em;
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
+import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
@@ -195,8 +196,11 @@ function UsersPage() {
         <Card title="Create User" subtitle="Admin only">
           <form className="master-data-form" onSubmit={handleCreate}>
             <div className="master-data-form-grid">
-              <label className="master-data-field">
-                <span className="master-data-field-label">Username</span>
+              <FieldHelp
+                className="master-data-field"
+                label="Username"
+                help="The name the user logs in with."
+              >
                 <input
                   value={createForm.username}
                   onChange={(event) =>
@@ -204,7 +208,7 @@ function UsersPage() {
                   }
                   required
                 />
-              </label>
+              </FieldHelp>
               <label className="master-data-field">
                 <span className="master-data-field-label">Display name</span>
                 <input
@@ -226,9 +230,9 @@ function UsersPage() {
                 />
               </label>
               <label className="master-data-field">
-                <span className="master-data-field-label">
-                  Temporary password <HelpTooltip text="Passwords are hashed on the server before storage." />
-                </span>
+                <HelpTooltip text="Passwords are hashed on the server before storage." className="master-data-field-label">
+                  Temporary password
+                </HelpTooltip>
                 <input
                   value={createForm.password}
                   onChange={(event) =>
@@ -238,8 +242,11 @@ function UsersPage() {
                   required
                 />
               </label>
-              <label className="master-data-field">
-                <span className="master-data-field-label">Role</span>
+              <FieldHelp
+                className="master-data-field"
+                label="Role"
+                help="Controls what areas of the system the user can access."
+              >
                 <select
                   value={createForm.role}
                   onChange={(event) =>
@@ -251,10 +258,12 @@ function UsersPage() {
                   <option value="warehouse">Warehouse</option>
                   <option value="read_only">Read only</option>
                 </select>
-              </label>
+              </FieldHelp>
               <label className="master-data-toggle-card">
                 <div className="master-data-toggle-copy">
-                  <span className="master-data-field-label">Active account</span>
+                  <HelpTooltip text="Inactive users cannot log in." className="master-data-field-label">
+                    Active account
+                  </HelpTooltip>
                   <span className="master-data-toggle-help">Inactive users cannot sign in.</span>
                 </div>
                 <span className={`master-data-switch${createForm.active ? " on" : ""}`}>
@@ -350,8 +359,11 @@ function UsersPage() {
                   required
                 />
               </label>
-              <label className="master-data-field">
-                <span className="master-data-field-label">Role</span>
+              <FieldHelp
+                className="master-data-field"
+                label="Role"
+                help="Controls what areas of the system the user can access."
+              >
                 <select
                   value={editForm.role}
                   onChange={(event) =>
@@ -363,10 +375,12 @@ function UsersPage() {
                   <option value="warehouse">Warehouse</option>
                   <option value="read_only">Read only</option>
                 </select>
-              </label>
+              </FieldHelp>
               <label className="master-data-toggle-card">
                 <div className="master-data-toggle-copy">
-                  <span className="master-data-field-label">Active account</span>
+                  <HelpTooltip text="Inactive users cannot log in." className="master-data-field-label">
+                    Active account
+                  </HelpTooltip>
                   <span className="master-data-toggle-help">
                     Turn this off to stop the user signing in.
                   </span>

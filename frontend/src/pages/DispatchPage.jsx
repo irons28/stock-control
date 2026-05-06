@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
+import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import PageHeader from "../components/PageHeader";
 import { HELP_CONTENT } from "../config/helpContent";
@@ -283,22 +284,28 @@ function DispatchPage() {
                       className="dispatch-scan-form"
                       onSubmit={(event) => handleScanSubmit(order, event)}
                     >
-                      <input
-                        className="serial-search-input"
-                        type="text"
-                        inputMode="text"
-                        autoComplete="off"
-                        autoCapitalize="characters"
-                        spellCheck={false}
-                        placeholder="Scan serial and press Enter"
-                        value={scanInputByOrder[order.salesOrderId] || ""}
-                        onChange={(event) =>
-                          setScanInputByOrder((current) => ({
-                            ...current,
-                            [order.salesOrderId]: event.target.value.toUpperCase(),
-                          }))
-                        }
-                      />
+                      <FieldHelp
+                        className="dispatch-form-field"
+                        label="Serial number"
+                        help="Scan or type the serial number for this item. Required for serialised stock."
+                      >
+                        <input
+                          className="serial-search-input"
+                          type="text"
+                          inputMode="text"
+                          autoComplete="off"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                          placeholder="Scan serial and press Enter"
+                          value={scanInputByOrder[order.salesOrderId] || ""}
+                          onChange={(event) =>
+                            setScanInputByOrder((current) => ({
+                              ...current,
+                              [order.salesOrderId]: event.target.value.toUpperCase(),
+                            }))
+                          }
+                        />
+                      </FieldHelp>
                       <Button type="submit">Check Serial</Button>
                     </form>
 
@@ -320,8 +327,11 @@ function DispatchPage() {
                 ) : null}
 
                 <div className="dispatch-form-grid">
-                  <label className="dispatch-form-field">
-                    <span className="field-label">Dispatch Reference</span>
+                  <FieldHelp
+                    className="dispatch-form-field"
+                    label="Dispatch reference"
+                    help="The dispatch or shipment reference."
+                  >
                     <input
                       className="text-input"
                       type="text"
@@ -334,7 +344,7 @@ function DispatchPage() {
                         }))
                       }
                     />
-                  </label>
+                  </FieldHelp>
                   <label className="dispatch-form-field">
                     <span className="field-label">Dispatched By</span>
                     <input

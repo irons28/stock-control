@@ -1,4 +1,5 @@
 const { all, get, run } = require("../db/connection");
+const jira = require("./jira");
 
 function createRequestError(message, status = 400) {
   const error = new Error(message);
@@ -835,6 +836,62 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
       lines: lineSummaries,
     };
   });
+
+  // ── Jira integration (after transaction — never blocks the receipt) ──────────
+  const jiraResult = { attempted: false, success: false, issueKey: null, error: null };
+
+  if (jira.isEnabled()) {
+    try {
+      const poRow = await get(
+        "SELECT jira_issue_key FROM purchase_orders WHERE order_number = ?",
+        [poNumber]
+      );
+      const issueKey = poRow?.jira_issue_key || null;
+
+      if (issueKey) {
+        jiraResult.attempted = true;
+        jiraResult.issueKey = issueKey;
+
+        // Build human-readable comment
+        const lineLines = receipt.lines.map((line) => {
+          const serials = line.serial_numbers?.length
+            ? `serials received: ${line.serial_numbers.join(", ")}`
+            : `received ${line.quantity_received_now} of ${line.quantity_ordered}, remaining ${line.quantity_remaining_after_receipt}`;
+          return `- SKU ${line.sku}: ${serials}`;
+        });
+
+        const receivedAt = `${receipt.receivedDate} ${new Date().toISOString().slice(11, 16)}`;
+        const statusLabel = receipt.status === "fully_received" ? "Fully received" : "Part received";
+
+        const commentText = [
+          `Goods received against ${receipt.purchaseOrderNumber}.`,
+          "",
+          `Delivery reference: ${receipt.deliveryNumber}`,
+          `Received by: ${receipt.receivedBy}`,
+          `Received at: ${receivedAt}`,
+          "",
+          "Lines received:",
+          ...lineLines,
+          "",
+          `Status: ${statusLabel}`,
+        ].join("\n");
+
+        const commentResult = await jira.addComment(issueKey, commentText);
+        jiraResult.success = commentResult !== null;
+
+        // Optionally transition the issue when fully received
+        const transition = process.env.JIRA_PO_RECEIVED_TRANSITION || "";
+        if (jiraResult.success && receipt.status === "fully_received" && transition) {
+          await jira.transitionIssue(issueKey, transition);
+        }
+      }
+    } catch (err) {
+      console.error("[Jira] Unexpected error during receipt integration:", err.message);
+      jiraResult.error = err.message;
+    }
+  }
+
+  return { ...receipt, jiraResult };
 }
 
 module.exports = {

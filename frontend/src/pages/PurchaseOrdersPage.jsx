@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
+import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
+import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import ActivityTimeline from "../components/ActivityTimeline";
@@ -26,7 +28,9 @@ function getSearchResultSummary(rows, activePoNumber) {
 const resultColumns = [
   {
     key: "poNumber",
-    header: "PO Number",
+    header: (
+      <HelpTooltip text="The supplier purchase order reference.">PO Number</HelpTooltip>
+    ),
     render: (row) => (
       <div>
         <strong>{row.poNumber}</strong>
@@ -36,7 +40,11 @@ const resultColumns = [
   },
   {
     key: "status",
-    header: "Status",
+    header: (
+      <HelpTooltip text="Shows whether the order is open, partially received, fully received, or overdue.">
+        Status
+      </HelpTooltip>
+    ),
     render: (row) => <span className={getStatusBadgeClass(row.status)}>{row.status}</span>,
   },
   {
@@ -165,8 +173,11 @@ function PurchaseOrdersPage({ onNavigate }) {
 
       <Card title="Search Purchase Orders" subtitle="PO Finder">
         <form className="search-form" onSubmit={handleSearch}>
-          <label className="search-field">
-            <span>PO Number</span>
+          <FieldHelp
+            className="search-field"
+            label="PO Number"
+            help="The supplier purchase order reference."
+          >
             <input
               type="search"
               value={inputValue}
@@ -174,7 +185,7 @@ function PurchaseOrdersPage({ onNavigate }) {
               placeholder="Search PO-1002"
               aria-label="Search by purchase order number"
             />
-          </label>
+          </FieldHelp>
           <div className="search-actions">
             <Button type="submit">Search</Button>
             <Button type="button" variant="secondary" onClick={handleClear}>
@@ -264,6 +275,14 @@ function PurchaseOrdersPage({ onNavigate }) {
                   <dt>Still Open</dt>
                   <dd>{detailData.openLineCount}</dd>
                 </div>
+                {detailData.jiraIssueKey && (
+                  <div>
+                    <dt>Jira Issue</dt>
+                    <dd>
+                      <span className="jira-issue-key">{detailData.jiraIssueKey}</span>
+                    </dd>
+                  </div>
+                )}
               </dl>
 
               <div className="receipt-progress">

@@ -1,31 +1,17 @@
-import { useEffect, useRef } from "react";
+import { forwardRef } from "react";
 
-function HelpPopover({ title, summary, steps = [], warnings = [], onClose }) {
-  const panelRef = useRef(null);
-
-  useEffect(() => {
-    function handleOutsideClick(event) {
-      if (panelRef.current && !panelRef.current.contains(event.target)) {
-        onClose();
-      }
-    }
-
-    function handleEscape(event) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    window.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      window.removeEventListener("keydown", handleEscape);
-    };
-  }, [onClose]);
-
+const HelpPopover = forwardRef(function HelpPopover(
+  { title, summary, steps = [], warnings = [], onClose, style },
+  ref
+) {
   return (
-    <div className="help-popover" ref={panelRef} role="dialog" aria-modal="false">
+    <div
+      className="help-popover help-popover--portal"
+      ref={ref}
+      style={style}
+      role="dialog"
+      aria-modal="false"
+    >
       <div className="help-popover-header">
         <div>
           <p className="eyebrow">Workflow Help</p>
@@ -58,6 +44,6 @@ function HelpPopover({ title, summary, steps = [], warnings = [], onClose }) {
       ) : null}
     </div>
   );
-}
+});
 
 export default HelpPopover;
