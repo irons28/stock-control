@@ -26,8 +26,22 @@ function LoginPage({ onSuccess }) {
     <div className="login-shell">
       <div className="login-card">
         <div className="login-copy">
-          <p className="eyebrow">Stock Control</p>
-          <h1>Sign in to continue</h1>
+          <div className="login-brand-hero">
+            <img
+              className="app-brand-logo app-brand-logo--login"
+              src="/swan-logo.png"
+              alt="SwanRetail logo"
+            />
+            <div className="app-brand-wordmark app-brand-wordmark--login">
+              <p className="eyebrow">Stock Control</p>
+              <h1 className="app-brand-title app-brand-title--login">
+                <span>Swan</span>
+                <span>Retail</span>
+              </h1>
+              <p className="app-brand-subtitle">Operations Workspace</p>
+            </div>
+          </div>
+          <h2>Sign in to continue</h2>
           <p>
             Use your username and password to open the stock workspace with the right permissions
             for your role.

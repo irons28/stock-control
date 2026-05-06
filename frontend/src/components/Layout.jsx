@@ -58,12 +58,21 @@ function Layout({
     <div className={`app-shell app-shell--topnav${isDemoMode ? " app-shell--demo" : ""}`}>
       <header className="app-topbar">
         <div className="app-topbar-brand">
-          <div>
+          <img
+            className="app-brand-logo"
+            src="/swan-logo.png"
+            alt="SwanRetail logo"
+          />
+          <div className="app-brand-wordmark">
             <p className="eyebrow">Stock Control</p>
-            <h1>Operations Workspace</h1>
+            <h1 className="app-brand-title">
+              <span>Swan</span>
+              <span>Retail</span>
+            </h1>
+            <p className="app-brand-subtitle">Operations Workspace</p>
           </div>
           <p className="app-topbar-copy">
-            Purchasing, stock, dispatch, and admin workflows with role-based access.
+            Internal purchasing, stock, dispatch, and admin workflows with role-based access.
           </p>
         </div>
 
