@@ -66,10 +66,28 @@ function HelpTooltip({ text, label = "Help", className = "", align = "center", c
       const maxLeft = Math.max(PAD, vw - tw - PAD);
       const maxTop  = Math.max(PAD, vh - th - PAD);
 
-      const left = Math.min(Math.max(preferredLeft, PAD), maxLeft);
-      const top  = Math.min(Math.max(preferredTop,  PAD), maxTop);
+      let left = Math.min(Math.max(preferredLeft, PAD), maxLeft);
+      let top  = Math.min(Math.max(preferredTop,  PAD), maxTop);
 
       setStyle({ position: "fixed", top, left, visibility: "visible", zIndex: 1200 });
+
+      // ── Second-pass correction ─────────────────────────────────────────────
+      // After the first setStyle, CSS rules (e.g. transforms on the base
+      // .help-tooltip class) may still shift the rendered element. Read the
+      // actual bounding rect after paint and nudge if any edge escapes.
+      requestAnimationFrame(() => {
+        const el = tooltipRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        let dl = 0, dt = 0;
+        if (r.left < PAD)          dl = PAD - r.left;
+        else if (r.right > vw - PAD) dl = (vw - PAD) - r.right;
+        if (r.top  < PAD)          dt = PAD - r.top;
+        else if (r.bottom > vh - PAD) dt = (vh - PAD) - r.bottom;
+        if (dl || dt) {
+          setStyle((prev) => ({ ...prev, left: prev.left + dl, top: prev.top + dt }));
+        }
+      });
     }
 
     // Call measure directly — useLayoutEffect runs after the DOM commit, so

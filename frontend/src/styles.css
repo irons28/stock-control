@@ -8453,6 +8453,15 @@ button.btn-permission-denied {
 /* (field-help-label-text styling moved to .help-tooltip-trigger--field above) */
 
 .help-tooltip--portal {
+  /* Portal tooltips are rendered into document.body with position:fixed.
+     Override the base .help-tooltip rule which uses position:absolute,
+     left:50%, and transform:translateX(-50%) — those values conflict with
+     the JS-clamped inline style and push the bubble off-screen. */
+  position: fixed !important;
+  transform: none !important;
+  left: auto;                 /* inline style drives the actual value */
+  top: auto;                  /* inline style drives the actual value */
+
   /* Width: capped at 22rem but never wider than the viewport minus 32px of
      breathing room (2 × PAD=16). Text always wraps. */
   max-width: min(22rem, calc(100vw - 32px));
