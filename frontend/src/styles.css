@@ -7923,6 +7923,223 @@ button.btn-permission-denied {
 .sidebar-user-role.role-office    { background: #2563eb; color: #fff; }
 .sidebar-user-role.role-warehouse { background: #16a34a; color: #fff; }
 
+.sidebar-user-role.role-read_only,
+.sidebar-user-role.role-read-only {
+  background: #475569;
+  color: #fff;
+}
+
+.nav-list--grouped {
+  gap: 1rem;
+}
+
+.nav-group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.nav-group-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.58);
+}
+
+.sidebar-user--static {
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.sidebar-logout-btn {
+  margin-left: auto;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.sidebar-logout-btn:hover {
+  background: rgba(30, 41, 59, 0.94);
+}
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.page-help-button-wrap,
+.help-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.page-help-button,
+.help-tooltip-trigger {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.72);
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.help-popover {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  z-index: 50;
+  width: min(26rem, 88vw);
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+}
+
+.help-popover-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.help-close {
+  border: 0;
+  background: transparent;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.help-summary,
+.guided-help-intro {
+  margin: 0.65rem 0 0;
+  color: #475569;
+}
+
+.help-section,
+.help-section--warning {
+  margin-top: 0.9rem;
+}
+
+.help-list,
+.guided-help-list {
+  margin: 0.55rem 0 0;
+  padding-left: 1.2rem;
+  color: #334155;
+}
+
+.help-tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  transform: translateX(-50%);
+  min-width: 14rem;
+  max-width: 20rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.8rem;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+}
+
+.guided-help-panel {
+  padding: 1.2rem 1.25rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(248, 250, 252, 1));
+}
+
+.guided-help-header h3 {
+  margin: 0;
+}
+
+.guided-help-warnings {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.guided-help-warnings p {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.8rem;
+  background: rgba(254, 242, 242, 0.9);
+  color: #991b1b;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: radial-gradient(circle at top, #dbeafe, #f8fafc 46%, #e2e8f0 100%);
+}
+
+.login-card {
+  width: min(28rem, 100%);
+  padding: 2rem;
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.15);
+  display: grid;
+  gap: 1.4rem;
+}
+
+.login-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.login-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #334155;
+}
+
+.login-form input {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.9rem;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+}
+
+.login-error {
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(254, 226, 226, 0.95);
+  color: #b91c1c;
+}
+
+.login-submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.app-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.admin-users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
 /* ── Activity Timeline ──────────────────────────────────────────────────────── */
 
 .tl-root {

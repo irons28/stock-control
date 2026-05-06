@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
+import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
+import { HELP_CONTENT } from "../config/helpContent";
 import { useUser } from "../context/UserContext";
 import { useApiResource } from "../hooks/useApiResource";
 import { apiFetch } from "../lib/api";
@@ -1163,11 +1166,18 @@ function ReceiveGoodsPage({ onNavigate }) {
         eyebrow="Goods In"
         title="Receive Goods"
         description="Book deliveries against open purchase orders, capture serials, and see which sales orders can be fulfilled immediately."
+        help={HELP_CONTENT.receiveGoods}
         actions={
           <Button variant="secondary" onClick={purchaseOrders.reload}>
             Refresh Orders
           </Button>
         }
+      />
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.receiveGoods.summary}
+        steps={HELP_CONTENT.receiveGoods.steps}
+        warnings={HELP_CONTENT.receiveGoods.warnings}
       />
 
       {/* Step 1 — Select PO */}
@@ -1190,7 +1200,7 @@ function ReceiveGoodsPage({ onNavigate }) {
                     (po) => !String(po.status || "").toLowerCase().includes("fully")
                   ).length
                 }{" "}
-                orders with outstanding lines
+                orders with outstanding lines <HelpTooltip text="Choose the purchase order that matches the physical delivery before you enter any quantities." />
               </small>
             )}
           </div>

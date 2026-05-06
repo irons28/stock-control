@@ -1,7 +1,9 @@
 import { useState } from "react";
 import Card from "../components/Card";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import PageHeader from "../components/PageHeader";
 import ScannerInput from "../components/ScannerInput";
+import { HELP_CONTENT } from "../config/helpContent";
 import { apiFetch } from "../lib/api";
 import { formatDate, formatDateTime, formatLabel } from "../lib/formatters";
 
@@ -298,6 +300,13 @@ function SerialTrackerPage() {
         eyebrow="Inventory"
         title="Serial Tracker"
         description="Scan a barcode or enter a serial number to view full lifecycle history — from supplier receipt through allocation, dispatch, returns, and warranty events."
+        help={HELP_CONTENT.serialSearch}
+      />
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.serialSearch.summary}
+        steps={HELP_CONTENT.serialSearch.steps}
+        warnings={HELP_CONTENT.serialSearch.warnings}
       />
 
       {/* Search */}

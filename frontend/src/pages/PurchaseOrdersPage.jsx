@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import ActivityTimeline from "../components/ActivityTimeline";
+import { HELP_CONTENT } from "../config/helpContent";
 import { useApiResource } from "../hooks/useApiResource";
 import { formatDate, formatNumber } from "../lib/formatters";
 
@@ -138,6 +140,7 @@ function PurchaseOrdersPage({ onNavigate }) {
         eyebrow="Inbound"
         title="Purchase Orders"
         description="Search by PO number, review supplier receipt progress, and spot the lines that still need to be booked in."
+        help={HELP_CONTENT.purchaseOrders}
         actions={
           <>
             <Button
@@ -152,6 +155,12 @@ function PurchaseOrdersPage({ onNavigate }) {
             <PermissionButton permission="po:create" className="btn" onClick={() => onNavigate?.("/purchase-orders/new")}>New Purchase Order</PermissionButton>
           </>
         }
+      />
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.purchaseOrders.summary}
+        steps={HELP_CONTENT.purchaseOrders.steps}
+        warnings={HELP_CONTENT.purchaseOrders.warnings}
       />
 
       <Card title="Search Purchase Orders" subtitle="PO Finder">

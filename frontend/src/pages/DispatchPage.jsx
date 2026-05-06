@@ -1,7 +1,9 @@
 import { useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import PageHeader from "../components/PageHeader";
+import { HELP_CONTENT } from "../config/helpContent";
 import { useApiResource } from "../hooks/useApiResource";
 import { apiFetch } from "../lib/api";
 import { formatDate, formatDateTime, formatNumber } from "../lib/formatters";
@@ -126,11 +128,18 @@ function DispatchPage() {
         eyebrow="Outbound"
         title="Dispatch Ready"
         description="Review fully allocated sales orders, verify serials with a scanner-friendly check step, and confirm dispatch with a reference."
+        help={HELP_CONTENT.dispatch}
         actions={
           <Button variant="secondary" onClick={dispatchReady.reload}>
             Refresh
           </Button>
         }
+      />
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.dispatch.summary}
+        steps={HELP_CONTENT.dispatch.steps}
+        warnings={HELP_CONTENT.dispatch.warnings}
       />
 
       {lastSuccess ? (

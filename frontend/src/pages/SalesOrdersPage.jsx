@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import ActivityTimeline from "../components/ActivityTimeline";
+import { HELP_CONTENT } from "../config/helpContent";
 import { useApiResource } from "../hooks/useApiResource";
 import { usePermission } from "../hooks/usePermission";
 import { apiFetch } from "../lib/api";
@@ -1124,6 +1126,7 @@ function SalesOrdersPage({ onNavigate }) {
         eyebrow="Outbound"
         title="Sales Orders"
         description="Search customer orders, review open demand, and allocate available stock."
+        help={HELP_CONTENT.salesOrders}
         actions={
           <>
             <Button variant="secondary" onClick={salesOrders.reload}>Refresh</Button>
@@ -1132,6 +1135,12 @@ function SalesOrdersPage({ onNavigate }) {
             )}
           </>
         }
+      />
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.allocation.summary}
+        steps={HELP_CONTENT.allocation.steps}
+        warnings={HELP_CONTENT.allocation.warnings}
       />
 
       <div className="so-layout">

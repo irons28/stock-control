@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import GuidedHelpPanel from "../components/GuidedHelpPanel";
+import PageHelpButton from "../components/PageHelpButton";
+import { HELP_CONTENT } from "../config/helpContent";
 import { useUser } from "../context/UserContext";
 import { API_BASE_URL, apiFetch, buildUserHeaders } from "../lib/api";
 import { usePermission } from "../hooks/usePermission";
@@ -437,7 +440,10 @@ function ImportPage() {
       <div className="page-content">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Import Data</h1>
+            <div className="page-title-row">
+              <h1 className="page-title">Import Data</h1>
+              <PageHelpButton title="Import Data" help={HELP_CONTENT.importData} />
+            </div>
             <p className="page-description">Signed in as {currentUser.name} · {currentUser.roleLabel}</p>
           </div>
         </div>
@@ -454,7 +460,10 @@ function ImportPage() {
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Import Data</h1>
+          <div className="page-title-row">
+            <h1 className="page-title">Import Data</h1>
+            <PageHelpButton title="Import Data" help={HELP_CONTENT.importData} />
+          </div>
           <p className="page-description">
             Upload a CSV file to bulk-import products, customers, suppliers or orders. Map your
             columns, preview errors, then apply — partial imports are allowed.
@@ -469,6 +478,12 @@ function ImportPage() {
           {showLogs ? "Hide" : "View"} import history
         </button>
       </div>
+
+      <GuidedHelpPanel
+        intro={HELP_CONTENT.importData.summary}
+        steps={HELP_CONTENT.importData.steps}
+        warnings={HELP_CONTENT.importData.warnings}
+      />
 
       {showLogs && (
         <div className="card imp-log-card">

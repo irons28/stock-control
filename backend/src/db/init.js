@@ -1,4 +1,32 @@
+const bcrypt = require("bcryptjs");
 const { all, run } = require("./connection");
+
+const DEMO_USERS = [
+  {
+    id: 1,
+    username: "admin",
+    email: "admin@ops.example",
+    displayName: "Alex Admin",
+    role: "admin",
+    password: "Admin123!",
+  },
+  {
+    id: 2,
+    username: "office",
+    email: "office@ops.example",
+    displayName: "Olivia Office",
+    role: "office",
+    password: "Office123!",
+  },
+  {
+    id: 3,
+    username: "warehouse",
+    email: "warehouse@ops.example",
+    displayName: "Wayne Warehouse",
+    role: "warehouse",
+    password: "Warehouse123!",
+  },
+];
 
 async function hasColumn(tableName, columnName) {
   const columns = await all(`PRAGMA table_info(${tableName})`);
@@ -18,9 +46,13 @@ async function addColumnIfMissing(tableName, columnDefinition) {
 async function createCoreTables() {
   await run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
     email TEXT NOT NULL UNIQUE,
+    display_name TEXT,
     full_name TEXT NOT NULL,
+    password_hash TEXT,
     role TEXT NOT NULL DEFAULT 'operator',
+    active INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'active',
     last_login_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -348,6 +380,11 @@ async function createCoreTables() {
 }
 
 async function applySchemaMigrations() {
+  await addColumnIfMissing("users", "username TEXT");
+  await addColumnIfMissing("users", "display_name TEXT");
+  await addColumnIfMissing("users", "password_hash TEXT");
+  await addColumnIfMissing("users", "active INTEGER NOT NULL DEFAULT 1");
+
   await addColumnIfMissing("customers", "address_line1 TEXT DEFAULT ''");
   await addColumnIfMissing("customers", "city TEXT DEFAULT ''");
   await addColumnIfMissing("customers", "postcode TEXT DEFAULT ''");
@@ -396,14 +433,77 @@ async function applySchemaMigrations() {
   // Priority and customer reference on sales orders
   await addColumnIfMissing("sales_orders", "priority TEXT NOT NULL DEFAULT 'normal'");
   await addColumnIfMissing("sales_orders", "customer_reference TEXT DEFAULT ''");
+
+  await run(`
+    UPDATE users
+    SET
+      display_name = COALESCE(NULLIF(TRIM(display_name), ''), full_name),
+      full_name = COALESCE(NULLIF(TRIM(full_name), ''), display_name, username, email),
+      username = COALESCE(
+        NULLIF(TRIM(username), ''),
+        LOWER(SUBSTR(email, 1, CASE
+          WHEN INSTR(email, '@') > 0 THEN INSTR(email, '@') - 1
+          ELSE LENGTH(email)
+        END))
+      ),
+      active = CASE
+        WHEN active IS NULL THEN CASE WHEN LOWER(COALESCE(status, 'active')) = 'active' THEN 1 ELSE 0 END
+        ELSE active
+      END,
+      status = CASE
+        WHEN COALESCE(active, 1) = 1 THEN 'active'
+        ELSE 'inactive'
+      END
+    WHERE 1 = 1
+  `);
+
+  await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_unique ON users(username)`);
 }
 
 async function seedReferenceData() {
-  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (1, 'admin@ops.example', 'Alex Admin', 'admin', 'active')`);
-  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (2, 'office@ops.example', 'Olivia Office', 'office', 'active')`);
-  await run(`INSERT OR IGNORE INTO users (id, email, full_name, role, status) VALUES (3, 'warehouse@ops.example', 'Wayne Warehouse', 'warehouse', 'active')`);
-  // Migrate legacy demo users to current 3-role model
-  await run(`UPDATE users SET role = 'office', full_name = 'Olivia Office', email = 'office@ops.example' WHERE id = 2`);
+  for (const user of DEMO_USERS) {
+    const passwordHash = bcrypt.hashSync(user.password, 10);
+
+    await run(
+      `INSERT OR IGNORE INTO users
+        (id, username, email, display_name, full_name, password_hash, role, active, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'active')`,
+      [
+        user.id,
+        user.username,
+        user.email,
+        user.displayName,
+        user.displayName,
+        passwordHash,
+        user.role,
+      ]
+    );
+
+    await run(
+      `UPDATE users
+       SET
+         username = ?,
+         email = ?,
+         display_name = ?,
+         full_name = ?,
+         password_hash = COALESCE(NULLIF(password_hash, ''), ?),
+         role = ?,
+         active = 1,
+         status = 'active'
+       WHERE id = ?`,
+      [
+        user.username,
+        user.email,
+        user.displayName,
+        user.displayName,
+        passwordHash,
+        user.role,
+        user.id,
+      ]
+    );
+  }
+
+  // Migrate any remaining legacy office-style demo users to the current role model.
   await run(`UPDATE users SET role = 'office' WHERE id IN (4, 5)`);
 
   await run(`INSERT OR IGNORE INTO customers (
