@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useDemo, DEMO_STEPS } from "../context/DemoContext";
+import { useDemo } from "../context/DemoContext";
 import DemoBanner from "./DemoBanner";
 
 function getInitials(name) {
@@ -25,7 +25,9 @@ function LiveFeedTicker({ message }) {
 }
 
 function Layout({
-  navigationSections,
+  topTabs,
+  activeTopTab,
+  subnavItems,
   activePath,
   onNavigate,
   onSearch,
@@ -36,10 +38,9 @@ function Layout({
 }) {
   const backendOnline = health.status === "success";
   const timestamp = backendOnline ? health.data?.database?.database_time : null;
-  const { isDemoMode, step, enterDemoMode, exitDemoMode, feedMessage } = useDemo();
+  const { isDemoMode, enterDemoMode, exitDemoMode, feedMessage } = useDemo();
   const [quickQuery, setQuickQuery] = useState("");
   const quickRef = useRef(null);
-  const activeStepNavKey = isDemoMode ? DEMO_STEPS[step]?.navKey : null;
 
   function handleQuickKeyDown(event) {
     if (event.key === "Enter" && quickQuery.trim()) {
@@ -54,126 +55,115 @@ function Layout({
   }
 
   return (
-    <div className={`app-shell${isDemoMode ? " app-shell--demo" : ""}`}>
-      <aside className="sidebar">
-        <div className="sidebar-section">
-          <p className="eyebrow">Stock Control</p>
-          <h1>Operations Workspace</h1>
-          <p className="sidebar-copy">
-            Authenticated purchasing, stock, and dispatch workflows with role-based access.
+    <div className={`app-shell app-shell--topnav${isDemoMode ? " app-shell--demo" : ""}`}>
+      <header className="app-topbar">
+        <div className="app-topbar-brand">
+          <div>
+            <p className="eyebrow">Stock Control</p>
+            <h1>Operations Workspace</h1>
+          </div>
+          <p className="app-topbar-copy">
+            Purchasing, stock, dispatch, and admin workflows with role-based access.
           </p>
         </div>
 
-        <div className="sidebar-search">
-          <span className="sidebar-search-icon" aria-hidden="true">⌕</span>
-          <input
-            ref={quickRef}
-            type="text"
-            className="sidebar-search-input"
-            value={quickQuery}
-            onChange={(event) => setQuickQuery(event.target.value)}
-            onKeyDown={handleQuickKeyDown}
-            placeholder="Quick search…"
-            autoComplete="off"
-            spellCheck={false}
-            aria-label="Quick search"
-          />
-          {quickQuery ? (
-            <button
-              type="button"
-              className="sidebar-search-clear"
-              onClick={() => {
-                setQuickQuery("");
-                quickRef.current?.focus();
-              }}
-              aria-label="Clear"
-            >
-              ×
-            </button>
-          ) : null}
-        </div>
+        <div className="app-topbar-tools">
+          <div className="topbar-search">
+            <span className="sidebar-search-icon" aria-hidden="true">⌕</span>
+            <input
+              ref={quickRef}
+              type="text"
+              className="sidebar-search-input"
+              value={quickQuery}
+              onChange={(event) => setQuickQuery(event.target.value)}
+              onKeyDown={handleQuickKeyDown}
+              placeholder="Quick search…"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Quick search"
+            />
+          </div>
 
-        <nav className="nav-list nav-list--grouped" aria-label="Primary">
-          {navigationSections.map((section) => (
-            <div key={section.label} className="nav-group">
-              <p className="nav-group-label">{section.label}</p>
-              {section.items.map((item) => {
-                const isActive = item.path === activePath;
-                const isDemoTarget = isDemoMode && item.key === activeStepNavKey;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={[
-                      "nav-item",
-                      isActive ? "active" : "",
-                      isDemoTarget ? "nav-item--demo-target" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => onNavigate(item.path)}
-                  >
-                    <span>
-                      {isDemoTarget ? <span className="demo-nav-pulse" aria-hidden="true" /> : null}
-                      {item.label}
-                    </span>
-                    <small>{item.description}</small>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        <div className="sidebar-section sidebar-footer">
-          <div className="sidebar-user sidebar-user--static">
+          <div className="topbar-user-card">
             <div className="sidebar-user-avatar">{getInitials(currentUser.name)}</div>
             <div className="sidebar-user-info">
               <span className="sidebar-user-name">{currentUser.name}</span>
               <span className={`sidebar-user-role role-${currentUser.role}`}>
                 {currentUser.roleLabel}
               </span>
-              <span className="sidebar-user-role-label">@{currentUser.username}</span>
             </div>
             <button type="button" className="sidebar-logout-btn" onClick={onLogout}>
               Log out
             </button>
           </div>
+        </div>
+      </header>
 
-          <div className="demo-mode-toggle">
-            {isDemoMode ? (
+      <div className="app-navigation-shell">
+        <nav className="top-tabs" aria-label="Primary sections">
+          {topTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`top-tab${tab.key === activeTopTab ? " active" : ""}`}
+              onClick={() => onNavigate(tab.items[0].path)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {subnavItems.length > 0 ? (
+          <nav className="sub-tabs" aria-label="Section pages">
+            {subnavItems.map((item) => (
               <button
+                key={item.path}
                 type="button"
-                className="demo-toggle-btn demo-toggle-btn--active"
-                onClick={exitDemoMode}
+                className={`sub-tab${item.path === activePath ? " active" : ""}`}
+                onClick={() => onNavigate(item.path)}
               >
-                <span className="demo-toggle-dot" aria-hidden="true" />
-                Demo Mode On
+                <span>{item.label}</span>
+                <small>{item.description}</small>
               </button>
-            ) : (
-              <button type="button" className="demo-toggle-btn" onClick={enterDemoMode}>
-                ▶ Start Demo Mode
-              </button>
-            )}
-          </div>
+            ))}
+          </nav>
+        ) : null}
+      </div>
 
-          <LiveFeedTicker message={feedMessage} />
+      <div className="app-utility-row">
+        <div className="demo-mode-toggle">
+          {isDemoMode ? (
+            <button
+              type="button"
+              className="demo-toggle-btn demo-toggle-btn--active"
+              onClick={exitDemoMode}
+            >
+              <span className="demo-toggle-dot" aria-hidden="true" />
+              Demo Mode On
+            </button>
+          ) : (
+            <button type="button" className="demo-toggle-btn" onClick={enterDemoMode}>
+              ▶ Start Demo Mode
+            </button>
+          )}
+        </div>
 
-          <div className={backendOnline ? "system-status online" : "system-status"}>
-            <span className="status-dot" aria-hidden="true" />
-            <div>
-              <strong>{backendOnline ? "API Connected" : "API Unavailable"}</strong>
-              <p>
-                {backendOnline
-                  ? `DB time: ${timestamp}`
-                  : "Start the backend on port 3001 to load live data."}
-              </p>
-            </div>
+        <LiveFeedTicker message={feedMessage} />
+
+        <div className={backendOnline ? "system-status online" : "system-status"}>
+          <span className="status-dot" aria-hidden="true" />
+          <div>
+            <strong>{backendOnline ? "API Connected" : "API Unavailable"}</strong>
+            <p>
+              {backendOnline
+                ? `DB time: ${timestamp}`
+                : "Start the backend on port 3001 to load live data."}
+            </p>
           </div>
         </div>
-      </aside>
+      </div>
 
-      <main className="content">
+      <main className="content content--topnav">
         <DemoBanner />
         {children}
       </main>

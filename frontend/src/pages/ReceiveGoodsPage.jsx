@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
+import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
 import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
@@ -1188,6 +1189,14 @@ function ReceiveGoodsPage({ onNavigate }) {
           </div>
         ) : (
           <div className="receive-po-search-block">
+            <div className="receive-field-help-row">
+              <FieldHelp
+                label="Purchase order"
+                help="Search for or select the purchase order you are receiving against."
+                className="receive-inline-help"
+                labelClassName="receive-inline-help-label"
+              />
+            </div>
             <POSearchInput
               options={poOptions}
               selectedPoNumber={selectedPoNumber}
@@ -1274,17 +1283,19 @@ function ReceiveGoodsPage({ onNavigate }) {
           {/* Step 3 — Delivery details */}
           <Card title="Delivery Details" subtitle="Step 2 of 3">
             <div className="receive-header-grid">
-              <label className="receive-field">
-                <span>
-                  Delivery number <span className="receive-required">*</span>
-                </span>
+              <FieldHelp
+                className="receive-field"
+                label="Delivery note/reference"
+                help="Enter the supplier delivery note or reference from the paperwork."
+                required
+              >
                 <input
                   value={formState.deliveryNumber}
                   onChange={(e) => handleHeaderField("deliveryNumber", e.target.value)}
                   placeholder="e.g. DN-2024-001"
                   autoComplete="off"
                 />
-              </label>
+              </FieldHelp>
               <label className="receive-field">
                 <span>
                   Received by <span className="receive-required">*</span>
@@ -1418,8 +1429,11 @@ function ReceiveGoodsPage({ onNavigate }) {
 
                         {!alreadyComplete && (
                           <div className="receive-line-entry">
-                            <label className="receive-field receive-qty-field">
-                              <span>Quantity receiving now</span>
+                            <FieldHelp
+                              className="receive-field receive-qty-field"
+                              label="Received quantity"
+                              help="Enter how many units arrived today. Do not enter more than the remaining quantity."
+                            >
                               <input
                                 type="number"
                                 min="0"
@@ -1430,12 +1444,19 @@ function ReceiveGoodsPage({ onNavigate }) {
                                 placeholder="0"
                                 className="receive-qty-input"
                               />
-                            </label>
+                            </FieldHelp>
 
                             {line.serialTrackingRequired && (
                               <div className="serial-entry-block">
                                 <div className="serial-entry-header">
-                                  <span className="serial-entry-label">Serial numbers</span>
+                                  <span className="serial-entry-label">
+                                    Serial numbers
+                                    <HelpTooltip
+                                      text="Scan or type the serial number for this item. Required for serialised stock."
+                                      label="Serial number help"
+                                      align="left"
+                                    />
+                                  </span>
                                   <span
                                     className={`serial-progress-badge${
                                       serialsOk && hasQty
@@ -1471,8 +1492,13 @@ function ReceiveGoodsPage({ onNavigate }) {
 
                 <div className="receive-form-actions">
                   <Button type="submit" disabled={submitting}>
-                    {submitting ? "Saving Receipt…" : "Submit Receipt"}
+                    {submitting ? "Saving Receipt…" : "Confirm Receipt"}
                   </Button>
+                  <HelpTooltip
+                    text="Creates the goods receipt and updates stock availability."
+                    label="Confirm receipt help"
+                    align="left"
+                  />
                   <Button
                     type="button"
                     variant="secondary"

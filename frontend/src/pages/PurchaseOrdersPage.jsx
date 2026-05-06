@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
+import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
+import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import ActivityTimeline from "../components/ActivityTimeline";
@@ -26,7 +28,12 @@ function getSearchResultSummary(rows, activePoNumber) {
 const resultColumns = [
   {
     key: "poNumber",
-    header: "PO Number",
+    header: (
+      <span className="field-help-label">
+        PO Number
+        <HelpTooltip text="The supplier purchase order reference." label="PO number help" />
+      </span>
+    ),
     render: (row) => (
       <div>
         <strong>{row.poNumber}</strong>
@@ -36,7 +43,15 @@ const resultColumns = [
   },
   {
     key: "status",
-    header: "Status",
+    header: (
+      <span className="field-help-label">
+        Status
+        <HelpTooltip
+          text="Shows whether the order is open, partially received, fully received, or overdue."
+          label="Purchase order status help"
+        />
+      </span>
+    ),
     render: (row) => <span className={getStatusBadgeClass(row.status)}>{row.status}</span>,
   },
   {
@@ -165,8 +180,11 @@ function PurchaseOrdersPage({ onNavigate }) {
 
       <Card title="Search Purchase Orders" subtitle="PO Finder">
         <form className="search-form" onSubmit={handleSearch}>
-          <label className="search-field">
-            <span>PO Number</span>
+          <FieldHelp
+            className="search-field"
+            label="PO Number"
+            help="The supplier purchase order reference."
+          >
             <input
               type="search"
               value={inputValue}
@@ -174,7 +192,7 @@ function PurchaseOrdersPage({ onNavigate }) {
               placeholder="Search PO-1002"
               aria-label="Search by purchase order number"
             />
-          </label>
+          </FieldHelp>
           <div className="search-actions">
             <Button type="submit">Search</Button>
             <Button type="button" variant="secondary" onClick={handleClear}>
@@ -233,7 +251,10 @@ function PurchaseOrdersPage({ onNavigate }) {
               <div className="detail-header">
                 <div>
                   <h3>{detailData.poNumber}</h3>
-                  <p>{detailData.supplier}</p>
+                  <p className="field-help-label">
+                    {detailData.supplier}
+                    <HelpTooltip text="The company the goods were ordered from." label="Supplier help" align="left" />
+                  </p>
                 </div>
                 <div className="purchase-orders-detail-actions">
                   <span className={getStatusBadgeClass(detailData.status)}>{detailData.status}</span>

@@ -31,7 +31,7 @@ const routes = [
   {
     key: "dashboard",
     label: "Dashboard",
-    group: "Dashboard",
+    topTab: "dashboard",
     path: "/",
     component: DashboardPage,
     permission: "dashboard:view",
@@ -40,7 +40,7 @@ const routes = [
   {
     key: "sales-orders",
     label: "Sales Orders",
-    group: "Sales",
+    topTab: "sales-orders",
     path: "/sales-orders",
     component: SalesOrdersPage,
     permission: "so:view",
@@ -49,7 +49,7 @@ const routes = [
   {
     key: "allocation",
     label: "Allocation",
-    group: "Sales",
+    topTab: "sales-orders",
     path: "/allocation",
     component: SalesOrdersPage,
     permission: "so:allocate",
@@ -59,7 +59,7 @@ const routes = [
   {
     key: "dispatch",
     label: "Dispatch Ready",
-    group: "Sales",
+    topTab: "dispatch",
     path: "/dispatch",
     component: DispatchPage,
     permission: "so:dispatch",
@@ -68,7 +68,7 @@ const routes = [
   {
     key: "customers",
     label: "Customers",
-    group: "Sales",
+    topTab: "sales-orders",
     path: "/customers",
     component: CustomersPage,
     permission: "master-data:view",
@@ -77,7 +77,7 @@ const routes = [
   {
     key: "purchase-orders",
     label: "Purchase Orders",
-    group: "Purchasing",
+    topTab: "purchase-orders",
     path: "/purchase-orders",
     component: PurchaseOrdersPage,
     permission: "po:view",
@@ -86,7 +86,7 @@ const routes = [
   {
     key: "receive-goods",
     label: "Receive Goods",
-    group: "Purchasing",
+    topTab: "purchase-orders",
     path: "/receive-goods",
     component: ReceiveGoodsPage,
     permission: "po:receive",
@@ -95,7 +95,7 @@ const routes = [
   {
     key: "stock",
     label: "Current Stock",
-    group: "Stock",
+    topTab: "stock",
     path: "/stock",
     component: StockPage,
     permission: "stock:view",
@@ -104,7 +104,7 @@ const routes = [
   {
     key: "serial-tracker",
     label: "Serial Number Search",
-    group: "Stock",
+    topTab: "stock",
     path: "/serial-tracker",
     component: SerialTrackerPage,
     permission: "serial:view",
@@ -112,8 +112,8 @@ const routes = [
   },
   {
     key: "search",
-    label: "Global Search",
-    group: "Stock",
+    label: "Stock Search",
+    topTab: "stock",
     path: "/search",
     component: SearchPage,
     permission: "stock:view",
@@ -122,7 +122,7 @@ const routes = [
   {
     key: "users",
     label: "Users",
-    group: "Admin",
+    topTab: "admin",
     path: "/users",
     component: UsersPage,
     permission: "users:view",
@@ -131,7 +131,7 @@ const routes = [
   {
     key: "import",
     label: "Import Data",
-    group: "Admin",
+    topTab: "admin",
     path: "/import",
     component: ImportPage,
     permission: "import:use",
@@ -140,7 +140,7 @@ const routes = [
   {
     key: "products",
     label: "Products",
-    group: "Admin",
+    topTab: "admin",
     path: "/products",
     component: ProductsPage,
     permission: "master-data:view",
@@ -149,7 +149,7 @@ const routes = [
   {
     key: "suppliers",
     label: "Suppliers",
-    group: "Admin",
+    topTab: "purchase-orders",
     path: "/suppliers",
     component: SuppliersPage,
     permission: "master-data:view",
@@ -158,7 +158,7 @@ const routes = [
   {
     key: "locations",
     label: "Locations",
-    group: "Admin",
+    topTab: "stock",
     path: "/locations",
     component: LocationsPage,
     permission: "master-data:manage",
@@ -167,7 +167,7 @@ const routes = [
   {
     key: "audit-log",
     label: "Audit Log",
-    group: "Admin",
+    topTab: "reports",
     path: "/audit-log",
     component: AuditLogPage,
     permission: "audit:view",
@@ -176,7 +176,7 @@ const routes = [
   {
     key: "returns",
     label: "Returns",
-    group: "Stock",
+    topTab: "stock",
     path: "/returns",
     component: ReturnsPage,
     permission: "returns:manage",
@@ -185,7 +185,7 @@ const routes = [
   {
     key: "exceptions",
     label: "Exceptions",
-    group: "Admin",
+    topTab: "reports",
     path: "/exceptions",
     component: ExceptionDashboardPage,
     permission: "exceptions:view",
@@ -193,6 +193,8 @@ const routes = [
   },
   {
     key: "new-sales-order",
+    label: "New Sales Order",
+    topTab: "sales-orders",
     path: "/sales-orders/new",
     component: NewSalesOrderPage,
     permission: "so:create",
@@ -200,6 +202,8 @@ const routes = [
   },
   {
     key: "purchase-order-create",
+    label: "New Purchase Order",
+    topTab: "purchase-orders",
     path: "/purchase-orders/new",
     component: NewPurchaseOrderPage,
     permission: "po:create",
@@ -229,33 +233,45 @@ function AppShell() {
   const [searchQuery, setSearchQuery] = useState("");
   const health = useApiResource("/health");
 
-  const navigationSections = useMemo(() => {
-    const visibleRoutes = routes.filter(
-      (route) =>
-        route.group &&
-        (!route.permission || canDo(currentUser.role, route.permission))
-    );
+  const navigationModel = useMemo(() => {
+    const tabs = [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "purchase-orders", label: "Purchase Orders" },
+      { key: "sales-orders", label: "Sales Orders" },
+      { key: "stock", label: "Stock" },
+      { key: "dispatch", label: "Dispatch" },
+      { key: "reports", label: "Reports" },
+      { key: "admin", label: "Admin" },
+    ];
 
-    const grouped = visibleRoutes.reduce((accumulator, route) => {
-      if (!accumulator[route.group]) {
-        accumulator[route.group] = [];
-      }
-      accumulator[route.group].push(route);
-      return accumulator;
-    }, {});
+    return tabs
+      .map((tab) => {
+        const items = routes.filter(
+          (route) =>
+            route.topTab === tab.key &&
+            route.label &&
+            (!route.permission || canDo(currentUser.role, route.permission))
+        );
 
-    return ["Dashboard", "Sales", "Purchasing", "Stock", "Admin"]
-      .map((group) => ({
-        label: group,
-        items: grouped[group] || [],
-      }))
-      .filter((section) => section.items.length > 0);
+        const uniqueItems = items.filter(
+          (item, index) => items.findIndex((entry) => entry.path === item.path) === index
+        );
+
+        return {
+          ...tab,
+          items: uniqueItems,
+        };
+      })
+      .filter((tab) => tab.items.length > 0);
   }, [currentUser.role]);
 
   const matchedRoute = findRoute(pathname);
   const activeRoute = matchedRoute || routes[0];
   const ActivePage = activeRoute?.component || DashboardPage;
   const isAllowed = !activeRoute?.permission || canDo(currentUser.role, activeRoute.permission);
+  const activeTopTab =
+    navigationModel.find((tab) => tab.key === activeRoute.topTab) || navigationModel[0] || null;
+  const activeSubnavItems = activeTopTab?.items || [];
 
   useEffect(() => {
     function handlePopState() {
@@ -306,7 +322,9 @@ function AppShell() {
   if (!matchedRoute || !isAllowed) {
     return (
       <Layout
-        navigationSections={navigationSections}
+        topTabs={navigationModel}
+        activeTopTab={activeTopTab?.key || ""}
+        subnavItems={activeSubnavItems}
         activePath={activeRoute.navPath || activeRoute.path}
         onNavigate={handleNavigate}
         onSearch={handleSearch}
@@ -340,7 +358,9 @@ function AppShell() {
   return (
     <DemoProvider onNavigate={handleNavigate}>
       <Layout
-        navigationSections={navigationSections}
+        topTabs={navigationModel}
+        activeTopTab={activeTopTab?.key || ""}
+        subnavItems={activeSubnavItems}
         activePath={activeRoute.navPath || activeRoute.path}
         onNavigate={handleNavigate}
         onSearch={handleSearch}

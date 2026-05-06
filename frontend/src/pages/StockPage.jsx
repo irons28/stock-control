@@ -2,6 +2,7 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
+import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
 import { HELP_CONTENT } from "../config/helpContent";
 import StatusPill from "../components/StatusPill";
@@ -61,6 +62,27 @@ function StockPage() {
         steps={HELP_CONTENT.stock.steps}
         warnings={HELP_CONTENT.stock.warnings}
       />
+
+      <Card title="Stock Field Guide" subtitle="Hover for quick definitions">
+        <div className="dispatch-order-meta">
+          <span className="field-help-label">
+            SKU / item code
+            <HelpTooltip text="The internal product or stock item code." label="SKU help" align="left" />
+          </span>
+          <span className="field-help-label">
+            Serial number
+            <HelpTooltip text="Unique identifier for a specific serialised item." label="Serial number help" align="left" />
+          </span>
+          <span className="field-help-label">
+            Location
+            <HelpTooltip text="Where the stock is currently stored." label="Location help" align="left" />
+          </span>
+          <span className="field-help-label">
+            Stock status
+            <HelpTooltip text="Shows whether stock is available, allocated, dispatched, or on hold." label="Stock status help" align="left" />
+          </span>
+        </div>
+      </Card>
 
       <Card title="Stock Movements" subtitle="Live Data">
         <DataTable

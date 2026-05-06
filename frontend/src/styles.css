@@ -8063,6 +8063,16 @@ button.btn-permission-denied {
   margin: 0;
 }
 
+.guided-help-toggle {
+  border: 1px solid rgba(22, 50, 79, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #16324f;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .guided-help-warnings {
   margin-top: 1rem;
   display: grid;
@@ -8125,6 +8135,15 @@ button.btn-permission-denied {
   justify-content: center;
 }
 
+.receive-inline-help {
+  display: inline-flex;
+}
+
+.receive-inline-help-label {
+  font-weight: 700;
+  color: #16324f;
+}
+
 .app-loading {
   min-height: 100vh;
   display: grid;
@@ -8138,6 +8157,245 @@ button.btn-permission-denied {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: 1rem;
+}
+
+.app-shell--topnav {
+  display: block;
+  min-height: 100vh;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.4rem;
+  background: rgba(238, 243, 248, 0.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(22, 50, 79, 0.08);
+}
+
+.app-topbar-brand {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.app-topbar-brand h1 {
+  margin: 0;
+  color: #16324f;
+  font-size: 1.2rem;
+}
+
+.app-topbar-copy {
+  margin: 0;
+  color: #58708a;
+  font-size: 0.9rem;
+}
+
+.app-topbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+}
+
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: min(24rem, 100%);
+  padding: 0.2rem 0.75rem;
+  border: 1px solid rgba(22, 50, 79, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.topbar-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.55rem 0.45rem 0.45rem;
+  border: 1px solid rgba(22, 50, 79, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.app-navigation-shell {
+  position: sticky;
+  top: 86px;
+  z-index: 35;
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem 1.4rem 0.95rem;
+  background: rgba(238, 243, 248, 0.94);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(22, 50, 79, 0.08);
+}
+
+.top-tabs,
+.sub-tabs {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+}
+
+.top-tabs::-webkit-scrollbar,
+.sub-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.top-tab,
+.sub-tab {
+  border: 1px solid rgba(22, 50, 79, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.top-tab {
+  flex: 0 0 auto;
+  padding: 0.8rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #24486d;
+  white-space: nowrap;
+}
+
+.top-tab.active {
+  background: linear-gradient(135deg, #16324f, #325d88);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(22, 50, 79, 0.18);
+}
+
+.sub-tab {
+  flex: 0 0 auto;
+  min-width: 12rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 16px;
+  text-align: left;
+}
+
+.sub-tab span {
+  display: block;
+  font-weight: 700;
+  color: #16324f;
+}
+
+.sub-tab small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #58708a;
+  line-height: 1.35;
+}
+
+.sub-tab.active {
+  background: rgba(37, 99, 235, 0.09);
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+.app-utility-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  justify-content: space-between;
+  padding: 0.95rem 1.4rem 0;
+}
+
+.content--topnav {
+  padding-top: 1rem;
+}
+
+.field-help-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.help-tooltip-trigger {
+  width: 1.55rem;
+  height: 1.55rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 50, 79, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: #16324f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.help-tooltip--portal {
+  max-width: min(22rem, calc(100vw - 1.5rem));
+  padding: 0.7rem 0.82rem;
+  border-radius: 0.85rem;
+  background: #16324f;
+  color: #f8fbff;
+  box-shadow: 0 18px 40px rgba(22, 50, 79, 0.24);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.page-help-button-wrap {
+  position: relative;
+}
+
+.page-help-button {
+  width: 2rem;
+  height: 2rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 50, 79, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  color: #16324f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.help-popover {
+  width: min(28rem, calc(100vw - 1.5rem));
+}
+
+@media (max-width: 900px) {
+  .app-navigation-shell {
+    top: 118px;
+  }
+
+  .app-topbar,
+  .app-navigation-shell,
+  .app-utility-row {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .topbar-user-card {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-navigation-shell {
+    top: 156px;
+  }
+
+  .sub-tab {
+    min-width: 10.5rem;
+  }
+
+  .app-topbar-copy {
+    display: none;
+  }
 }
 
 /* ── Activity Timeline ──────────────────────────────────────────────────────── */
