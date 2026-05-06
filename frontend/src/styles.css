@@ -10631,3 +10631,214 @@ body::after {
     font-size: 4rem;
   }
 }
+
+/* ── Swan Retail: Light Body + Corrected Glass ────────────────────────────── *
+ *  Overrides the dark-purple body from earlier theme blocks.                  *
+ *  Cards remain white/soft-purple (from Light Glass Tuning section above).   *
+ *  Pills, badges, and field labels corrected for the now-light surface.       *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* 1. Light background — subtle purple-tinted cube grid */
+body {
+  color: #1d2340;
+  background-color: #f0f1f8;
+  background-image:
+    linear-gradient(rgba(80, 55, 180, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80, 55, 180, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-attachment: fixed;
+}
+
+/* Remove the old dark hex-pattern overlays */
+body::before,
+body::after {
+  display: none;
+}
+
+/* Subtle cyan glow on the app shell stays (very faint on light bg) */
+.app-shell--topnav::before,
+.login-shell::before {
+  background: radial-gradient(circle at top right, rgba(25, 212, 255, 0.06), transparent 22%);
+}
+
+/* 2. Field labels inside cards — must be dark on white/light surfaces */
+.master-data-field-label,
+.login-form label span,
+.integrations-label,
+.field-help-label,
+.receive-inline-help-label {
+  color: #3b3567;
+}
+
+/* Help tooltip field triggers — darken for light surfaces */
+.help-tooltip-trigger--field {
+  color: #5c3ecf;
+  text-decoration-color: rgba(92, 62, 207, 0.5);
+}
+
+.help-tooltip-trigger--field:hover,
+.help-tooltip-trigger--field:focus {
+  color: #3d1fa8;
+}
+
+/* 3. Pills and status badges — recalibrated for light/white card surfaces */
+
+/* Base pill — override the light-text variant from the dark theme block */
+.pill,
+.so-pill,
+.so-dispatch-tag,
+.jira-issue-key {
+  color: #3b3567;
+  background: rgba(100, 80, 190, 0.11);
+  border-color: rgba(100, 80, 190, 0.2);
+}
+
+.pill.subtle,
+.status-badge.neutral,
+.status-badge--grey,
+.so-pill--awaiting,
+.so-dispatch-tag--none {
+  background: rgba(100, 90, 150, 0.1);
+  color: #58617f;
+  border-color: rgba(100, 90, 150, 0.18);
+}
+
+.pill.positive,
+.status-badge.success,
+.status-badge--green,
+.so-pill--ready,
+.so-dispatch-tag--ok {
+  background: rgba(16, 140, 90, 0.12);
+  color: #0b5c3a;
+  border-color: rgba(16, 140, 90, 0.22);
+}
+
+.pill.info,
+.status-badge.warning,
+.status-badge--amber,
+.so-pill--partial,
+.so-dispatch-tag--soon,
+.pill.serial-required {
+  background: rgba(190, 120, 0, 0.12);
+  color: #7c5000;
+  border-color: rgba(190, 120, 0, 0.22);
+}
+
+.pill.negative,
+.status-badge.danger,
+.so-dispatch-tag--overdue {
+  background: rgba(200, 30, 60, 0.11);
+  color: #8c0a24;
+  border-color: rgba(200, 30, 60, 0.2);
+}
+
+.so-pill--full,
+.jira-issue-key {
+  background: rgba(17, 120, 200, 0.12);
+  color: #0a4a8c;
+  border-color: rgba(17, 120, 200, 0.22);
+}
+
+a.jira-issue-link,
+.jira-issue-link {
+  color: #1060b8;
+}
+
+a.jira-issue-link:hover,
+.jira-issue-link:hover {
+  color: #0a4a8c;
+}
+
+.jira-key-empty {
+  color: #9090b0;
+}
+
+.jira-key-edit-btn {
+  color: #5c3ecf;
+  border-color: rgba(92, 62, 207, 0.28);
+  background: rgba(92, 62, 207, 0.08);
+}
+
+.jira-key-edit-btn:hover {
+  color: #3d1fa8;
+  background: rgba(92, 62, 207, 0.14);
+  border-color: rgba(92, 62, 207, 0.42);
+}
+
+.jira-key-error {
+  color: #8c0a24;
+}
+
+/* 4. Inline alerts in card context */
+.alert.info {
+  background: rgba(37, 99, 235, 0.08);
+  border-left-color: #3b82f6;
+  color: #1e3a5f;
+}
+
+.alert.warning {
+  background: rgba(190, 120, 0, 0.09);
+  border-left-color: #d97706;
+  color: #7c5000;
+}
+
+.alert.error {
+  background: rgba(200, 30, 60, 0.08);
+  border-left-color: #dc2626;
+  color: #8c0a24;
+}
+
+.alert.success {
+  background: rgba(16, 140, 90, 0.09);
+  border-left-color: #10b981;
+  color: #0b5c3a;
+}
+
+/* 5. Receive/receipt progress colours on light surface */
+.line-remaining {
+  color: #7c5000;
+  font-weight: 700;
+}
+
+.line-complete {
+  color: #0b5c3a;
+  font-weight: 700;
+}
+
+.receipt-progress {
+  color: #3b3567;
+}
+
+/* 6. Jira row in SO detail — restore border for light cards */
+.alloc-jira-row {
+  border-top-color: rgba(80, 55, 180, 0.1);
+  color: #3b3567;
+}
+
+/* 7. search summary and similar helper text */
+.search-summary,
+.table-search-count {
+  color: #58617f;
+}
+
+/* 8. Status dot and system-status text remain light on their dark glass bg */
+.system-status strong {
+  color: #f7fafc;
+}
+
+.system-status p {
+  color: rgba(231, 235, 247, 0.75);
+}
+
+/* 9. Demo feed stays light (it's on a dark glass element) */
+.demo-live-user,
+.demo-live-text {
+  color: #f7fafc;
+}
+
+/* 10. Role pills in tables / user panel — keep readable */
+.sidebar-user-role.role-admin      { background: rgba(220, 100, 100, 0.15); color: #8c1a1a; border-color: rgba(220, 100, 100, 0.25); }
+.sidebar-user-role.role-warehouse  { background: rgba(16, 140, 90, 0.13);   color: #0b5c3a; border-color: rgba(16, 140, 90, 0.22); }
+.sidebar-user-role.role-dispatch   { background: rgba(130, 100, 210, 0.15); color: #4a1fa8; border-color: rgba(130, 100, 210, 0.25); }
+.sidebar-user-role.role-management { background: rgba(190, 130, 0, 0.13);   color: #7c5000; border-color: rgba(190, 130, 0, 0.22); }
+.sidebar-user-role.role-purchasing { background: rgba(17, 120, 200, 0.13);  color: #0a4a8c; border-color: rgba(17, 120, 200, 0.22); }
