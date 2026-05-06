@@ -10842,3 +10842,351 @@ a.jira-issue-link:hover,
 .sidebar-user-role.role-dispatch   { background: rgba(130, 100, 210, 0.15); color: #4a1fa8; border-color: rgba(130, 100, 210, 0.25); }
 .sidebar-user-role.role-management { background: rgba(190, 130, 0, 0.13);   color: #7c5000; border-color: rgba(190, 130, 0, 0.22); }
 .sidebar-user-role.role-purchasing { background: rgba(17, 120, 200, 0.13);  color: #0a4a8c; border-color: rgba(17, 120, 200, 0.22); }
+
+/* ═══════════════════════════════════════════════════════════════════════════ *
+ * Swan Retail: Purple Cube Theme — final correction                          *
+ * Overrides the light-body block above. Deep purple + cyan cube pattern.     *
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Body: deep purple base + cyan cube image overlay ────────────────── */
+
+body {
+  color: #f7fafc;
+  background-color: #25105a;
+  background-image: linear-gradient(
+    135deg,
+    #25105a 0%,
+    #180a3d 55%,
+    #1e0a42 100%
+  );
+  background-attachment: fixed;
+}
+
+/* Cube image tinted cyan via filter + screen blend */
+body::before {
+  display: block;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("/backgrounds/cube-pattern.jpg");
+  background-size: 420px auto;
+  background-repeat: repeat;
+  background-attachment: fixed;
+  opacity: 0.14;
+  filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Subtle vignette / depth overlay */
+body::after {
+  display: block;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(10, 4, 30, 0.03), rgba(10, 4, 30, 0.16)),
+    radial-gradient(circle at center, rgba(17, 197, 232, 0.04), transparent 48%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── 2. Header: deepen the purple panel & enlarge watermark ─────────────── */
+
+.app-topbar {
+  background: linear-gradient(
+    135deg,
+    rgba(37, 16, 90, 0.97),
+    rgba(22, 8, 61, 0.95)
+  );
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+}
+
+/* Larger, more prominent faint Swan Retail mark — header only */
+.app-topbar::after {
+  font-size: clamp(5rem, 11vw, 9.5rem);
+  color: rgba(255, 255, 255, 0.065);
+  right: 2.5rem;
+  top: -0.3rem;
+  letter-spacing: -0.075em;
+}
+
+/* ── 3. Cards: strong purple glass ──────────────────────────────────────── */
+
+.card,
+.master-data-banner,
+.master-data-toggle-card,
+.notice,
+.po-review-metrics div,
+.po-success-grid div,
+.integrations-setup-hint,
+.po-inline-empty,
+.dashboard-state-card {
+  background: rgba(45, 24, 95, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+/* ── 4. Card text: restore white for dark glass surface ─────────────────── */
+
+.card-header h3,
+.card-header h4,
+.card strong,
+.definition-list dd,
+.table-state strong,
+.detail-state strong,
+.dashboard-state h3,
+.summary-value,
+.dashboard-card-value,
+.po-lines-toolbar strong,
+.po-review-section h4,
+.po-success-hero h3,
+.po-review-line strong,
+.po-sales-order-card strong,
+.master-data-primary-cell strong,
+.integrations-detail-list dd,
+.data-table td,
+.po-lines-table td {
+  color: #f0eeff;
+}
+
+.card,
+.card-body,
+.card-header,
+.dashboard-card-label,
+.summary-label,
+.definition-list dt,
+.master-data-primary-cell span,
+.master-data-notes-preview,
+.master-data-toggle-help,
+.table-search-count,
+.result-meta,
+.po-sales-order-card span,
+.po-review-line span,
+.po-review-hero span,
+.po-lines-toolbar p,
+.po-review-section p,
+.po-success-hero p,
+.integrations-label,
+.integrations-test-detail,
+.integrations-message,
+.integrations-detail-list dt,
+.table-state,
+.detail-state {
+  color: rgba(215, 220, 239, 0.82);
+}
+
+/* ── 5. Field labels: restore light for dark glass context ──────────────── */
+
+.master-data-field-label,
+.login-form label span,
+.integrations-label,
+.field-help-label,
+.receive-inline-help-label {
+  color: #e8ebff;
+}
+
+.help-tooltip-trigger--field {
+  color: #9fe9fb;
+  text-decoration-color: rgba(159, 233, 251, 0.5);
+}
+
+.help-tooltip-trigger--field:hover,
+.help-tooltip-trigger--field:focus {
+  color: #19d4ff;
+  text-decoration-color: #19d4ff;
+}
+
+/* ── 6. Table wraps: dark glass ─────────────────────────────────────────── */
+
+.table-wrap,
+.po-lines-table-wrap,
+.imp-preview-table-wrap {
+  background: rgba(13, 7, 34, 0.24);
+  border-color: rgba(199, 214, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.data-table th,
+.po-lines-table th {
+  color: #a7efff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.data-table td,
+.po-lines-table td {
+  border-bottom-color: rgba(199, 214, 255, 0.09);
+}
+
+.data-table tbody tr:hover,
+.po-lines-table tbody tr:hover {
+  background: rgba(17, 197, 232, 0.07);
+}
+
+/* ── 7. Pills and badges: light text for dark glass ─────────────────────── */
+
+.pill,
+.so-pill,
+.so-dispatch-tag,
+.jira-issue-key {
+  color: #dde4ff;
+  background: rgba(110, 135, 177, 0.16);
+  border-color: rgba(110, 135, 177, 0.2);
+}
+
+.pill.subtle,
+.status-badge.neutral,
+.status-badge--grey,
+.so-pill--awaiting,
+.so-dispatch-tag--none {
+  background: rgba(110, 135, 177, 0.13);
+  color: #c4ceea;
+  border-color: transparent;
+}
+
+.pill.positive,
+.status-badge.success,
+.status-badge--green,
+.so-pill--ready,
+.so-dispatch-tag--ok {
+  background: rgba(92, 239, 183, 0.16);
+  color: #d6fff0;
+  border-color: rgba(92, 239, 183, 0.14);
+}
+
+.pill.info,
+.status-badge.warning,
+.status-badge--amber,
+.so-pill--partial,
+.so-dispatch-tag--soon,
+.pill.serial-required {
+  background: rgba(255, 191, 92, 0.16);
+  color: #ffe4a6;
+  border-color: rgba(255, 191, 92, 0.14);
+}
+
+.pill.negative,
+.status-badge.danger,
+.so-dispatch-tag--overdue {
+  background: rgba(255, 108, 152, 0.16);
+  color: #ffd3df;
+  border-color: rgba(255, 108, 152, 0.14);
+}
+
+.so-pill--full,
+.jira-issue-key {
+  background: rgba(17, 197, 232, 0.18);
+  color: #dcfbff;
+  border-color: rgba(25, 212, 255, 0.18);
+}
+
+/* ── 8. Jira key components: light text ─────────────────────────────────── */
+
+a.jira-issue-link,
+.jira-issue-link {
+  color: #9be7ff;
+}
+
+a.jira-issue-link:hover,
+.jira-issue-link:hover {
+  color: #19d4ff;
+}
+
+.jira-key-empty {
+  color: rgba(215, 220, 239, 0.45);
+}
+
+.jira-key-edit-btn {
+  color: #9be7ff;
+  border-color: rgba(155, 231, 255, 0.24);
+  background: rgba(155, 231, 255, 0.07);
+}
+
+.jira-key-edit-btn:hover {
+  color: #19d4ff;
+  background: rgba(25, 212, 255, 0.13);
+  border-color: rgba(25, 212, 255, 0.36);
+}
+
+.jira-key-error {
+  color: #ffd3df;
+}
+
+/* ── 9. Receipt line / progress colours ─────────────────────────────────── */
+
+.line-remaining {
+  color: #ffe4a6;
+  font-weight: 700;
+}
+
+.line-complete {
+  color: #d6fff0;
+  font-weight: 700;
+}
+
+.receipt-progress {
+  color: rgba(215, 220, 239, 0.82);
+}
+
+/* ── 10. Alerts for dark glass ──────────────────────────────────────────── */
+
+.alert.info {
+  background: rgba(37, 99, 235, 0.14);
+  border-left-color: #60a5fa;
+  color: #bfdbfe;
+}
+
+.alert.warning {
+  background: rgba(180, 110, 0, 0.14);
+  border-left-color: #fbbf24;
+  color: #fde68a;
+}
+
+.alert.error {
+  background: rgba(200, 30, 60, 0.14);
+  border-left-color: #f87171;
+  color: #fecaca;
+}
+
+.alert.success {
+  background: rgba(16, 140, 90, 0.14);
+  border-left-color: #34d399;
+  color: #a7f3d0;
+}
+
+/* ── 11. Misc surface / helper text restores ────────────────────────────── */
+
+.alloc-jira-row {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: rgba(215, 220, 239, 0.82);
+}
+
+.search-summary,
+.table-search-count {
+  color: rgba(215, 220, 239, 0.65);
+}
+
+.system-status strong {
+  color: #f7fafc;
+}
+
+.system-status p {
+  color: rgba(231, 235, 247, 0.72);
+}
+
+.demo-live-user,
+.demo-live-text {
+  color: #f7fafc;
+}
+
+/* ── 12. Sidebar role pills: restore dark-theme colours ─────────────────── */
+
+.sidebar-user-role.role-admin      { background: rgba(220, 100, 100, 0.15); color: #f5a0a0; border-color: rgba(220, 100, 100, 0.25); }
+.sidebar-user-role.role-warehouse  { background: rgba(93, 203, 150, 0.13);  color: #6edcae; border-color: rgba(93, 203, 150, 0.22); }
+.sidebar-user-role.role-dispatch   { background: rgba(160, 130, 230, 0.15); color: #c8b4f5; border-color: rgba(160, 130, 230, 0.25); }
+.sidebar-user-role.role-management { background: rgba(240, 180, 60, 0.13);  color: #f5d080; border-color: rgba(240, 180, 60, 0.22); }
+.sidebar-user-role.role-purchasing { background: rgba(106, 174, 232, 0.15); color: #7ec8f5; border-color: rgba(106, 174, 232, 0.22); }
