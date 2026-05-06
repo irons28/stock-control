@@ -75,13 +75,14 @@ function FieldHelp({
   const iconRef = useRef(null);
   const [open, setOpen] = useState(false);
 
+  // Only wire up focus/blur on the child input — hover is managed by the
+  // label wrapper's onMouseEnter/Leave so moving within the label doesn't
+  // prematurely close the tooltip.
   const child = children
     ? cloneElement(children, {
         "aria-describedby": open ? tooltipId : children.props["aria-describedby"],
         onFocus: mergeHandlers(children.props.onFocus, () => setOpen(true)),
         onBlur: mergeHandlers(children.props.onBlur, () => setOpen(false)),
-        onMouseEnter: mergeHandlers(children.props.onMouseEnter, () => setOpen(true)),
-        onMouseLeave: mergeHandlers(children.props.onMouseLeave, () => setOpen(false)),
       })
     : null;
 

@@ -7982,27 +7982,60 @@ button.btn-permission-denied {
 
 .page-help-button,
 .help-tooltip-trigger {
-  width: 2rem;
-  height: 2rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(255, 255, 255, 0.72);
-  color: #0f172a;
+  border: 1.5px solid rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.75);
   font-weight: 700;
+  font-size: 0.8rem;
   cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.page-help-button:hover,
+.help-tooltip-trigger:hover,
+.page-help-button:focus,
+.help-tooltip-trigger:focus {
+  background: rgba(255, 255, 255, 0.28);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+  outline: none;
+}
+
+/* In light contexts (topbar, page header on light bg), use dark version */
+.app-topbar .help-tooltip-trigger,
+.page-header .page-help-button,
+.page-header .help-tooltip-trigger {
+  background: rgba(22, 50, 79, 0.08);
+  border-color: rgba(22, 50, 79, 0.2);
+  color: #325d88;
+}
+
+.app-topbar .help-tooltip-trigger:hover,
+.page-header .page-help-button:hover,
+.page-header .help-tooltip-trigger:hover {
+  background: rgba(22, 50, 79, 0.15);
+  color: #16324f;
+  border-color: rgba(22, 50, 79, 0.35);
 }
 
 .help-popover {
   position: absolute;
   top: calc(100% + 0.75rem);
   right: 0;
-  z-index: 50;
+  z-index: 200;
   width: min(26rem, 88vw);
   padding: 1rem;
   border-radius: 1rem;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: #fff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
 }
 
 .help-popover-header {
@@ -8055,28 +8088,75 @@ button.btn-permission-denied {
 .guided-help-panel {
   padding: 1.2rem 1.25rem;
   border-radius: 1.1rem;
-  border: 1px solid rgba(59, 130, 246, 0.14);
-  background: linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(248, 250, 252, 1));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(30, 41, 75, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.guided-help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .guided-help-header h3 {
   margin: 0;
+  color: var(--text-primary, #e4e9f4);
+  font-size: 0.95rem;
+}
+
+.guided-help-header .eyebrow {
+  color: #6aaee8;
 }
 
 .guided-help-toggle {
-  border: 1px solid rgba(22, 50, 79, 0.14);
+  flex-shrink: 0;
+  border: 1px solid rgba(99, 153, 255, 0.3);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  color: #16324f;
-  padding: 0.6rem 0.9rem;
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.guided-help-toggle:hover {
+  background: rgba(59, 130, 246, 0.22);
+  color: #bfdbfe;
+}
+
+.guided-help-intro {
+  margin: 0.65rem 0 0;
+  color: var(--text-secondary, #aab4cc);
+  font-size: 0.88rem;
+}
+
+.help-list,
+.guided-help-list {
+  margin: 0.55rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary, #aab4cc);
+  font-size: 0.88rem;
+  line-height: 1.65;
 }
 
 .guided-help-warnings {
   margin-top: 1rem;
   display: grid;
   gap: 0.45rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.07);
+  border: 1px solid rgba(234, 179, 8, 0.18);
+  color: #fde68a;
+  font-size: 0.83rem;
+}
+
+.guided-help-warnings p {
+  margin: 0;
 }
 
 .guided-help-warnings p {
@@ -8141,7 +8221,7 @@ button.btn-permission-denied {
 
 .receive-inline-help-label {
   font-weight: 700;
-  color: #16324f;
+  color: var(--text-secondary, #aab4cc);
 }
 
 .app-loading {
@@ -8275,28 +8355,24 @@ button.btn-permission-denied {
 
 .sub-tab {
   flex: 0 0 auto;
-  min-width: 12rem;
-  padding: 0.8rem 0.95rem;
-  border-radius: 16px;
-  text-align: left;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #24486d;
+  white-space: nowrap;
 }
 
-.sub-tab span {
-  display: block;
-  font-weight: 700;
-  color: #16324f;
-}
-
-.sub-tab small {
-  display: block;
-  margin-top: 0.2rem;
-  color: #58708a;
-  line-height: 1.35;
+.sub-tab:hover {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.2);
 }
 
 .sub-tab.active {
-  background: rgba(37, 99, 235, 0.09);
-  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.32);
+  color: #1a3a66;
+  font-weight: 700;
 }
 
 .app-utility-row {
@@ -8319,18 +8395,7 @@ button.btn-permission-denied {
   flex-wrap: wrap;
 }
 
-.help-tooltip-trigger {
-  width: 1.55rem;
-  height: 1.55rem;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 999px;
-  border: 1px solid rgba(22, 50, 79, 0.18);
-  background: rgba(255, 255, 255, 0.92);
-  color: #16324f;
-  font-weight: 700;
-  cursor: pointer;
-}
+/* (duplicate .help-tooltip-trigger block removed — see canonical definition above) */
 
 .help-tooltip--portal {
   max-width: min(22rem, calc(100vw - 1.5rem));

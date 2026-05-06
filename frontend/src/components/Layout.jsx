@@ -121,9 +121,9 @@ function Layout({
                 type="button"
                 className={`sub-tab${item.path === activePath ? " active" : ""}`}
                 onClick={() => onNavigate(item.path)}
+                title={item.description}
               >
-                <span>{item.label}</span>
-                <small>{item.description}</small>
+                {item.label}
               </button>
             ))}
           </nav>
