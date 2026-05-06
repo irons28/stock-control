@@ -78,6 +78,7 @@ async function fetchSalesOrderRow(orderNumber) {
         so.order_number,
         so.customer_id,
         so.linked_purchase_order_id,
+        so.jira_issue_key,
         so.status,
         so.requested_at,
         so.dispatch_due_at,
@@ -324,6 +325,7 @@ async function getSalesOrderPayload(orderNumber) {
       customerCode: order.customer_code,
       customerName: order.customer_name,
       linkedPurchaseOrderId: order.linked_purchase_order_id,
+      jiraIssueKey: order.jira_issue_key || null,
       requestedAt: order.requested_at,
       dispatchDueAt: order.dispatch_due_at,
       notes: order.notes,
@@ -949,6 +951,63 @@ router.get("/:soNumber", async (req, res, next) => {
   try {
     const payload = await getSalesOrderPayload(req.params.soNumber);
     res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── PATCH /:soNumber/jira-key ─────────────────────────────────────────────────
+// Set, update, or clear the Jira issue key linked to a sales order.
+
+const JIRA_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/;
+
+router.patch("/:soNumber/jira-key", requireRole("admin", "office"), async (req, res, next) => {
+  try {
+    const { soNumber } = req.params;
+    const rawKey = typeof req.body.jiraIssueKey === "string" ? req.body.jiraIssueKey.trim() : null;
+
+    if (rawKey !== null && rawKey !== "" && !JIRA_KEY_RE.test(rawKey)) {
+      return res.status(400).json({
+        error: true,
+        message: "Invalid Jira issue key format. Expected something like ABC-123.",
+      });
+    }
+
+    const newKey = rawKey || null;
+
+    const so = await get(
+      `SELECT id, order_number, jira_issue_key FROM sales_orders WHERE order_number = ? LIMIT 1`,
+      [soNumber],
+    );
+    if (!so) {
+      return res.status(404).json({ error: true, message: `Sales order ${soNumber} not found.` });
+    }
+
+    await run(
+      `UPDATE sales_orders SET jira_issue_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [newKey, so.id],
+    );
+
+    const previousKey = so.jira_issue_key || null;
+    const actionType = newKey && previousKey ? "jira_key_updated"
+                     : newKey               ? "jira_key_set"
+                                            : "jira_key_cleared";
+    const summary = newKey
+      ? `Jira issue key ${previousKey ? "updated" : "set"} to ${newKey} on SO ${soNumber}`
+      : `Jira issue key cleared on SO ${soNumber}`;
+
+    await writeActivityLog({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userName: req.user?.full_name,
+      actionType,
+      entityType: "sales_order",
+      entityRef: soNumber,
+      summary,
+      details: { previousKey, newKey },
+    });
+
+    res.json({ jiraIssueKey: newKey, message: summary });
   } catch (error) {
     next(error);
   }

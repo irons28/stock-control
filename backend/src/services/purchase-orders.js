@@ -627,7 +627,9 @@ async function receivePurchaseOrder(poNumber, payload, userContext = {}) {
     orderDetails.lines.map((line) => [Number(line.id), Number(line.quantity_received)])
   );
 
-  return withTransaction(async () => {
+  // Run the receipt inside a transaction, then apply Jira integration outside it
+  // so a Jira failure never rolls back the receipt.
+  const receipt = await withTransaction(async () => {
     const receiptResult = await run(
       `INSERT INTO goods_receipts (
         purchase_order_id,

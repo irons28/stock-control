@@ -173,4 +173,75 @@ async function transitionIssue(issueKey, transitionName) {
   }
 }
 
-module.exports = { isEnabled, getConfig, getIssue, addComment, transitionIssue };
+/**
+ * Test the Jira connection without exposing credentials.
+ *
+ * Returns an object:
+ *   { ok: bool, status: 'disabled'|'missing_credentials'|'connected'|'failed',
+ *     message: string, detail?: string }
+ *
+ * Never includes the API token, email, or auth header in the return value.
+ */
+async function testConnection() {
+  const cfg = readConfig();
+
+  if (!cfg.enabled) {
+    return { ok: false, status: "disabled", message: "Jira integration is disabled (JIRA_ENABLED is not true)." };
+  }
+
+  const configured = Boolean(cfg.baseUrl) && Boolean(cfg.email) && Boolean(cfg.apiToken);
+  if (!configured) {
+    const missing = [];
+    if (!cfg.baseUrl)   missing.push("JIRA_BASE_URL");
+    if (!cfg.email)     missing.push("JIRA_EMAIL");
+    if (!cfg.apiToken)  missing.push("JIRA_API_TOKEN");
+    return {
+      ok: false,
+      status: "missing_credentials",
+      message: `Missing required configuration: ${missing.join(", ")}.`,
+    };
+  }
+
+  // Try to reach the Jira API — use /myself as a lightweight connectivity check.
+  try {
+    const url = `${cfg.baseUrl}/rest/api/3/myself`;
+    const encoded = Buffer.from(`${cfg.email}:${cfg.apiToken}`).toString("base64");
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${encoded}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      // Only return safe fields — never accountId, email, avatar, etc.
+      const displayName = data.displayName || "unknown user";
+      let detail = `Authenticated as "${displayName}"`;
+      if (cfg.projectKey) {
+        detail += `. Project key: ${cfg.projectKey}`;
+      }
+      return { ok: true, status: "connected", message: "Jira connection successful.", detail };
+    }
+
+    // Non-2xx response — return the status code, never the auth header.
+    const text = await response.text().catch(() => "");
+    const safe = text.slice(0, 200).replace(/<[^>]*>/g, ""); // strip any HTML
+    return {
+      ok: false,
+      status: "failed",
+      message: `Jira returned HTTP ${response.status}.`,
+      detail: safe || undefined,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: "failed",
+      message: "Could not reach the Jira server.",
+      detail: err.message,
+    };
+  }
+}
+
+module.exports = { isEnabled, getConfig, getIssue, addComment, transitionIssue, testConnection };

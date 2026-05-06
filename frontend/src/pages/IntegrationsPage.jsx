@@ -8,9 +8,54 @@ function StatusBadge({ active, configured, enabled }) {
   return <span className="status-badge status-badge--grey">Disabled</span>;
 }
 
+/**
+ * TestConnectionResult — renders the result returned by POST /admin/integrations/jira/test.
+ * Never shows credentials: the backend strips them before responding.
+ */
+function TestConnectionResult({ result }) {
+  if (!result) return null;
+
+  const alertClass =
+    result.status === "connected" ? "alert success"
+    : result.status === "disabled" ? "alert info"
+    : "alert warning";
+
+  const icon =
+    result.status === "connected" ? "✓"
+    : result.status === "disabled" ? "ⓘ"
+    : "⚠";
+
+  return (
+    <div className={`${alertClass} integrations-test-result`} role="status">
+      <strong>{icon} {result.message}</strong>
+      {result.detail && <p className="integrations-test-detail">{result.detail}</p>}
+    </div>
+  );
+}
+
 function JiraCard({ status }) {
   const { enabled, configured, active, baseUrl, projectKey, poReceivedTransition, message } =
     status || {};
+
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
+
+  async function handleTest() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await apiFetch("/admin/integrations/jira/test", { method: "POST" });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        status: "failed",
+        message: err.message || "Test request failed.",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <Card title="Jira" subtitle="Issue Tracker Integration">
@@ -55,6 +100,7 @@ function JiraCard({ status }) {
           <p>
             Set environment variables on the backend server to configure this integration.
             See <code>.env.example</code> for the full list of required variables.
+            See <code>docs/jira-integration.md</code> for setup instructions.
           </p>
           {active && (
             <p className="integrations-active-hint">
@@ -62,6 +108,18 @@ function JiraCard({ status }) {
               added to the Jira ticket automatically.
             </p>
           )}
+        </div>
+
+        <div className="integrations-test-section">
+          <button
+            type="button"
+            className="button secondary integrations-test-btn"
+            onClick={handleTest}
+            disabled={testing}
+          >
+            {testing ? "Testing…" : "Test Jira Connection"}
+          </button>
+          <TestConnectionResult result={testResult} />
         </div>
       </div>
     </Card>

@@ -1138,12 +1138,23 @@ function ReceiveGoodsPage({ onNavigate }) {
           ))}
         </div>
 
-        {/* Jira integration result */}
-        {successSummary.jiraResult?.attempted && (
-          <div className={`alert ${successSummary.jiraResult.success ? "success" : "warning"}`}>
-            {successSummary.jiraResult.success
-              ? `Jira comment added to ${successSummary.jiraResult.issueKey}.`
-              : `Jira update could not be completed for ${successSummary.jiraResult.issueKey}. The receipt was still saved.`}
+        {/* Jira integration result — only shown when Jira was attempted */}
+        {successSummary.jiraResult?.attempted && successSummary.jiraResult.success && (
+          <div className="alert success receive-jira-notice">
+            <strong>Jira updated.</strong>{" "}
+            Comment added to{" "}
+            <span className="jira-issue-key">{successSummary.jiraResult.issueKey}</span>.
+          </div>
+        )}
+        {successSummary.jiraResult?.attempted && !successSummary.jiraResult.success && (
+          <div className="alert warning receive-jira-notice">
+            <strong>Goods received successfully.</strong>{" "}
+            However, Jira could not be updated for{" "}
+            <span className="jira-issue-key">{successSummary.jiraResult.issueKey}</span>.{" "}
+            Please check the linked Jira issue or review Admin &rsaquo; Integrations.
+            {successSummary.jiraResult.error && (
+              <span className="receive-jira-error-detail"> ({successSummary.jiraResult.error})</span>
+            )}
           </div>
         )}
 

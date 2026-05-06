@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import DataTable from "../components/DataTable";
@@ -10,7 +10,131 @@ import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import ActivityTimeline from "../components/ActivityTimeline";
 import { HELP_CONTENT } from "../config/helpContent";
 import { useApiResource } from "../hooks/useApiResource";
+import { apiFetch } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/formatters";
+
+const JIRA_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/;
+
+/**
+ * Inline editor for a Jira issue key on a PO or SO.
+ *
+ * Props:
+ *   issueKey   – current value (string | null)
+ *   jiraBaseUrl – safe base URL from integration status (string | null)
+ *   onSave(newKey)  – async fn called with trimmed string or "" to clear
+ *   disabled   – hides the edit button
+ */
+function JiraKeyEditor({ issueKey, jiraBaseUrl, onSave, disabled = false }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const inputRef = useRef(null);
+
+  function startEdit() {
+    setDraft(issueKey || "");
+    setError("");
+    setEditing(true);
+    // focus after render
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setError("");
+  }
+
+  async function save() {
+    const trimmed = draft.trim().toUpperCase();
+    if (trimmed && !JIRA_KEY_RE.test(trimmed)) {
+      setError("Format must be like ABC-123 (uppercase project key, dash, number).");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(trimmed);
+      setEditing(false);
+    } catch (err) {
+      setError(err.message || "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const jiraUrl =
+    jiraBaseUrl && issueKey
+      ? `${jiraBaseUrl}/browse/${encodeURIComponent(issueKey)}`
+      : null;
+
+  if (editing) {
+    return (
+      <div className="jira-key-editor">
+        <input
+          ref={inputRef}
+          type="text"
+          className="jira-key-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          placeholder="e.g. ABC-123"
+          aria-label="Jira issue key"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") cancel();
+          }}
+          disabled={saving}
+        />
+        <Button variant="primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="secondary" onClick={cancel} disabled={saving}>
+          Cancel
+        </Button>
+        {draft.trim() && (
+          <Button
+            variant="secondary"
+            onClick={() => { setDraft(""); }}
+            disabled={saving}
+          >
+            Clear
+          </Button>
+        )}
+        {error && <span className="jira-key-error">{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="jira-key-display">
+      {issueKey ? (
+        jiraUrl ? (
+          <a
+            href={jiraUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="jira-issue-key jira-issue-link"
+          >
+            {issueKey}
+          </a>
+        ) : (
+          <span className="jira-issue-key">{issueKey}</span>
+        )
+      ) : (
+        <span className="jira-key-empty">Not linked</span>
+      )}
+      {!disabled && (
+        <button
+          type="button"
+          className="jira-key-edit-btn"
+          onClick={startEdit}
+          aria-label={issueKey ? "Edit Jira issue key" : "Link Jira issue key"}
+        >
+          {issueKey ? "Edit" : "Link issue"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function getStatusBadgeClass(status) {
   return `pill ${String(status).toLowerCase().replace(/\s+/g, "-")}`;
@@ -110,6 +234,9 @@ function PurchaseOrdersPage({ onNavigate }) {
   const detail = useApiResource(
     selectedPoNumber ? `/purchase-orders/${encodeURIComponent(selectedPoNumber)}` : "",
   );
+  // Fetch Jira base URL safely from integration status (never exposes credentials)
+  const integrationStatus = useApiResource("/admin/integrations/status");
+  const jiraBaseUrl = integrationStatus.data?.jira?.baseUrl || null;
 
   useEffect(() => {
     if (!rows.length) {
@@ -121,6 +248,14 @@ function PurchaseOrdersPage({ onNavigate }) {
       setSelectedPoNumber(rows[0].poNumber);
     }
   }, [rows, selectedPoNumber]);
+
+  async function handleSaveJiraKey(newKey) {
+    await apiFetch(`/purchase-orders/${encodeURIComponent(selectedPoNumber)}/jira-key`, {
+      method: "PATCH",
+      body: JSON.stringify({ jiraIssueKey: newKey }),
+    });
+    detail.reload();
+  }
 
   const summaryText = useMemo(
     () => getSearchResultSummary(rows, selectedPoNumber),
@@ -275,14 +410,24 @@ function PurchaseOrdersPage({ onNavigate }) {
                   <dt>Still Open</dt>
                   <dd>{detailData.openLineCount}</dd>
                 </div>
-                {detailData.jiraIssueKey && (
-                  <div>
-                    <dt>Jira Issue</dt>
-                    <dd>
-                      <span className="jira-issue-key">{detailData.jiraIssueKey}</span>
-                    </dd>
-                  </div>
-                )}
+                <div>
+                  <dt>Jira Issue</dt>
+                  <dd>
+                    <PermissionGate permission="po:create" fallback={
+                      detailData.jiraIssueKey
+                        ? (jiraBaseUrl
+                            ? <a href={`${jiraBaseUrl}/browse/${encodeURIComponent(detailData.jiraIssueKey)}`} target="_blank" rel="noopener noreferrer" className="jira-issue-key jira-issue-link">{detailData.jiraIssueKey}</a>
+                            : <span className="jira-issue-key">{detailData.jiraIssueKey}</span>)
+                        : <span className="jira-key-empty">Not linked</span>
+                    }>
+                      <JiraKeyEditor
+                        issueKey={detailData.jiraIssueKey}
+                        jiraBaseUrl={jiraBaseUrl}
+                        onSave={handleSaveJiraKey}
+                      />
+                    </PermissionGate>
+                  </dd>
+                </div>
               </dl>
 
               <div className="receipt-progress">

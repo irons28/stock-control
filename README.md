@@ -192,6 +192,16 @@ npm run test         # Vitest unit tests
 
 ---
 
+## Integrations
+
+| Integration | Status | Docs |
+|---|---|---|
+| Jira (Atlassian) | Optional, backend-only | [docs/jira-integration.md](docs/jira-integration.md) |
+
+Configure via environment variables on the backend. Credentials are never exposed to the frontend.
+
+---
+
 ## Security Notes
 
 - Authentication is **header-based** (`x-user-id`, `x-user-name`, `x-user-role`). This is a trusted-network internal tool — it assumes users on the network are authorised staff.

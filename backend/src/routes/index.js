@@ -208,6 +208,16 @@ router.get("/admin/integrations/status", requireRole("admin"), (_req, res) => {
   res.json({ jira: jira.getConfig() });
 });
 
+router.post("/admin/integrations/jira/test", requireRole("admin"), async (req, res, next) => {
+  try {
+    const result = await jira.testConnection();
+    // result never contains credentials — see jira.testConnection() docs.
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/dashboard/summary", async (_req, res, next) => {
   try {
     const summary = await get(dashboardSummaryQuery);
@@ -477,6 +487,74 @@ router.get("/purchase-orders/:poNumber", async (req, res, next) => {
     next(error);
   }
 });
+
+// ── PATCH /purchase-orders/:poNumber/jira-key ─────────────────────────────────
+// Set, update, or clear the Jira issue key linked to a purchase order.
+// Only stores the issue key — never any Jira credentials.
+// Accepts: { jiraIssueKey: "ABC-123" } or { jiraIssueKey: "" } to clear.
+
+const JIRA_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/;
+
+router.patch(
+  "/purchase-orders/:poNumber/jira-key",
+  requireRole("admin", "office"),
+  async (req, res, next) => {
+    try {
+      const { poNumber } = req.params;
+      const rawKey = typeof req.body.jiraIssueKey === "string" ? req.body.jiraIssueKey.trim() : null;
+
+      // Validate: either empty/null (clear) or a valid KEY-NNN pattern.
+      if (rawKey !== null && rawKey !== "" && !JIRA_KEY_RE.test(rawKey)) {
+        return res.status(400).json({
+          error: true,
+          message: "Invalid Jira issue key format. Expected something like ABC-123.",
+        });
+      }
+
+      const newKey = rawKey || null;
+
+      const po = await get(
+        `SELECT id, order_number, jira_issue_key FROM purchase_orders WHERE order_number = ? LIMIT 1`,
+        [poNumber],
+      );
+      if (!po) {
+        return res.status(404).json({ error: true, message: `Purchase order ${poNumber} not found.` });
+      }
+
+      await run(
+        `UPDATE purchase_orders SET jira_issue_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newKey, po.id],
+      );
+
+      // Audit log
+      const previousKey = po.jira_issue_key || null;
+      const actionType = newKey && previousKey ? "jira_key_updated"
+                       : newKey               ? "jira_key_set"
+                                              : "jira_key_cleared";
+      const summary = newKey
+        ? `Jira issue key ${previousKey ? "updated" : "set"} to ${newKey} on PO ${poNumber}`
+        : `Jira issue key cleared on PO ${poNumber}`;
+
+      await run(
+        `INSERT INTO activity_log (user_id, user_role, user_name, action_type, entity_type, entity_ref, summary, details_json)
+         VALUES (?, ?, ?, ?, 'purchase_order', ?, ?, ?)`,
+        [
+          req.user?.id || null,
+          req.user?.role || "system",
+          req.user?.full_name || "System",
+          actionType,
+          poNumber,
+          summary,
+          JSON.stringify({ previousKey, newKey }),
+        ],
+      );
+
+      res.json({ jiraIssueKey: newKey, message: summary });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.get("/purchase-orders/:poNumber/timeline", async (req, res, next) => {
   try {

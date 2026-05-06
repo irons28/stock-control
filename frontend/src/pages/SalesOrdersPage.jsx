@@ -12,6 +12,111 @@ import { apiFetch } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/formatters";
 import { useUser } from "../context/UserContext";
 
+// ── Jira key editor (reused from PO page pattern) ─────────────────────────────
+
+const JIRA_KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/;
+
+function JiraKeyEditor({ issueKey, jiraBaseUrl, onSave, disabled = false }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const inputRef = useRef(null);
+
+  function startEdit() {
+    setDraft(issueKey || "");
+    setError("");
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setError("");
+  }
+
+  async function save() {
+    const trimmed = draft.trim().toUpperCase();
+    if (trimmed && !JIRA_KEY_RE.test(trimmed)) {
+      setError("Format must be like ABC-123 (uppercase project key, dash, number).");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(trimmed);
+      setEditing(false);
+    } catch (err) {
+      setError(err.message || "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const jiraUrl = jiraBaseUrl && issueKey
+    ? `${jiraBaseUrl}/browse/${encodeURIComponent(issueKey)}`
+    : null;
+
+  if (editing) {
+    return (
+      <div className="jira-key-editor">
+        <input
+          ref={inputRef}
+          type="text"
+          className="jira-key-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          placeholder="e.g. ABC-123"
+          aria-label="Jira issue key"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") cancel();
+          }}
+          disabled={saving}
+        />
+        <Button variant="primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="secondary" onClick={cancel} disabled={saving}>
+          Cancel
+        </Button>
+        {draft.trim() && (
+          <Button variant="secondary" onClick={() => setDraft("")} disabled={saving}>
+            Clear
+          </Button>
+        )}
+        {error && <span className="jira-key-error">{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="jira-key-display">
+      {issueKey ? (
+        jiraUrl ? (
+          <a href={jiraUrl} target="_blank" rel="noopener noreferrer" className="jira-issue-key jira-issue-link">
+            {issueKey}
+          </a>
+        ) : (
+          <span className="jira-issue-key">{issueKey}</span>
+        )
+      ) : (
+        <span className="jira-key-empty">Not linked</span>
+      )}
+      {!disabled && (
+        <button
+          type="button"
+          className="jira-key-edit-btn"
+          onClick={startEdit}
+          aria-label={issueKey ? "Edit Jira issue key" : "Link Jira issue key"}
+        >
+          {issueKey ? "Edit" : "Link issue"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function classifyDispatchDate(dateStr) {
@@ -859,6 +964,10 @@ function SalesOrdersPage({ onNavigate }) {
       : null,
   );
 
+  // Jira base URL (safe, no credentials) from integration status
+  const integrationStatus = useApiResource("/admin/integrations/status");
+  const jiraBaseUrl = integrationStatus.data?.jira?.baseUrl || null;
+
   const [orderDetail, setOrderDetail] = useState(null);
   const [detailStatus, setDetailStatus] = useState("idle");
   const [detailError, setDetailError] = useState("");
@@ -988,6 +1097,17 @@ function SalesOrdersPage({ onNavigate }) {
 
   function handleSelectOrder(orderNumber) {
     setSelectedOrderNumber(orderNumber);
+  }
+
+  async function handleSaveJiraKey(newKey) {
+    if (!orderDetail?.order?.orderNumber) return;
+    await apiFetch(
+      `/sales-orders/${encodeURIComponent(orderDetail.order.orderNumber)}/jira-key`,
+      { method: "PATCH", body: JSON.stringify({ jiraIssueKey: newKey }) },
+    );
+    // Reload detail
+    const updated = await apiFetch(`/sales-orders/${encodeURIComponent(orderDetail.order.orderNumber)}`);
+    setOrderDetail(updated);
   }
 
   function handleSerialAdd(lineId, stockItemId) {
@@ -1300,6 +1420,38 @@ function SalesOrdersPage({ onNavigate }) {
                     </strong>
                   </div>
                 )}
+              </div>
+
+              {/* Jira issue key */}
+              <div className="alloc-jira-row">
+                <span className="alloc-summary-label">Jira Issue</span>
+                <PermissionGate
+                  permission="so:create"
+                  fallback={
+                    orderDetail.order.jiraIssueKey ? (
+                      jiraBaseUrl ? (
+                        <a
+                          href={`${jiraBaseUrl}/browse/${encodeURIComponent(orderDetail.order.jiraIssueKey)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="jira-issue-key jira-issue-link"
+                        >
+                          {orderDetail.order.jiraIssueKey}
+                        </a>
+                      ) : (
+                        <span className="jira-issue-key">{orderDetail.order.jiraIssueKey}</span>
+                      )
+                    ) : (
+                      <span className="jira-key-empty">Not linked</span>
+                    )
+                  }
+                >
+                  <JiraKeyEditor
+                    issueKey={orderDetail.order.jiraIssueKey}
+                    jiraBaseUrl={jiraBaseUrl}
+                    onSave={handleSaveJiraKey}
+                  />
+                </PermissionGate>
               </div>
 
               {/* Auto-allocate CTA */}
