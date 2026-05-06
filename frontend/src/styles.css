@@ -7980,19 +7980,21 @@ button.btn-permission-denied {
   align-items: center;
 }
 
+/* Help trigger button — dark by default so the "?" is visible on any light background */
 .page-help-button,
 .help-tooltip-trigger {
   width: 1.6rem;
   height: 1.6rem;
   border-radius: 999px;
-  border: 1.5px solid rgba(148, 163, 184, 0.5);
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.75);
+  border: 1.5px solid rgba(22, 50, 79, 0.22);
+  background: rgba(22, 50, 79, 0.07);
+  color: #325d88;
   font-weight: 700;
   font-size: 0.8rem;
   cursor: pointer;
   display: inline-grid;
   place-items: center;
+  line-height: 1;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
@@ -8001,27 +8003,28 @@ button.btn-permission-denied {
 .help-tooltip-trigger:hover,
 .page-help-button:focus,
 .help-tooltip-trigger:focus {
-  background: rgba(255, 255, 255, 0.28);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(22, 50, 79, 0.14);
+  color: #16324f;
+  border-color: rgba(22, 50, 79, 0.38);
   outline: none;
 }
 
-/* In light contexts (topbar, page header on light bg), use dark version */
-.app-topbar .help-tooltip-trigger,
-.page-header .page-help-button,
-.page-header .help-tooltip-trigger {
-  background: rgba(22, 50, 79, 0.08);
-  border-color: rgba(22, 50, 79, 0.2);
-  color: #325d88;
+/* On genuinely dark backgrounds, flip to white */
+.scanner-panel .help-tooltip-trigger,
+.guided-help-panel .help-tooltip-trigger {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
 }
 
-.app-topbar .help-tooltip-trigger:hover,
-.page-header .page-help-button:hover,
-.page-header .help-tooltip-trigger:hover {
-  background: rgba(22, 50, 79, 0.15);
-  color: #16324f;
-  border-color: rgba(22, 50, 79, 0.35);
+.scanner-panel .help-tooltip-trigger:hover,
+.scanner-panel .help-tooltip-trigger:focus,
+.guided-help-panel .help-tooltip-trigger:hover,
+.guided-help-panel .help-tooltip-trigger:focus {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+  outline: none;
 }
 
 .help-popover {
@@ -8432,17 +8435,10 @@ label:focus-within .field-help-label-text {
   position: relative;
 }
 
+/* .page-help-button sizing override — slightly larger than field triggers */
 .page-help-button {
   width: 2rem;
   height: 2rem;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 999px;
-  border: 1px solid rgba(22, 50, 79, 0.16);
-  background: rgba(255, 255, 255, 0.82);
-  color: #16324f;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 @media (max-width: 900px) {
