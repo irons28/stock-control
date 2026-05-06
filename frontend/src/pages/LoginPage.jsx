@@ -25,27 +25,24 @@ function LoginPage({ onSuccess }) {
   return (
     <div className="login-shell">
       <div className="login-card">
+        <div className="login-brand-panel">
+          <img
+            className="login-brand-panel-logo"
+            src="/swan-logo.png"
+            alt="Swan brand artwork"
+          />
+          <div className="login-brand-panel-copy">
+            <span>Operations Workspace</span>
+          </div>
+        </div>
+
         <div className="login-copy">
           <div className="login-brand-lockup">
-            <div className="app-brand-mark app-brand-mark--login" aria-hidden="true">
-              <svg viewBox="0 0 64 64" role="presentation" focusable="false">
-                <defs>
-                  <linearGradient id="loginBrandCubeStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#11C5E8" />
-                    <stop offset="100%" stopColor="#8EEBFF" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M32 7 51 18v28L32 57 13 46V18Z"
-                  fill="none"
-                  stroke="url(#loginBrandCubeStroke)"
-                  strokeWidth="4"
-                  strokeLinejoin="round"
-                />
-                <path d="M32 7v50M13 18l19 11 19-11" fill="none" stroke="#F7FAFC" strokeWidth="3" strokeOpacity="0.9" />
-                <circle cx="49" cy="15" r="6" fill="#11C5E8" />
-              </svg>
-            </div>
+            <img
+              className="app-brand-logo app-brand-logo--login"
+              src="/swan-logo.png"
+              alt="Swan brand artwork"
+            />
             <div>
               <p className="eyebrow">Stock Control</p>
               <h1>Operations Workspace</h1>

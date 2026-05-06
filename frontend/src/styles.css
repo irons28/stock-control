@@ -9347,6 +9347,7 @@ a.jira-issue-link:hover, .jira-issue-link:hover {
 
 body {
   color: var(--text-main);
+  background-color: #2B1363;
   background:
     radial-gradient(circle at top left, rgba(17, 197, 232, 0.22), transparent 24%),
     radial-gradient(circle at 85% 15%, rgba(95, 70, 190, 0.34), transparent 22%),
@@ -9359,13 +9360,24 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.34;
+  opacity: 0.4;
   background-image:
-    linear-gradient(30deg, rgba(17, 197, 232, 0.1) 12%, transparent 12.5%, transparent 87%, rgba(17, 197, 232, 0.1) 87.5%, rgba(17, 197, 232, 0.1)),
-    linear-gradient(150deg, rgba(255, 255, 255, 0.06) 12%, transparent 12.5%, transparent 87%, rgba(255, 255, 255, 0.06) 87.5%, rgba(255, 255, 255, 0.06)),
-    linear-gradient(90deg, rgba(17, 197, 232, 0.05) 2%, transparent 2.5%, transparent 97%, rgba(17, 197, 232, 0.05) 97.5%, rgba(17, 197, 232, 0.05));
-  background-size: 84px 146px, 84px 146px, 84px 146px;
-  background-position: 0 0, 0 0, 42px 73px;
+    linear-gradient(30deg, rgba(76, 117, 224, 0.18) 12%, transparent 12.5%, transparent 87%, rgba(76, 117, 224, 0.18) 87.5%, rgba(76, 117, 224, 0.18)),
+    linear-gradient(150deg, rgba(76, 117, 224, 0.18) 12%, transparent 12.5%, transparent 87%, rgba(76, 117, 224, 0.18) 87.5%, rgba(76, 117, 224, 0.18)),
+    linear-gradient(90deg, rgba(76, 117, 224, 0.14) 2%, transparent 2.5%, transparent 97%, rgba(76, 117, 224, 0.14) 97.5%, rgba(76, 117, 224, 0.14));
+  background-size: 88px 152px, 88px 152px, 88px 152px;
+  background-position: 0 0, 0 0, 44px 76px;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background:
+    linear-gradient(180deg, rgba(12, 7, 35, 0.12), rgba(12, 7, 35, 0.22)),
+    radial-gradient(circle at center, rgba(17, 197, 232, 0.06), transparent 48%);
 }
 
 #root {
@@ -9517,6 +9529,25 @@ body::before {
     linear-gradient(135deg, rgba(43, 19, 99, 0.9), rgba(53, 26, 120, 0.92));
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 18px 32px rgba(16, 8, 43, 0.22);
+  overflow: hidden;
+}
+
+.app-topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(20, 10, 54, 0.86), rgba(20, 10, 54, 0.45)),
+    url("/frs-geometric-bg.png");
+  background-size: auto 250%;
+  background-position: 120% center;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.app-topbar > * {
+  position: relative;
+  z-index: 1;
 }
 
 .app-topbar-brand {
@@ -9539,30 +9570,18 @@ body::before {
   color: rgba(215, 220, 239, 0.84);
 }
 
-.app-brand-mark {
-  display: grid;
-  place-items: center;
-  width: 3rem;
+.app-brand-logo {
+  width: auto;
   height: 3rem;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(17, 197, 232, 0.08)),
-    rgba(22, 11, 53, 0.48);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  max-width: 11rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 10px 20px rgba(6, 4, 18, 0.24));
 }
 
-.app-brand-mark svg {
-  width: 2rem;
-  height: 2rem;
-}
-
-.app-brand-mark--login {
-  width: 3.4rem;
-  height: 3.4rem;
-  background:
-    linear-gradient(145deg, rgba(17, 197, 232, 0.22), rgba(43, 19, 99, 0.7)),
-    rgba(22, 11, 53, 0.9);
+.app-brand-logo--login {
+  height: 3.5rem;
+  max-width: 12rem;
 }
 
 .topbar-search,
@@ -9860,11 +9879,75 @@ body::before {
 
 .login-card {
   width: min(31rem, 100%);
-  padding: 2.1rem;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.38);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(247, 250, 252, 0.94));
   box-shadow: 0 36px 70px rgba(16, 8, 43, 0.34);
+  overflow: hidden;
+}
+
+.login-brand-panel {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 11.5rem;
+  padding: 1.4rem 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(22, 11, 53, 0.12), rgba(22, 11, 53, 0.28)),
+    url("/frs-geometric-bg.png");
+  background-color: #2B1363;
+  background-size: cover;
+  background-position: center;
+}
+
+.login-brand-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(20, 10, 54, 0.28), rgba(20, 10, 54, 0.1)),
+    linear-gradient(180deg, transparent, rgba(20, 10, 54, 0.16));
+}
+
+.login-brand-panel-logo,
+.login-brand-panel-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.login-brand-panel-logo {
+  width: auto;
+  height: 4.75rem;
+  max-width: 12rem;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 28px rgba(6, 4, 18, 0.3));
+}
+
+.login-brand-panel-copy {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f7fafc;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.login-copy,
+.login-form {
+  padding-left: 2.1rem;
+  padding-right: 2.1rem;
+}
+
+.login-copy {
+  padding-top: 1.6rem;
 }
 
 .login-brand-lockup {
@@ -9900,6 +9983,10 @@ body::before {
   border: 1px solid rgba(191, 52, 87, 0.16);
   background: rgba(191, 52, 87, 0.08);
   color: #8a1d41;
+}
+
+.login-form {
+  padding-bottom: 2.1rem;
 }
 
 .app-loading {
@@ -9962,10 +10049,36 @@ body::before {
   }
 
   .login-card {
-    padding: 1.5rem;
+    width: min(100%, 31rem);
   }
 
   .login-brand-lockup {
     align-items: flex-start;
+  }
+
+  .login-copy,
+  .login-form {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .login-form {
+    padding-bottom: 1.5rem;
+  }
+
+  .login-brand-panel {
+    min-height: 10rem;
+    padding: 1rem 1.1rem;
+    background-position: 44% center;
+  }
+
+  .login-brand-panel-logo {
+    height: 3.8rem;
+    max-width: 9.5rem;
+  }
+
+  .app-brand-logo {
+    height: 2.5rem;
+    max-width: 8.75rem;
   }
 }
