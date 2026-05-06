@@ -4,11 +4,23 @@ import { createPortal } from "react-dom";
 const MARGIN = 14;
 const GAP = 10;
 
-function HelpTooltip({ text, label = "Help", className = "", align = "center" }) {
+/**
+ * HelpTooltip
+ *
+ * Two modes:
+ *   - Page / icon mode  (no children): renders a circular "?" button.
+ *     Use next to page titles or section headings.
+ *   - Field / text mode (children provided): renders the children as a
+ *     styled text trigger with a dotted underline. No circle, no "?" icon.
+ *     Use in table headers and beside form field labels.
+ */
+function HelpTooltip({ text, label = "Help", className = "", align = "center", children }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
   const tooltipRef = useRef(null);
   const tooltipId = useId();
+
+  const isFieldMode = Boolean(children);
 
   // Start off-screen hidden so we can measure before revealing
   const [style, setStyle] = useState({
@@ -93,8 +105,8 @@ function HelpTooltip({ text, label = "Help", className = "", align = "center" })
       <button
         ref={triggerRef}
         type="button"
-        className="help-tooltip-trigger"
-        aria-label={label}
+        className={isFieldMode ? "help-tooltip-trigger--field" : "help-tooltip-trigger"}
+        aria-label={isFieldMode ? undefined : label}
         aria-describedby={open ? tooltipId : undefined}
         aria-expanded={open}
         onMouseEnter={() => setOpen(true)}
@@ -106,7 +118,7 @@ function HelpTooltip({ text, label = "Help", className = "", align = "center" })
           setOpen((v) => !v);
         }}
       >
-        ?
+        {children ?? "?"}
       </button>
       {open && typeof document !== "undefined"
         ? createPortal(

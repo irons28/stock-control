@@ -29,10 +29,7 @@ const resultColumns = [
   {
     key: "poNumber",
     header: (
-      <span className="field-help-label">
-        PO Number
-        <HelpTooltip text="The supplier purchase order reference." label="PO number help" />
-      </span>
+      <HelpTooltip text="The supplier purchase order reference.">PO Number</HelpTooltip>
     ),
     render: (row) => (
       <div>
@@ -44,13 +41,9 @@ const resultColumns = [
   {
     key: "status",
     header: (
-      <span className="field-help-label">
+      <HelpTooltip text="Shows whether the order is open, partially received, fully received, or overdue.">
         Status
-        <HelpTooltip
-          text="Shows whether the order is open, partially received, fully received, or overdue."
-          label="Purchase order status help"
-        />
-      </span>
+      </HelpTooltip>
     ),
     render: (row) => <span className={getStatusBadgeClass(row.status)}>{row.status}</span>,
   },
@@ -251,10 +244,7 @@ function PurchaseOrdersPage({ onNavigate }) {
               <div className="detail-header">
                 <div>
                   <h3>{detailData.poNumber}</h3>
-                  <p className="field-help-label">
-                    {detailData.supplier}
-                    <HelpTooltip text="The company the goods were ordered from." label="Supplier help" align="left" />
-                  </p>
+                  <p>{detailData.supplier}</p>
                 </div>
                 <div className="purchase-orders-detail-actions">
                   <span className={getStatusBadgeClass(detailData.status)}>{detailData.status}</span>

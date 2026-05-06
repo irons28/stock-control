@@ -8009,6 +8009,55 @@ button.btn-permission-denied {
   outline: none;
 }
 
+/* ── Field-mode trigger ─────────────────────────────────────────────────────
+   No circle, no icon. The label/word itself is the trigger.
+   Used by HelpTooltip (children mode) and FieldHelp.
+   ─────────────────────────────────────────────────────────────────────────── */
+.help-tooltip-trigger--field {
+  /* Reset all button chrome */
+  display: inline;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  /* Inherit text context */
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  /* Hint that help is available */
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: rgba(22, 50, 79, 0.3);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.help-tooltip-trigger--field:hover,
+.help-tooltip-trigger--field:focus {
+  color: var(--accent, #1e6bc5);
+  text-decoration-color: var(--accent, #1e6bc5);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+/* On dark backgrounds the label text is already light; keep it, just brighten on hover */
+.scanner-panel .help-tooltip-trigger--field:hover,
+.scanner-panel .help-tooltip-trigger--field:focus,
+.guided-help-panel .help-tooltip-trigger--field:hover,
+.guided-help-panel .help-tooltip-trigger--field:focus {
+  color: #fff;
+  text-decoration-color: rgba(255, 255, 255, 0.7);
+}
+
 /* On genuinely dark backgrounds, flip to white */
 .scanner-panel .help-tooltip-trigger,
 .guided-help-panel .help-tooltip-trigger {
@@ -8401,23 +8450,7 @@ button.btn-permission-denied {
   flex-wrap: wrap;
 }
 
-/* Label text — dotted underline hints that help is available */
-.field-help-label-text {
-  cursor: help;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: rgba(36, 72, 109, 0.35);
-  text-underline-offset: 3px;
-  transition: color 0.15s ease, text-decoration-color 0.15s ease;
-}
-
-label:hover .field-help-label-text,
-label:focus-within .field-help-label-text {
-  color: var(--accent, #1e6bc5);
-  text-decoration-color: var(--accent, #1e6bc5);
-}
-
-/* (duplicate .help-tooltip-trigger block removed — see canonical definition above) */
+/* (field-help-label-text styling moved to .help-tooltip-trigger--field above) */
 
 .help-tooltip--portal {
   max-width: min(22rem, calc(100vw - 1.5rem));

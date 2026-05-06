@@ -3,7 +3,6 @@ import Button from "../components/Button";
 import Card from "../components/Card";
 import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
-import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
 import { HELP_CONTENT } from "../config/helpContent";
 import { useApiResource } from "../hooks/useApiResource";
@@ -378,11 +377,6 @@ function DispatchPage() {
                   >
                     {isSubmitting ? "Dispatching…" : "Confirm Dispatch"}
                   </Button>
-                  <HelpTooltip
-                    text="Marks the allocated stock as dispatched. Check customer, order, and serial numbers first."
-                    label="Confirm dispatch help"
-                    align="left"
-                  />
                 </div>
               </Card>
             );

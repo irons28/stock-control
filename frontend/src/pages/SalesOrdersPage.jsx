@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
 import FieldHelp from "../components/FieldHelp";
 import GuidedHelpPanel from "../components/GuidedHelpPanel";
-import HelpTooltip from "../components/HelpTooltip";
 import PageHeader from "../components/PageHeader";
 import PermissionGate, { PermissionButton } from "../components/PermissionGate";
 import ActivityTimeline from "../components/ActivityTimeline";
@@ -1259,18 +1258,15 @@ function SalesOrdersPage({ onNavigate }) {
                   <div className="alloc-order-eyebrow">Sales Order</div>
                   <h2 className="alloc-order-number">
                     {orderDetail.order.orderNumber}
-                    <HelpTooltip text="The customer sales order reference." label="Sales order number help" align="left" />
                   </h2>
                   <p className="alloc-order-customer">
                     {orderDetail.order.customerName}
-                    <HelpTooltip text="The customer this order belongs to." label="Customer help" align="left" />
                   </p>
                 </div>
                 <div className="alloc-order-header-right">
                   <AllocationStatusPill allocationStatus={orderDetail.order.summary.allocationStatus} />
                   {orderDetail.order.priority === "urgent" && <PriorityBadge priority="urgent" />}
                   <DispatchTag dateStr={orderDetail.order.dispatchDueAt} />
-                  <HelpTooltip text="The date the customer needs the goods by." label="Required date help" align="right" />
                 </div>
               </div>
 
@@ -1368,11 +1364,6 @@ function SalesOrdersPage({ onNavigate }) {
                       >
                         {submitStatus === "submitting" ? "Saving…" : "Confirm Allocation"}
                       </Button>
-                      <HelpTooltip
-                        text="Assigns available stock or serial numbers to this sales order."
-                        label="Allocate stock help"
-                        align="left"
-                      />
                     </>
                   ) : (
                     <PermissionGate permission="so:allocate" />

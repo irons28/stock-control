@@ -74,6 +74,14 @@ function mergeHandlers(original, injected) {
   };
 }
 
+/**
+ * FieldHelp
+ *
+ * Wraps a form field with a label whose text is itself the help trigger.
+ * No "?" icon — the label word(s) get a dotted underline and accent hover.
+ * Hovering the label, focusing the label text, or focusing the child input
+ * all open the tooltip.
+ */
 function FieldHelp({
   label,
   help,
@@ -83,13 +91,11 @@ function FieldHelp({
   labelClassName = "master-data-field-label",
 }) {
   const tooltipId = useId();
-  const iconRef = useRef(null);
+  const labelTextRef = useRef(null);
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
 
-  // Only attach focus/blur to the child — the label wrapper's
-  // onMouseEnter/Leave handles hover, so moving within the label
-  // does not prematurely close the tooltip.
+  // Inject focus/blur into the child input so tooltip opens when input is focused
   const child = children
     ? cloneElement(children, {
         "aria-describedby": open ? tooltipId : children.props["aria-describedby"],
@@ -106,15 +112,13 @@ function FieldHelp({
       onMouseLeave={() => setOpen(false)}
     >
       <span className={`${labelClassName} field-help-label`}>
-        <span className="field-help-label-text">{label}</span>
-        {required ? <span className="master-data-required">*</span> : null}
+        {/* The label text IS the trigger — styled as underlined text, no circle */}
         <button
-          ref={iconRef}
+          ref={labelTextRef}
           type="button"
-          className="help-tooltip-trigger"
-          aria-label={`Help for ${label}`}
-          aria-describedby={open ? tooltipId : undefined}
+          className="help-tooltip-trigger--field"
           aria-expanded={open}
+          aria-describedby={open ? tooltipId : undefined}
           onClick={(e) => {
             e.preventDefault();
             setOpen((v) => !v);
@@ -122,12 +126,13 @@ function FieldHelp({
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
         >
-          ?
+          {label}
         </button>
+        {required ? <span className="master-data-required">*</span> : null}
       </span>
       {child}
       {open
-        ? <TooltipBubble anchorRef={iconRef.current ? iconRef : wrapperRef} text={help} id={tooltipId} />
+        ? <TooltipBubble anchorRef={labelTextRef.current ? labelTextRef : wrapperRef} text={help} id={tooltipId} />
         : null}
     </label>
   );

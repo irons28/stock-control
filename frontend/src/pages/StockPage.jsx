@@ -65,22 +65,18 @@ function StockPage() {
 
       <Card title="Stock Field Guide" subtitle="Hover for quick definitions">
         <div className="dispatch-order-meta">
-          <span className="field-help-label">
+          <HelpTooltip text="The internal product or stock item code." align="left">
             SKU / item code
-            <HelpTooltip text="The internal product or stock item code." label="SKU help" align="left" />
-          </span>
-          <span className="field-help-label">
+          </HelpTooltip>
+          <HelpTooltip text="Unique identifier for a specific serialised item." align="left">
             Serial number
-            <HelpTooltip text="Unique identifier for a specific serialised item." label="Serial number help" align="left" />
-          </span>
-          <span className="field-help-label">
+          </HelpTooltip>
+          <HelpTooltip text="Where the stock is currently stored." align="left">
             Location
-            <HelpTooltip text="Where the stock is currently stored." label="Location help" align="left" />
-          </span>
-          <span className="field-help-label">
+          </HelpTooltip>
+          <HelpTooltip text="Shows whether stock is available, allocated, dispatched, or on hold." align="left">
             Stock status
-            <HelpTooltip text="Shows whether stock is available, allocated, dispatched, or on hold." label="Stock status help" align="left" />
-          </span>
+          </HelpTooltip>
         </div>
       </Card>
 

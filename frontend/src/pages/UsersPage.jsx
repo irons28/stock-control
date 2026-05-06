@@ -230,9 +230,9 @@ function UsersPage() {
                 />
               </label>
               <label className="master-data-field">
-                <span className="master-data-field-label">
-                  Temporary password <HelpTooltip text="Passwords are hashed on the server before storage." />
-                </span>
+                <HelpTooltip text="Passwords are hashed on the server before storage." className="master-data-field-label">
+                  Temporary password
+                </HelpTooltip>
                 <input
                   value={createForm.password}
                   onChange={(event) =>
@@ -261,10 +261,9 @@ function UsersPage() {
               </FieldHelp>
               <label className="master-data-toggle-card">
                 <div className="master-data-toggle-copy">
-                  <span className="master-data-field-label">
+                  <HelpTooltip text="Inactive users cannot log in." className="master-data-field-label">
                     Active account
-                    <HelpTooltip text="Inactive users cannot log in." label="Active user help" align="left" />
-                  </span>
+                  </HelpTooltip>
                   <span className="master-data-toggle-help">Inactive users cannot sign in.</span>
                 </div>
                 <span className={`master-data-switch${createForm.active ? " on" : ""}`}>
@@ -379,10 +378,9 @@ function UsersPage() {
               </FieldHelp>
               <label className="master-data-toggle-card">
                 <div className="master-data-toggle-copy">
-                  <span className="master-data-field-label">
+                  <HelpTooltip text="Inactive users cannot log in." className="master-data-field-label">
                     Active account
-                    <HelpTooltip text="Inactive users cannot log in." label="Active user help" align="left" />
-                  </span>
+                  </HelpTooltip>
                   <span className="master-data-toggle-help">
                     Turn this off to stop the user signing in.
                   </span>

@@ -1209,7 +1209,9 @@ function ReceiveGoodsPage({ onNavigate }) {
                     (po) => !String(po.status || "").toLowerCase().includes("fully")
                   ).length
                 }{" "}
-                orders with outstanding lines <HelpTooltip text="Choose the purchase order that matches the physical delivery before you enter any quantities." />
+                <HelpTooltip text="Choose the purchase order that matches the physical delivery before you enter any quantities.">
+                  orders with outstanding lines
+                </HelpTooltip>
               </small>
             )}
           </div>
@@ -1449,14 +1451,13 @@ function ReceiveGoodsPage({ onNavigate }) {
                             {line.serialTrackingRequired && (
                               <div className="serial-entry-block">
                                 <div className="serial-entry-header">
-                                  <span className="serial-entry-label">
+                                  <HelpTooltip
+                                    text="Scan or type the serial number for this item. Required for serialised stock."
+                                    align="left"
+                                    className="serial-entry-label"
+                                  >
                                     Serial numbers
-                                    <HelpTooltip
-                                      text="Scan or type the serial number for this item. Required for serialised stock."
-                                      label="Serial number help"
-                                      align="left"
-                                    />
-                                  </span>
+                                  </HelpTooltip>
                                   <span
                                     className={`serial-progress-badge${
                                       serialsOk && hasQty
@@ -1494,11 +1495,6 @@ function ReceiveGoodsPage({ onNavigate }) {
                   <Button type="submit" disabled={submitting}>
                     {submitting ? "Saving Receipt…" : "Confirm Receipt"}
                   </Button>
-                  <HelpTooltip
-                    text="Creates the goods receipt and updates stock availability."
-                    label="Confirm receipt help"
-                    align="left"
-                  />
                   <Button
                     type="button"
                     variant="secondary"
