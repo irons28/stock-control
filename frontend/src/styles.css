@@ -10228,13 +10228,14 @@ body {
 }
 
 body::before {
-  opacity: 0.08;
+  opacity: 0.055;
   background-image:
-    linear-gradient(30deg, rgba(25, 212, 255, 0.92) 12%, transparent 12.5%, transparent 87%, rgba(25, 212, 255, 0.92) 87.5%, rgba(25, 212, 255, 0.92)),
-    linear-gradient(150deg, rgba(25, 212, 255, 0.92) 12%, transparent 12.5%, transparent 87%, rgba(25, 212, 255, 0.92) 87.5%, rgba(25, 212, 255, 0.92)),
-    linear-gradient(90deg, rgba(25, 212, 255, 0.78) 2%, transparent 2.5%, transparent 97%, rgba(25, 212, 255, 0.78) 97.5%, rgba(25, 212, 255, 0.78));
-  background-size: 78px 135px, 78px 135px, 78px 135px;
-  background-position: 0 0, 0 0, 39px 67px;
+    linear-gradient(30deg, rgba(66, 216, 255, 0.95) 12%, transparent 12.5%, transparent 87%, rgba(66, 216, 255, 0.95) 87.5%, rgba(66, 216, 255, 0.95)),
+    linear-gradient(150deg, rgba(77, 151, 255, 0.92) 12%, transparent 12.5%, transparent 87%, rgba(77, 151, 255, 0.92) 87.5%, rgba(77, 151, 255, 0.92)),
+    linear-gradient(90deg, rgba(79, 132, 255, 0.74) 2%, transparent 2.5%, transparent 97%, rgba(79, 132, 255, 0.74) 97.5%, rgba(79, 132, 255, 0.74));
+  background-size: 96px 166px, 96px 166px, 96px 166px;
+  background-position: 0 0, 0 0, 48px 83px;
+  mix-blend-mode: screen;
 }
 
 body::after {
@@ -10268,7 +10269,20 @@ body::after {
   background-position: 0 0, 0 0, 27px 47px;
 }
 
-.app-topbar::after,
+.app-topbar::after {
+  content: "SwanRetail";
+  position: absolute;
+  right: 3rem;
+  top: 0.3rem;
+  font-size: clamp(4rem, 9vw, 8.25rem);
+  font-weight: 900;
+  letter-spacing: -0.065em;
+  line-height: 0.88;
+  color: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  user-select: none;
+}
+
 .page-header::before {
   content: none;
 }
@@ -10351,7 +10365,8 @@ body::after {
 .btn-primary,
 .page-actions .button.secondary,
 .integrations-test-btn.button.secondary {
-  box-shadow: 0 10px 24px rgba(17, 197, 232, 0.24);
+  background: linear-gradient(135deg, #18D4F6 0%, #1678D8 100%);
+  box-shadow: 0 12px 28px rgba(17, 197, 232, 0.22);
 }
 
 .app-utility-row {
@@ -10608,5 +10623,11 @@ body::after {
 
   .login-card {
     padding: 1.3rem;
+  }
+
+  .app-topbar::after {
+    right: 1rem;
+    top: 0.55rem;
+    font-size: 4rem;
   }
 }
