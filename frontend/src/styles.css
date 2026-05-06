@@ -8453,7 +8453,12 @@ button.btn-permission-denied {
 /* (field-help-label-text styling moved to .help-tooltip-trigger--field above) */
 
 .help-tooltip--portal {
-  max-width: min(22rem, calc(100vw - 1.5rem));
+  /* Width: capped at 22rem but never wider than the viewport minus 32px of
+     breathing room (2 × PAD=16). Text always wraps. */
+  max-width: min(22rem, calc(100vw - 32px));
+  width: max-content;         /* shrink-wrap short text */
+  word-wrap: break-word;
+  white-space: normal;
   padding: 0.7rem 0.82rem;
   border-radius: 0.85rem;
   background: #16324f;
