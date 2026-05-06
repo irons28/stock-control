@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Card from "../components/Card";
+import PageHeader from "../components/PageHeader";
 import { apiFetch } from "../lib/api";
 
 function StatusBadge({ active, configured, enabled }) {
@@ -148,13 +149,11 @@ export default function IntegrationsPage() {
 
   return (
     <div className="page-stack">
-      <div className="page-header">
-        <div>
-          <p className="eyebrow">Admin</p>
-          <h2>Integrations</h2>
-          <p className="page-subtitle">External service connections for this workspace.</p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Admin"
+        title="Integrations"
+        description="External service connections, health checks, and safe operational configuration for this workspace."
+      />
 
       {loading && <p className="loading-text">Loading integration status…</p>}
       {error && <div className="alert error">{error}</div>}
