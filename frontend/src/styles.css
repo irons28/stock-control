@@ -11212,3 +11212,12 @@ body::before {
   filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
   mix-blend-mode: screen;
 }
+
+/* ── 14. Unify body pattern with header ─────────────────────────────────── *
+ *  The body::after dark-vignette gradient (rgba 10,4,30 → 0.16) was          *
+ *  absent from the header, making the body look muddier/darker.              *
+ *  Disable it so both surfaces use only the cube pattern over purple.        *
+ * ─────────────────────────────────────────────────────────────────────────── */
+body::after {
+  display: none;
+}
