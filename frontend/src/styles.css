@@ -11240,3 +11240,36 @@ body::before {
   pointer-events:     none                                               !important;
   z-index:            0                                                  !important;
 }
+
+/* ── 14. Glass card effect ──────────────────────────────────────────────── *
+ *  Reduce card background opacity so the cube pattern bleeds through.       *
+ *  Heavy backdrop-filter blur softens the pattern into a smooth haze.       *
+ *  Inset top highlight simulates light refracting through glass.            *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.card,
+.master-data-banner,
+.master-data-toggle-card,
+.notice,
+.po-review-metrics div,
+.po-success-grid div,
+.integrations-setup-hint,
+.po-inline-empty,
+.dashboard-state-card {
+  background: rgba(55, 28, 115, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* Page-header card stays opaque — it carries the main page title */
+.page-header {
+  background: linear-gradient(
+    145deg,
+    rgba(63, 30, 130, 0.72),
+    rgba(32, 12, 88, 0.68)
+  );
+}
