@@ -11247,6 +11247,9 @@ body::before {
  *  Inset top highlight simulates light refracting through glass.            *
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/* Glass cards: brighter mid-purple at low opacity so the card reads as a
+   lighter frosted surface above the dark #25105a body background.
+   The backdrop-filter blurs the cube pattern into a smooth haze beneath. */
 .card,
 .master-data-banner,
 .master-data-toggle-card,
@@ -11256,20 +11259,24 @@ body::before {
 .integrations-setup-hint,
 .po-inline-empty,
 .dashboard-state-card {
-  background: rgba(55, 28, 115, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.20);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: linear-gradient(
+    145deg,
+    rgba(140, 100, 245, 0.22),
+    rgba(90, 50, 195, 0.26)
+  ) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    0 8px 32px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
 }
 
-/* Page-header card stays opaque — it carries the main page title */
+/* Page-header card: slightly more opaque so the title stays prominent */
 .page-header {
   background: linear-gradient(
     145deg,
-    rgba(63, 30, 130, 0.72),
-    rgba(32, 12, 88, 0.68)
-  );
+    rgba(100, 60, 200, 0.60),
+    rgba(55, 25, 145, 0.58)
+  ) !important;
 }
