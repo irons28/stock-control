@@ -10848,48 +10848,53 @@ a.jira-issue-link:hover,
  * Overrides the light-body block above. Deep purple + cyan cube pattern.     *
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Body: deep purple base + cyan cube image overlay ────────────────── */
-
-body {
-  color: #f7fafc;
-  background-color: #25105a;
-  background-image: linear-gradient(
+:root {
+  --shared-cube-surface-bg: linear-gradient(
     135deg,
     #25105a 0%,
     #180a3d 55%,
     #1e0a42 100%
   );
+  --shared-cube-pattern-image: url("/backgrounds/cube-pattern.jpg");
+  --shared-cube-pattern-size: 420px auto;
+  --shared-cube-pattern-opacity: 0.16;
+  --shared-cube-pattern-filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
+  --shared-cube-pattern-blend: screen;
+}
+
+/* ── 1. Body: deep purple base + cyan cube image overlay ────────────────── */
+
+body {
+  color: #f7fafc;
+  background-color: #25105a;
+  background-image: var(--shared-cube-surface-bg);
   background-attachment: fixed;
 }
 
-/* Cube image tinted cyan via filter + screen blend */
-body::before {
+/* Shared cube outline pattern for body and header */
+body::before,
+.app-topbar::before {
   display: block;
   content: "";
-  position: fixed;
   inset: 0;
-  background-image: url("/backgrounds/cube-pattern.jpg");
-  background-size: 420px auto;
+  background-image: var(--shared-cube-pattern-image);
+  background-size: var(--shared-cube-pattern-size);
   background-repeat: repeat;
-  background-attachment: fixed;
-  opacity: 0.14;
-  filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
-  mix-blend-mode: screen;
+  opacity: var(--shared-cube-pattern-opacity);
+  filter: var(--shared-cube-pattern-filter);
+  mix-blend-mode: var(--shared-cube-pattern-blend);
   pointer-events: none;
+}
+
+body::before {
+  position: fixed;
+  background-attachment: fixed;
   z-index: 0;
 }
 
-/* Subtle vignette / depth overlay */
+/* Remove the body-only dark overlay so it matches the header pattern */
 body::after {
-  display: block;
-  content: "";
-  position: fixed;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(10, 4, 30, 0.03), rgba(10, 4, 30, 0.16)),
-    radial-gradient(circle at center, rgba(17, 197, 232, 0.04), transparent 48%);
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 
 /* ── 2. Header: deepen the purple panel & enlarge watermark ─────────────── */
@@ -11191,33 +11196,8 @@ a.jira-issue-link:hover,
 .sidebar-user-role.role-management { background: rgba(240, 180, 60, 0.13);  color: #f5d080; border-color: rgba(240, 180, 60, 0.22); }
 .sidebar-user-role.role-purchasing { background: rgba(106, 174, 232, 0.15); color: #7ec8f5; border-color: rgba(106, 174, 232, 0.22); }
 
-/* ── 13. Align header cube pattern with body ────────────────────────────── *
- *  The header's ::before previously rendered the old CSS hex/triangle        *
- *  pattern from earlier layers. Override it to use the same cube-pattern.jpg *
- *  treatment as body::before. Also nudge body opacity from 0.14 → 0.16.     *
- * ─────────────────────────────────────────────────────────────────────────── */
-
-/* Slightly more visible cube pattern on the body */
-body::before {
-  opacity: 0.16;
-}
-
-/* Header ::before — same cube image, same filter/blend as the body */
+/* ── 13. Keep header and body on the exact same cube pattern ────────────── */
 .app-topbar::before {
-  background-image: url("/backgrounds/cube-pattern.jpg");
-  background-size: 420px auto;
+  position: absolute;
   background-position: 0 0;   /* reset multi-value position from hex pattern */
-  background-repeat: repeat;
-  opacity: 0.16;
-  filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
-  mix-blend-mode: screen;
-}
-
-/* ── 14. Unify body pattern with header ─────────────────────────────────── *
- *  The body::after dark-vignette gradient (rgba 10,4,30 → 0.16) was          *
- *  absent from the header, making the body look muddier/darker.              *
- *  Disable it so both surfaces use only the cube pattern over purple.        *
- * ─────────────────────────────────────────────────────────────────────────── */
-body::after {
-  display: none;
 }
