@@ -11190,3 +11190,25 @@ a.jira-issue-link:hover,
 .sidebar-user-role.role-dispatch   { background: rgba(160, 130, 230, 0.15); color: #c8b4f5; border-color: rgba(160, 130, 230, 0.25); }
 .sidebar-user-role.role-management { background: rgba(240, 180, 60, 0.13);  color: #f5d080; border-color: rgba(240, 180, 60, 0.22); }
 .sidebar-user-role.role-purchasing { background: rgba(106, 174, 232, 0.15); color: #7ec8f5; border-color: rgba(106, 174, 232, 0.22); }
+
+/* ── 13. Align header cube pattern with body ────────────────────────────── *
+ *  The header's ::before previously rendered the old CSS hex/triangle        *
+ *  pattern from earlier layers. Override it to use the same cube-pattern.jpg *
+ *  treatment as body::before. Also nudge body opacity from 0.14 → 0.16.     *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Slightly more visible cube pattern on the body */
+body::before {
+  opacity: 0.16;
+}
+
+/* Header ::before — same cube image, same filter/blend as the body */
+.app-topbar::before {
+  background-image: url("/backgrounds/cube-pattern.jpg");
+  background-size: 420px auto;
+  background-position: 0 0;   /* reset multi-value position from hex pattern */
+  background-repeat: repeat;
+  opacity: 0.16;
+  filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
+  mix-blend-mode: screen;
+}
