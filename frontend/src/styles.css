@@ -10849,17 +10849,10 @@ a.jira-issue-link:hover,
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --shared-cube-surface-bg: linear-gradient(
-    135deg,
-    #25105a 0%,
-    #180a3d 55%,
-    #1e0a42 100%
-  );
-  --shared-cube-pattern-image: url("/backgrounds/cube-pattern.jpg");
-  --shared-cube-pattern-size: 420px auto;
-  --shared-cube-pattern-opacity: 0.16;
-  --shared-cube-pattern-filter: invert(1) sepia(1) saturate(5) hue-rotate(150deg);
-  --shared-cube-pattern-blend: screen;
+  --shared-cube-surface-bg: #25105a;
+  --shared-geometry-overlay-image: url("/backgrounds/geometric-pattern-source.png");
+  --shared-geometry-overlay-opacity: 0.16;
+  --shared-geometry-overlay-filter: invert(1) sepia(1) saturate(8) hue-rotate(135deg) brightness(0.56) contrast(1.08);
 }
 
 /* ── 1. Body: deep purple base + cyan cube image overlay ────────────────── */
@@ -10867,34 +10860,32 @@ a.jira-issue-link:hover,
 body {
   color: #f7fafc;
   background-color: #25105a;
-  background-image: var(--shared-cube-surface-bg);
-  background-attachment: fixed;
+  background-image: none;
 }
 
-/* Shared cube outline pattern for body and header */
-body::before,
-.app-topbar::before {
-  display: block;
-  content: "";
-  inset: 0;
-  background-image: var(--shared-cube-pattern-image);
-  background-size: var(--shared-cube-pattern-size);
-  background-repeat: repeat;
-  opacity: var(--shared-cube-pattern-opacity);
-  filter: var(--shared-cube-pattern-filter);
-  mix-blend-mode: var(--shared-cube-pattern-blend);
-  pointer-events: none;
-}
-
+/* One subtle viewport-level overlay using the uploaded reference image */
 body::before {
+  content: "";
+  display: block !important;
   position: fixed;
-  background-attachment: fixed;
+  inset: 0;
+  background-image: var(--shared-geometry-overlay-image) !important;
+  background-repeat: no-repeat !important;
+  background-position: center top !important;
+  background-size: cover !important;
+  opacity: var(--shared-geometry-overlay-opacity) !important;
+  filter: var(--shared-geometry-overlay-filter) !important;
+  mix-blend-mode: screen;
+  pointer-events: none;
   z-index: 0;
 }
 
 /* Remove the body-only dark overlay so it matches the header pattern */
 body::after {
-  display: none;
+  content: none;
+  display: none !important;
+  background: none !important;
+  opacity: 0 !important;
 }
 
 /* ── 2. Header: deepen the purple panel & enlarge watermark ─────────────── */
@@ -10902,8 +10893,8 @@ body::after {
 .app-topbar {
   background: linear-gradient(
     135deg,
-    rgba(37, 16, 90, 0.97),
-    rgba(22, 8, 61, 0.95)
+    rgba(37, 16, 90, 0.78),
+    rgba(22, 8, 61, 0.76)
   );
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
@@ -10916,6 +10907,19 @@ body::after {
   right: 2.5rem;
   top: -0.3rem;
   letter-spacing: -0.075em;
+}
+
+.app-topbar::before {
+  content: none;
+  display: none !important;
+  background: none !important;
+}
+
+.app-shell--topnav::before,
+.login-shell::before {
+  content: none;
+  display: none !important;
+  background: none !important;
 }
 
 /* ── 3. Cards: strong purple glass ──────────────────────────────────────── */
@@ -11196,8 +11200,43 @@ a.jira-issue-link:hover,
 .sidebar-user-role.role-management { background: rgba(240, 180, 60, 0.13);  color: #f5d080; border-color: rgba(240, 180, 60, 0.22); }
 .sidebar-user-role.role-purchasing { background: rgba(106, 174, 232, 0.15); color: #7ec8f5; border-color: rgba(106, 174, 232, 0.22); }
 
-/* ── 13. Keep header and body on the exact same cube pattern ────────────── */
+/* ── 13. Cube pattern: fix broken path, restore header, unify both ──────── *
+ *  The earlier block had three bugs:                                          *
+ *  (a) wrong image path (geometric-pattern-source.png — file doesn't exist)  *
+ *  (b) body::before used background-size:cover instead of repeat tile        *
+ *  (c) app-topbar::before was fully disabled (display:none !important)       *
+ *  This block fixes all three in one pass.                                   *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* (a) Correct the shared image variable — cube-pattern.jpg is the real file */
+:root {
+  --shared-geometry-overlay-image:   url("/backgrounds/cube-pattern.jpg");
+  --shared-geometry-overlay-opacity: 0.22;
+  --shared-geometry-overlay-filter:  invert(1) brightness(1.5) sepia(1) saturate(8) hue-rotate(150deg);
+}
+
+/* (b) Body: fix tiling layout (was cover/center; needs repeat/0 0) */
+body::before {
+  background-size:       420px auto   !important;
+  background-repeat:     repeat       !important;
+  background-position:   0 0          !important;
+  background-attachment: fixed        !important;
+}
+
+/* (c) Header: re-enable with identical treatment */
 .app-topbar::before {
-  position: absolute;
-  background-position: 0 0;   /* reset multi-value position from hex pattern */
+  display:            block                                              !important;
+  content:            ""                                                 !important;
+  position:           absolute                                           !important;
+  inset:              0                                                  !important;
+  background-image:   url("/backgrounds/cube-pattern.jpg")              !important;
+  background-size:    420px auto                                         !important;
+  background-repeat:  repeat                                             !important;
+  background-position: 0 0                                              !important;
+  background-attachment: initial                                         !important;
+  opacity:            0.22                                               !important;
+  filter:             invert(1) brightness(1.5) sepia(1) saturate(8) hue-rotate(150deg) !important;
+  mix-blend-mode:     screen                                             !important;
+  pointer-events:     none                                               !important;
+  z-index:            0                                                  !important;
 }
